@@ -214,6 +214,13 @@ func (p *replicatorQueueProcessorImpl) getTasks(
 		if len(token) == 0 || len(tasks) > 0 {
 			break
 		}
+
+		if len(response.Tasks) != 0 && len(tasks) == 0 {
+			_ = p.executionMgr.RangeCompleteReplicationTask(&persistence.RangeCompleteReplicationTaskRequest{
+				ShardID:            p.shard.GetShardID(),
+				InclusiveEndTaskID: response.Tasks[len(response.Tasks)-1].GetTaskId(),
+			})
+		}
 	}
 
 	// sanity check we will finish pagination or return some tasks
