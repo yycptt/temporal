@@ -25,6 +25,7 @@
 package cassandra
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -970,14 +971,18 @@ func (d *cassandraPersistence) CreateWorkflowExecution(
 	record := make(map[string]interface{})
 	applied, iter, err := d.session.MapExecuteBatchCAS(batch, record)
 	if err != nil {
-		return nil, gocql.ConvertError("CreateWorkflowExecution", err)
+		err = gocql.ConvertError("CreateWorkflowExecution", err)
+		if _, ok := err.(*serviceerror.Internal); ok {
+			d.logger.Error(fmt.Sprintf("CreateWorkflowExecution logging (json): %v", prettyPrintJson(request)))
+		}
+		return nil, err
 	}
 	defer func() {
 		_ = iter.Close()
 	}()
 
 	if !applied {
-		return nil, convertErrors(
+		err := convertErrors(
 			record,
 			iter,
 			shardID,
@@ -991,6 +996,10 @@ func (d *cassandraPersistence) CreateWorkflowExecution(
 				nextEventID: newWorkflow.Condition,
 			}},
 		)
+		if _, ok := err.(*serviceerror.Internal); ok {
+			d.logger.Error(fmt.Sprintf("CreateWorkflowExecution logging (json): %v", prettyPrintJson(request)))
+		}
+		return nil, err
 	}
 
 	return &p.InternalCreateWorkflowExecutionResponse{}, nil
@@ -2484,4 +2493,9 @@ func executionStateBlobFromRow(
 	}
 
 	return p.NewDataBlob(state, stateEncoding), nil
+}
+
+func prettyPrintJson(input interface{}) string {
+	binary, _ := json.MarshalIndent(input, "", "  ")
+	return string(binary)
 }

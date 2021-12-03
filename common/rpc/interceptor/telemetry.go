@@ -26,8 +26,12 @@ package interceptor
 
 import (
 	"context"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/api/workflowservice/v1"
 	"google.golang.org/grpc"
@@ -114,7 +118,7 @@ func (ti *TelemetryInterceptor) Intercept(
 	}
 
 	if err != nil {
-		ti.handleError(metricsScope, logTags, err)
+		ti.handleError(req, metricsScope, logTags, err)
 		return nil, err
 	}
 
@@ -142,6 +146,7 @@ func (ti *TelemetryInterceptor) metricsScopeLogTags(
 }
 
 func (ti *TelemetryInterceptor) handleError(
+	req interface{},
 	scope metrics.Scope,
 	logTags []tag.Tag,
 	err error,
@@ -184,9 +189,13 @@ func (ti *TelemetryInterceptor) handleError(
 		ti.logger.Error("internal service error, data loss", append(logTags, tag.Error(err))...)
 	case *serviceerror.Internal:
 		scope.IncCounter(metrics.ServiceFailures)
+		ti.logger.Error(fmt.Sprintf("request logging (json): %v", prettyPrintJson(req)))
+		ti.logger.Error(fmt.Sprintf("request logging (hex): %v", prettyPrintProto(req)))
 		ti.logger.Error("internal service error", append(logTags, tag.Error(err))...)
 	default:
 		scope.IncCounter(metrics.ServiceFailures)
+		ti.logger.Error(fmt.Sprintf("request logging (json): %v", prettyPrintJson(req)))
+		ti.logger.Error(fmt.Sprintf("request logging (hex): %v", prettyPrintProto(req)))
 		ti.logger.Error("uncategorized error", append(logTags, tag.Error(err))...)
 	}
 }
@@ -201,4 +210,21 @@ func MetricsScope(
 		return metrics.NoopScope(metrics.Frontend)
 	}
 	return scope
+}
+
+func prettyPrintJson(input interface{}) string {
+	binary, _ := json.MarshalIndent(input, "", "  ")
+	return string(binary)
+}
+
+func prettyPrintProto(input interface{}) string {
+	message, ok := input.(proto.Message)
+	if !ok {
+		return ""
+	}
+	binary, err := proto.Marshal(message)
+	if err != nil {
+		return "error encountered: " + err.Error()
+	}
+	return hex.EncodeToString(binary)
 }

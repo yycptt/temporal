@@ -26,6 +26,7 @@ package visibility
 
 import (
 	"go.temporal.io/api/serviceerror"
+
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
@@ -241,6 +242,8 @@ func (p *visibilityPersistenceClient) DeleteWorkflowExecution(request *Visibilit
 
 func (p *visibilityPersistenceClient) updateErrorMetric(scope metrics.Scope, err error) {
 	switch err.(type) {
+	case nil:
+		// noop
 	case *persistence.ConditionFailedError:
 		scope.IncCounter(metrics.VisibilityPersistenceConditionFailed)
 	case *persistence.TimeoutError:
