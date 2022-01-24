@@ -49,6 +49,7 @@ import (
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/workflow"
+	"go.temporal.io/server/service/worker/archiver"
 )
 
 type (
@@ -62,19 +63,19 @@ type (
 
 func newTimerQueueActiveTaskExecutor(
 	shard shard.Context,
-	historyService *historyEngineImpl,
+	workflowCache workflow.Cache,
+	archivalClient archiver.Client,
 	queueProcessor *timerQueueActiveProcessorImpl,
 	logger log.Logger,
-	metricsClient metrics.Client,
 	config *configs.Config,
 	matchingClient matchingservice.MatchingServiceClient,
 ) queueTaskExecutor {
 	return &timerQueueActiveTaskExecutor{
 		timerQueueTaskExecutorBase: newTimerQueueTaskExecutorBase(
 			shard,
-			historyService,
+			workflowCache,
+			archivalClient,
 			logger,
-			metricsClient,
 			config,
 		),
 		queueProcessor: queueProcessor,

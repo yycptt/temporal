@@ -181,13 +181,12 @@ func (s *timerQueueStandbyTaskExecutorSuite) SetupTest() {
 
 	s.timerQueueStandbyTaskExecutor = newTimerQueueStandbyTaskExecutor(
 		s.mockShard,
-		h,
+		h.historyCache,
+		h.archivalClient,
 		s.mockNDCHistoryResender,
 		s.logger,
-		s.mockShard.GetMetricsClient(),
 		s.clusterName,
 		config,
-		s.mockBean,
 	).(*timerQueueStandbyTaskExecutor)
 
 }

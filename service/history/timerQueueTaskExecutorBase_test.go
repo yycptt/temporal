@@ -121,9 +121,9 @@ func (s *timerQueueTaskExecutorBaseSuite) SetupTest() {
 
 	s.timerQueueTaskExecutorBase = newTimerQueueTaskExecutorBase(
 		s.mockShard,
-		h,
+		h.historyCache,
+		h.archivalClient,
 		logger,
-		s.mockShard.GetMetricsClient(),
 		config,
 	)
 }

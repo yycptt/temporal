@@ -254,9 +254,7 @@ func (h *Handler) CreateEngine(
 		h.replicationTaskFetchers,
 		h.matchingRawClient,
 		h.newCacheFn,
-		h.clientBean,
 		h.archiverProvider,
-		h.namespaceRegistry,
 	)
 }
 

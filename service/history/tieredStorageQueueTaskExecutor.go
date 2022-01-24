@@ -28,6 +28,7 @@ import (
 	"context"
 
 	"go.temporal.io/api/serviceerror"
+	sdkclient "go.temporal.io/sdk/client"
 
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/api/matchingservice/v1"
@@ -47,7 +48,6 @@ var (
 type (
 	tieredStorageQueueTaskExecutor struct {
 		shard                   shard.Context
-		historyService          *historyEngineImpl
 		cache                   workflow.Cache
 		logger                  log.Logger
 		metricsClient           metrics.Client
@@ -60,26 +60,24 @@ type (
 
 func newTieredStorageQueueTaskExecutor(
 	shard shard.Context,
-	historyService *historyEngineImpl,
+	workflowCache workflow.Cache,
+	publicClient sdkclient.Client,
 	logger log.Logger,
-	metricsClient metrics.Client,
-	config *configs.Config,
 	matchingClient matchingservice.MatchingServiceClient,
 ) *tieredStorageQueueTaskExecutor {
 	return &tieredStorageQueueTaskExecutor{
 		shard:          shard,
-		historyService: historyService,
-		cache:          historyService.historyCache,
+		cache:          workflowCache,
 		logger:         logger,
-		metricsClient:  metricsClient,
+		metricsClient:  shard.GetMetricsClient(),
 		matchingClient: matchingClient,
-		config:         config,
+		config:         shard.GetConfig(),
 		historyClient:  shard.GetHistoryClient(),
 		parentClosePolicyClient: parentclosepolicy.NewClient(
 			shard.GetMetricsClient(),
 			shard.GetLogger(),
-			historyService.publicClient,
-			config.NumParentClosePolicySystemWorkflows(),
+			publicClient,
+			shard.GetConfig().NumParentClosePolicySystemWorkflows(),
 		),
 	}
 }

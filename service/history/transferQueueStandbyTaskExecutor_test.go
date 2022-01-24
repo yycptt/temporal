@@ -184,13 +184,11 @@ func (s *transferQueueStandbyTaskExecutorSuite) SetupTest() {
 
 	s.transferQueueStandbyTaskExecutor = newTransferQueueStandbyTaskExecutor(
 		s.mockShard,
-		h,
+		h.historyCache,
+		h.archivalClient,
 		s.mockNDCHistoryResender,
 		s.logger,
-		s.mockShard.GetMetricsClient(),
 		s.clusterName,
-		config,
-		s.mockBean,
 		s.mockShard.Resource.GetMatchingClient(),
 	).(*transferQueueStandbyTaskExecutor)
 }

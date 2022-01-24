@@ -53,8 +53,8 @@ const (
 type (
 	transferQueueTaskExecutorBase struct {
 		shard                    shard.Context
-		historyService           *historyEngineImpl
 		cache                    workflow.Cache
+		archivalClient           archiver.Client
 		logger                   log.Logger
 		metricsClient            metrics.Client
 		matchingClient           matchingservice.MatchingServiceClient
@@ -65,20 +65,19 @@ type (
 
 func newTransferQueueTaskExecutorBase(
 	shard shard.Context,
-	historyEngine *historyEngineImpl,
+	workflowCache workflow.Cache,
+	archivalClient archiver.Client,
 	logger log.Logger,
-	metricsClient metrics.Client,
-	config *configs.Config,
 	matchingClient matchingservice.MatchingServiceClient,
 ) *transferQueueTaskExecutorBase {
 	return &transferQueueTaskExecutorBase{
 		shard:                    shard,
-		historyService:           historyEngine,
-		cache:                    historyEngine.historyCache,
+		cache:                    workflowCache,
+		archivalClient:           archivalClient,
 		logger:                   logger,
-		metricsClient:            metricsClient,
+		metricsClient:            shard.GetMetricsClient(),
 		matchingClient:           matchingClient,
-		config:                   config,
+		config:                   shard.GetConfig(),
 		searchAttributesProvider: shard.GetSearchAttributesProvider(),
 	}
 }
@@ -180,7 +179,7 @@ func (t *transferQueueTaskExecutorBase) recordWorkflowClosed(
 	// and it might not have access to type map (i.e. type needs to be embedded).
 	searchattribute.ApplyTypeMap(searchAttributes, saTypeMap)
 
-	_, err = t.historyService.archivalClient.Archive(ctx, &archiver.ClientRequest{
+	_, err = t.archivalClient.Archive(ctx, &archiver.ClientRequest{
 		ArchiveRequest: &archiver.ArchiveRequest{
 			NamespaceID:      namespaceID.String(),
 			Namespace:        namespaceEntry.Name().String(),

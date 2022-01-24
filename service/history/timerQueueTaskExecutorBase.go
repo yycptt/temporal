@@ -47,8 +47,8 @@ import (
 type (
 	timerQueueTaskExecutorBase struct {
 		shard                    shard.Context
-		historyService           *historyEngineImpl
 		cache                    workflow.Cache
+		archivalClient           archiver.Client
 		logger                   log.Logger
 		metricsClient            metrics.Client
 		config                   *configs.Config
@@ -58,17 +58,17 @@ type (
 
 func newTimerQueueTaskExecutorBase(
 	shard shard.Context,
-	historyEngine *historyEngineImpl,
+	workflowCache workflow.Cache,
+	archivalClient archiver.Client,
 	logger log.Logger,
-	metricsClient metrics.Client,
 	config *configs.Config,
 ) *timerQueueTaskExecutorBase {
 	return &timerQueueTaskExecutorBase{
 		shard:                    shard,
-		historyService:           historyEngine,
-		cache:                    historyEngine.historyCache,
+		cache:                    workflowCache,
+		archivalClient:           archivalClient,
 		logger:                   logger,
-		metricsClient:            metricsClient,
+		metricsClient:            shard.GetMetricsClient(),
 		config:                   config,
 		searchAttributesProvider: shard.GetSearchAttributesProvider(),
 	}
@@ -204,7 +204,7 @@ func (t *timerQueueTaskExecutorBase) archiveWorkflow(
 
 	ctx, cancel := context.WithTimeout(context.Background(), t.config.TimerProcessorArchivalTimeLimit())
 	defer cancel()
-	resp, err := t.historyService.archivalClient.Archive(ctx, req)
+	resp, err := t.archivalClient.Archive(ctx, req)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.temporal.io/server/api/historyservice/v1"
+	sdkclient "go.temporal.io/sdk/client"
+
 	"go.temporal.io/server/api/matchingservice/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/log"
@@ -40,6 +41,7 @@ import (
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
+	"go.temporal.io/server/service/history/workflow"
 )
 
 type (
@@ -78,14 +80,13 @@ type (
 
 func newTieredStorageQueueProcessor(
 	shard shard.Context,
-	historyEngine *historyEngineImpl,
+	workflowCache workflow.Cache,
+	publicClient sdkclient.Client,
 	matchingClient matchingservice.MatchingServiceClient,
-	_ historyservice.HistoryServiceClient,
-	logger log.Logger,
 ) *tieredStorageQueueProcessorImpl {
 
 	config := shard.GetConfig()
-	logger = log.With(logger, tag.ComponentTieredStorageQueue)
+	logger := log.With(shard.GetLogger(), tag.ComponentTieredStorageQueue)
 
 	options := &QueueProcessorOptions{
 		BatchSize:                           config.TieredStorageTaskBatchSize,
@@ -124,13 +125,12 @@ func newTieredStorageQueueProcessor(
 		tieredStorageQueueShutdown:  tieredStorageQueueShutdown,
 		tieredStorageTaskFilter:     tieredStorageTaskFilter,
 		logger:                      logger,
-		metricsClient:               historyEngine.metricsClient,
+		metricsClient:               shard.GetMetricsClient(),
 		taskExecutor: newTieredStorageQueueTaskExecutor(
 			shard,
-			historyEngine,
+			workflowCache,
+			publicClient,
 			logger,
-			historyEngine.metricsClient,
-			config,
 			matchingClient,
 		),
 
@@ -157,7 +157,7 @@ func newTieredStorageQueueProcessor(
 		options,
 		retProcessor,
 		queueAckMgr,
-		historyEngine.historyCache,
+		workflowCache,
 		logger,
 		shard.GetMetricsClient().Scope(metrics.TieredStorageQueueProcessorScope),
 	)

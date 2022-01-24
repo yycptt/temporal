@@ -165,16 +165,17 @@ func (s *timerQueueActiveTaskExecutorSuite) SetupTest() {
 
 	s.timerQueueActiveTaskExecutor = newTimerQueueActiveTaskExecutor(
 		s.mockShard,
-		h,
+		h.historyCache,
+		h.archivalClient,
 		newTimerQueueActiveProcessor(
 			s.mockShard,
-			h,
+			h.historyCache,
+			h.archivalClient,
 			s.mockMatchingClient,
 			newTaskAllocator(s.mockShard),
 			s.logger,
 		),
 		s.logger,
-		s.mockShard.GetMetricsClient(),
 		config,
 		s.mockShard.Resource.GetMatchingClient(),
 	).(*timerQueueActiveTaskExecutor)

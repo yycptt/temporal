@@ -43,7 +43,6 @@ import (
 	"go.temporal.io/api/workflowservice/v1"
 	sdkclient "go.temporal.io/sdk/client"
 
-	"go.temporal.io/server/client"
 	"go.temporal.io/server/common/archiver/provider"
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	"go.temporal.io/server/service/history/tasks"
@@ -136,9 +135,7 @@ func NewEngineWithShardContext(
 	replicationTaskFetchers ReplicationTaskFetchers,
 	rawMatchingClient matchingservice.MatchingServiceClient,
 	newCacheFn workflow.NewCacheFn,
-	clientBean client.Bean,
 	archiverProvider provider.ArchiverProvider,
-	registry namespace.Registry,
 ) *historyEngineImpl {
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 
@@ -174,14 +171,35 @@ func NewEngineWithShardContext(
 		replicationTaskFetchers:   replicationTaskFetchers,
 	}
 
-	historyEngImpl.txProcessor = newTransferQueueProcessor(shard, historyEngImpl,
-		matchingClient, historyClient, logger, clientBean, registry)
-	historyEngImpl.timerProcessor = newTimerQueueProcessor(shard, historyEngImpl,
-		matchingClient, logger, clientBean)
-	historyEngImpl.visibilityProcessor = newVisibilityQueueProcessor(shard, historyEngImpl, visibilityMgr,
-		matchingClient, historyClient, logger)
-	historyEngImpl.tieredStorageProcessor = newTieredStorageQueueProcessor(shard, historyEngImpl,
-		matchingClient, historyClient, logger)
+	historyEngImpl.txProcessor = newTransferQueueProcessor(
+		shard,
+		historyEngImpl,
+		historyCache,
+		historyEngImpl.archivalClient,
+		publicClient,
+		matchingClient,
+		historyClient,
+	)
+	historyEngImpl.timerProcessor = newTimerQueueProcessor(
+		shard,
+		historyEngImpl,
+		historyCache,
+		historyEngImpl.archivalClient,
+		matchingClient,
+	)
+	historyEngImpl.visibilityProcessor = newVisibilityQueueProcessor(
+		shard,
+		historyCache,
+		visibilityMgr,
+		matchingClient,
+		historyClient,
+	)
+	historyEngImpl.tieredStorageProcessor = newTieredStorageQueueProcessor(
+		shard,
+		historyCache,
+		publicClient,
+		matchingClient,
+	)
 	historyEngImpl.eventsReapplier = newNDCEventsReapplier(shard.GetMetricsClient(), logger)
 
 	if shard.GetClusterMetadata().IsGlobalNamespaceEnabled() {
