@@ -51,6 +51,8 @@ type (
 
 		Task() tasks.Task
 		Attempt() int
+
+		QueueType() QueueType
 	}
 
 	Executor interface {
@@ -68,7 +70,6 @@ var (
 )
 
 const (
-	defaultTaskTimeout  = 3 * time.Second
 	resubmitMaxAttempts = 10
 )
 
@@ -91,6 +92,7 @@ type (
 		scope              metrics.Scope
 		criticalRetryCount dynamicconfig.IntPropertyFn
 
+		queueType     QueueType
 		filter        TaskFilter
 		shouldProcess bool
 	}
@@ -104,9 +106,31 @@ func NewExecutable(
 	scheduler Scheduler,
 	rescheduler Rescheduler,
 	logger log.Logger,
-	scope metrics.Scope,
+	queueType QueueType,
 ) Executable {
 	timeSource := shard.GetTimeSource()
+
+	logger = tasks.InitializeLogger(task, logger)
+
+	var scopeIdx int
+	switch queueType {
+	case QueueTypeActiveTransfer:
+		scopeIdx = tasks.GetActiveTransferTaskMetricsScope(task)
+	case QueueTypeStandbyTransfer:
+		scopeIdx = tasks.GetStandbyTransferTaskMetricsScope(task)
+	case QueueTypeActiveTimer:
+		scopeIdx = tasks.GetActiveTimerTaskMetricScope(task)
+	case QueueTypeStandbyTimer:
+		scopeIdx = tasks.GetStandbyTimerTaskMetricScope(task)
+	case QueueTypeVisibility:
+		scopeIdx = tasks.GetVisibilityTaskMetricsScope(task)
+	}
+	scope := shard.GetMetricsClient().Scope(scopeIdx, getNamespaceTagByID(
+		shard.GetNamespaceRegistry(),
+		namespace.ID(task.GetNamespaceID()),
+		logger,
+	))
+
 	return &executableImpl{
 		state:              ctasks.TaskStatePending,
 		priority:           -1,
@@ -117,8 +141,9 @@ func NewExecutable(
 		rescheduler:        rescheduler,
 		timeSource:         timeSource,
 		loadTime:           timeSource.Now(),
-		logger:             tasks.InitializeLogger(task, logger),
+		logger:             logger,
 		scope:              scope,
+		queueType:          queueType,
 		criticalRetryCount: shard.GetConfig().TransferTaskMaxRetryCount,
 		filter:             filter,
 	}
@@ -287,6 +312,10 @@ func (e *executableImpl) Attempt() int {
 	return e.attempt
 }
 
+func (e *executableImpl) QueueType() QueueType {
+	return e.queueType
+}
+
 func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 	// this is an optimization for skipping rescheduler and retry the task sooner
 	// this can be useful for errors like unable to get workflow lock, which doesn't
@@ -298,4 +327,17 @@ func (e *executableImpl) backoffDuration(attempt int) time.Duration {
 	// elapsedTime (the first parameter) is not relevant here since reschedule policy
 	// has no expiration interval.
 	return reschedulePolicy.ComputeNextDelay(0, attempt)
+}
+
+func getNamespaceTagByID(
+	namespaceRegistry namespace.Registry,
+	namespaceID namespace.ID,
+	logger log.Logger,
+) metrics.Tag {
+	namespaceName, err := namespaceRegistry.GetNamespaceName(namespaceID)
+	if err != nil {
+		logger.Debug("Unable to get namespace", tag.Error(err))
+		return metrics.NamespaceUnknownTag()
+	}
+	return metrics.NamespaceTag(namespaceName.String())
 }
