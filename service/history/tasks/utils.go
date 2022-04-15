@@ -39,9 +39,9 @@ func InitializeLogger(
 	taskCategory := task.GetCategory()
 	switch taskCategory.ID() {
 	case CategoryIDTransfer:
-		taskEventID = getTransferTaskEventID
+		taskEventID = GetTransferTaskEventID
 	case CategoryIDTimer:
-		taskEventID = getTimerTaskEventID
+		taskEventID = GetTimerTaskEventID
 	case CategoryIDVisibility:
 		// visibility tasks don't have task eventID
 		taskEventID = func(task Task) int64 { return 0 }
@@ -64,7 +64,7 @@ func InitializeLogger(
 	return taskLogger
 }
 
-func getTransferTaskEventID(
+func GetTransferTaskEventID(
 	transferTask Task,
 ) int64 {
 	eventID := int64(0)
@@ -91,7 +91,7 @@ func getTransferTaskEventID(
 	return eventID
 }
 
-func getTimerTaskEventID(
+func GetTimerTaskEventID(
 	timerTask Task,
 ) int64 {
 	eventID := int64(0)

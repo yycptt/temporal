@@ -54,9 +54,11 @@ type (
 	}
 
 	Executor interface {
-		Execute(context.Context, tasks.Task, bool) error
+		Execute(context.Context, tasks.Task) error
 	}
 
+	// TODO: remove after merging active/standby queue processor
+	// task should always be executed as active or verified as standby
 	TaskFilter func(task tasks.Task) bool
 )
 
@@ -123,22 +125,25 @@ func NewExecutable(
 }
 
 func (e *executableImpl) Execute() error {
+	// this filter should also contain the logic for overriding
+	// results from task allocator (force executing some standby task types)
 	e.shouldProcess = e.filter(e.task)
+	if !e.shouldProcess {
+		return nil
+	}
 
 	ctx := metrics.AddMetricsContext(context.Background())
 	startTime := e.timeSource.Now()
-	err := e.executor.Execute(ctx, e.task, e.shouldProcess)
+	err := e.executor.Execute(ctx, e.task)
 	var userLatency time.Duration
 	if duration, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency); ok {
 		userLatency = time.Duration(duration)
 	}
 	e.userLatency += userLatency
 
-	if e.shouldProcess {
-		e.scope.IncCounter(metrics.TaskRequests)
-		e.scope.RecordTimer(metrics.TaskProcessingLatency, time.Since(startTime))
-		e.scope.RecordTimer(metrics.TaskNoUserProcessingLatency, time.Since(startTime)-userLatency)
-	}
+	e.scope.IncCounter(metrics.TaskRequests)
+	e.scope.RecordTimer(metrics.TaskProcessingLatency, time.Since(startTime))
+	e.scope.RecordTimer(metrics.TaskNoUserProcessingLatency, time.Since(startTime)-userLatency)
 	return err
 }
 

@@ -348,7 +348,7 @@ func (t *timerQueueProcessorBase) submitTask(
 		NewTaskInfo(
 			t.timerProcessor,
 			taskInfo,
-			initializeLoggerForTask(taskInfo, t.logger),
+			tasks.InitializeLogger(taskInfo, t.logger),
 		),
 	)
 }
