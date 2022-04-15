@@ -157,6 +157,7 @@ func LoadMutableStateForTask(
 	return mutableState, nil
 }
 
+// TODO: remove
 func initializeLoggerForTask(
 	task tasks.Task,
 	logger log.Logger,
@@ -190,6 +191,7 @@ func initializeLoggerForTask(
 	return taskLogger
 }
 
+// TODO: remove
 func getTransferTaskEventID(
 	transferTask tasks.Task,
 ) int64 {
@@ -231,6 +233,7 @@ func getTransferTaskEventIDAndRetryable(
 	return eventID, retryable
 }
 
+// TODO: remove
 func getTimerTaskEventID(
 	timerTask tasks.Task,
 ) int64 {
