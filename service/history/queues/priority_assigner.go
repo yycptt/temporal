@@ -24,9 +24,135 @@
 
 package queues
 
+import (
+	"sync"
+
+	enumsspb "go.temporal.io/server/api/enums/v1"
+	"go.temporal.io/server/common/dynamicconfig"
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/namespace"
+	"go.temporal.io/server/common/quotas"
+	"go.temporal.io/server/common/tasks"
+	"go.temporal.io/server/service/history/configs"
+)
+
 type (
 	// PriorityAssigner assigns priority to task executables
 	PriorityAssigner interface {
 		Assign(Executable) error
 	}
+
+	priorityAssignerImpl struct {
+		currentClusterName    string
+		namespaceRegistry     namespace.Registry
+		logger                log.Logger
+		scope                 metrics.Scope
+		rpsFn                 dynamicconfig.IntPropertyFnWithNamespaceFilter
+		criticalRetryAttempts dynamicconfig.IntPropertyFn
+
+		sync.RWMutex
+		rateLimiters map[string]quotas.RateLimiter
+	}
 )
+
+func NewPriorityAssigner(
+	currentClusterName string,
+	namespaceRegistry namespace.Registry,
+	logger log.Logger,
+	metricsClient metrics.Client,
+	config *configs.Config,
+	rpsFn dynamicconfig.IntPropertyFnWithNamespaceFilter,
+	criticalRetryAttempts dynamicconfig.IntPropertyFn,
+) PriorityAssigner {
+	return &priorityAssignerImpl{
+		currentClusterName:    currentClusterName,
+		namespaceRegistry:     namespaceRegistry,
+		logger:                logger,
+		scope:                 metricsClient.Scope(metrics.TaskPriorityAssignerScope),
+		rpsFn:                 rpsFn,
+		criticalRetryAttempts: criticalRetryAttempts,
+	}
+}
+
+func (a *priorityAssignerImpl) Assign(executable Executable) error {
+
+	if executable.Attempt() > a.criticalRetryAttempts() {
+		executable.SetPriority(tasks.PriorityLow)
+		return nil
+	}
+
+	namespaceEntry, err := a.namespaceRegistry.GetNamespaceByID(namespace.ID(executable.Task().GetNamespaceID()))
+	if err != nil {
+		return err
+	}
+
+	namespaceName := namespaceEntry.Name().String()
+	namespaceActive := namespaceEntry.ActiveInCluster(a.currentClusterName)
+	// TODO: remove QueueType() and the special logic for assgining high priority to no-op tasks
+	// after merging active/standby queue processor or performing task filtering before submitting
+	// tasks to worker pool
+	taskActive := executable.QueueType() != QueueTypeStandbyTransfer &&
+		executable.QueueType() != QueueTypeStandbyTimer
+
+	if !taskActive && !namespaceActive {
+		// standby tasks
+		executable.SetPriority(tasks.PriorityLow)
+		return nil
+	}
+
+	if (taskActive && !namespaceActive) || (!taskActive && namespaceActive) {
+		// no-op tasks, set to high priority to ack them as soon as possible
+		// don't consume rps limit
+		// ignoring overrides for some no-op standby tasks here
+		executable.SetPriority(tasks.PriorityHigh)
+		return nil
+	}
+
+	// active tasks for active namespaces
+	switch executable.Task().GetType() {
+	case enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT:
+		executable.SetPriority(tasks.PriorityDefault)
+		return nil
+	}
+
+	ratelimiter := a.getOrCreateRateLimiter(executable.Task().GetNamespaceID())
+	if !ratelimiter.Allow() {
+		executable.SetPriority(tasks.PriorityDefault)
+
+		category := executable.Task().GetCategory()
+		a.scope.Tagged(
+			metrics.NamespaceTag(namespaceName),
+			metrics.TaskCategoryTag(category.Name()),
+		).IncCounter(metrics.TaskThrottledCounter)
+		return nil
+	}
+
+	executable.SetPriority(tasks.PriorityHigh)
+	return nil
+}
+
+func (a *priorityAssignerImpl) getOrCreateRateLimiter(
+	namespaceName string,
+) quotas.RateLimiter {
+	a.RLock()
+	rateLimiter, ok := a.rateLimiters[namespaceName]
+	a.RUnlock()
+	if ok {
+		return rateLimiter
+	}
+
+	newRateLimiter := quotas.NewDefaultIncomingRateLimiter(
+		func() float64 { return float64(a.rpsFn(namespaceName)) },
+	)
+
+	a.Lock()
+	defer a.Unlock()
+
+	rateLimiter, ok = a.rateLimiters[namespaceName]
+	if ok {
+		return rateLimiter
+	}
+	a.rateLimiters[namespaceName] = newRateLimiter
+	return newRateLimiter
+}
