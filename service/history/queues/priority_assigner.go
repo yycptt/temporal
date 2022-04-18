@@ -34,7 +34,6 @@ import (
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/quotas"
 	"go.temporal.io/server/common/tasks"
-	"go.temporal.io/server/service/history/configs"
 )
 
 type (
@@ -43,13 +42,17 @@ type (
 		Assign(Executable) error
 	}
 
+	PriorityAssignerOptions struct {
+		HighPriorityRPS         dynamicconfig.IntPropertyFnWithNamespaceFilter
+		HighPriorityMaxAttempts dynamicconfig.IntPropertyFn
+	}
+
 	priorityAssignerImpl struct {
-		currentClusterName    string
-		namespaceRegistry     namespace.Registry
-		logger                log.Logger
-		scope                 metrics.Scope
-		rpsFn                 dynamicconfig.IntPropertyFnWithNamespaceFilter
-		criticalRetryAttempts dynamicconfig.IntPropertyFn
+		currentClusterName string
+		namespaceRegistry  namespace.Registry
+		logger             log.Logger
+		scope              metrics.Scope
+		options            PriorityAssignerOptions
 
 		sync.RWMutex
 		rateLimiters map[string]quotas.RateLimiter
@@ -59,25 +62,22 @@ type (
 func NewPriorityAssigner(
 	currentClusterName string,
 	namespaceRegistry namespace.Registry,
+	options PriorityAssignerOptions,
 	logger log.Logger,
 	metricsClient metrics.Client,
-	config *configs.Config,
-	rpsFn dynamicconfig.IntPropertyFnWithNamespaceFilter,
-	criticalRetryAttempts dynamicconfig.IntPropertyFn,
 ) PriorityAssigner {
 	return &priorityAssignerImpl{
-		currentClusterName:    currentClusterName,
-		namespaceRegistry:     namespaceRegistry,
-		logger:                logger,
-		scope:                 metricsClient.Scope(metrics.TaskPriorityAssignerScope),
-		rpsFn:                 rpsFn,
-		criticalRetryAttempts: criticalRetryAttempts,
+		currentClusterName: currentClusterName,
+		namespaceRegistry:  namespaceRegistry,
+		logger:             logger,
+		scope:              metricsClient.Scope(metrics.TaskPriorityAssignerScope),
+		options:            options,
 	}
 }
 
 func (a *priorityAssignerImpl) Assign(executable Executable) error {
 
-	if executable.Attempt() > a.criticalRetryAttempts() {
+	if executable.Attempt() > a.options.HighPriorityMaxAttempts() {
 		executable.SetPriority(tasks.PriorityLow)
 		return nil
 	}
@@ -143,7 +143,7 @@ func (a *priorityAssignerImpl) getOrCreateRateLimiter(
 	}
 
 	newRateLimiter := quotas.NewDefaultIncomingRateLimiter(
-		func() float64 { return float64(a.rpsFn(namespaceName)) },
+		func() float64 { return float64(a.options.HighPriorityRPS(namespaceName)) },
 	)
 
 	a.Lock()

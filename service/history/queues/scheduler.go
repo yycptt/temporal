@@ -26,9 +26,11 @@ package queues
 
 import (
 	"go.temporal.io/server/common"
+	"go.temporal.io/server/common/cluster"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/tasks"
 )
 
@@ -44,9 +46,9 @@ type (
 	}
 
 	SchedulerOptions struct {
-		QueueSize        int
-		WorkerCount      int
-		PriorityToWeight map[int]int
+		tasks.ParallelProcessorOptions
+		tasks.InterleavedWeightedRoundRobinSchedulerOptions
+		PriorityAssignerOptions
 	}
 
 	schedulerImpl struct {
@@ -56,16 +58,22 @@ type (
 )
 
 func NewScheduler(
-	priorityAssigner PriorityAssigner, // TODO: should init priority assigner internally
+	clusterMetadata cluster.Metadata,
+	namespaceRegistry namespace.Registry,
 	options SchedulerOptions,
 	metricsClient metrics.Client,
 	logger log.Logger,
 ) *schedulerImpl {
+	priorityAssigner := NewPriorityAssigner(
+		clusterMetadata.GetCurrentClusterName(),
+		namespaceRegistry,
+		options.PriorityAssignerOptions,
+		logger,
+		metricsClient,
+	)
+
 	processor := tasks.NewParallelProcessor(
-		&tasks.ParallelProcessorOptions{
-			WorkerCount: options.WorkerCount,
-			QueueSize:   options.QueueSize,
-		},
+		&options.ParallelProcessorOptions,
 		metricsClient,
 		logger,
 	)
@@ -73,9 +81,7 @@ func NewScheduler(
 	return &schedulerImpl{
 		priorityAssigner: priorityAssigner,
 		wRRScheduler: tasks.NewInterleavedWeightedRoundRobinScheduler(
-			tasks.InterleavedWeightedRoundRobinSchedulerOptions{
-				PriorityToWeight: options.PriorityToWeight,
-			},
+			options.InterleavedWeightedRoundRobinSchedulerOptions,
 			processor,
 			metricsClient,
 			logger,
