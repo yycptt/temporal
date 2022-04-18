@@ -27,11 +27,13 @@
 package queues
 
 import (
-	"sort"
 	"sync"
 	"time"
 
 	"go.temporal.io/server/common/clock"
+	"go.temporal.io/server/common/collection"
+	"go.temporal.io/server/common/log/tag"
+	"go.temporal.io/server/common/metrics"
 )
 
 type (
@@ -53,32 +55,33 @@ type (
 		Len() int
 	}
 
+	rescheduledExecuable struct {
+		executable     Executable
+		rescheduleTime time.Time
+	}
+
 	reschedulerImpl struct {
 		scheduler  Scheduler
 		timeSource clock.TimeSource
+		scope      metrics.Scope
 
 		sync.Mutex
-		buckets        map[time.Time][]Executable
-		numExecutables int
-
-		rescheduleTimes  []time.Time
-		priorityChanFull map[int]bool
+		pq collection.Queue[rescheduledExecuable]
 	}
-)
-
-const (
-	defaultRescheduleBucketDuration = 3 * time.Second
 )
 
 func NewRescheduler(
 	scheduler Scheduler,
 	timeSource clock.TimeSource,
+	scope metrics.Scope,
 ) *reschedulerImpl {
 	return &reschedulerImpl{
-		scheduler:      scheduler,
-		timeSource:     timeSource,
-		buckets:        make(map[time.Time][]Executable),
-		numExecutables: 0,
+		scheduler:  scheduler,
+		timeSource: timeSource,
+		scope:      scope,
+		pq: collection.NewPriorityQueue((func(this rescheduledExecuable, that rescheduledExecuable) bool {
+			return this.rescheduleTime.Before(that.rescheduleTime)
+		})),
 	}
 }
 
@@ -86,16 +89,13 @@ func (r *reschedulerImpl) Add(
 	executable Executable,
 	backoff time.Duration,
 ) {
-	rescheduleTime := r.timeSource.Now().Add(backoff).Truncate(defaultRescheduleBucketDuration)
-
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.buckets[rescheduleTime]; !ok {
-		r.rescheduleTimes = append(r.rescheduleTimes, rescheduleTime)
-	}
-	r.buckets[rescheduleTime] = append(r.buckets[rescheduleTime], executable)
-	r.numExecutables++
+	r.pq.Add(rescheduledExecuable{
+		executable:     executable,
+		rescheduleTime: r.timeSource.Now().Add(backoff),
+	})
 }
 
 func (r *reschedulerImpl) Reschedule(
@@ -104,54 +104,37 @@ func (r *reschedulerImpl) Reschedule(
 	r.Lock()
 	defer r.Unlock()
 
+	r.scope.RecordDistribution(metrics.TaskReschedulerPendingTasks, r.pq.Len())
+
 	if targetRescheduleSize == 0 {
-		targetRescheduleSize = r.numExecutables
+		targetRescheduleSize = r.pq.Len()
 	}
 
-	sort.Slice(r.rescheduleTimes, func(i int, j int) bool {
-		return r.rescheduleTimes[i].Before(r.rescheduleTimes[j])
-	})
-	for priority := range r.priorityChanFull {
-		r.priorityChanFull[priority] = false
-	}
-
-	rescheduled := 0
-	for _, rescheduleTime := range r.rescheduleTimes {
-		if r.timeSource.Now().Before(rescheduleTime) {
+	var failToSubmit []rescheduledExecuable
+	numRescheduled := 0
+	for !r.pq.IsEmpty() {
+		if r.timeSource.Now().Before(r.pq.Peek().rescheduleTime) {
 			break
 		}
 
-		var newBucket []Executable
-		oldBucket := r.buckets[rescheduleTime]
-		r.numExecutables -= len(oldBucket)
-		for idx, executable := range oldBucket {
-			if r.priorityChanFull[executable.GetPriority()] {
-				continue
-			}
-
-			submitted, err := r.scheduler.TrySubmit(executable)
-			if err != nil {
-				newBucket = append(newBucket, executable)
-			} else if !submitted {
-				r.priorityChanFull[executable.GetPriority()] = true
-				newBucket = append(newBucket, executable)
-			} else {
-				// successfully rescheduled
-				rescheduled++
-				if rescheduled >= targetRescheduleSize {
-					// skip the rest executables in the bucket
-					newBucket = append(newBucket, oldBucket[idx+1:]...)
-					break
-				}
-			}
+		rescheduled := r.pq.Remove()
+		submitted, err := r.scheduler.TrySubmit(rescheduled.executable)
+		if err != nil {
+			rescheduled.executable.Logger().Error("Failed to reschedule task", tag.Error(err))
 		}
 
-		r.numExecutables += len(newBucket)
-		if len(newBucket) != 0 {
-			r.buckets[rescheduleTime] = newBucket
+		if !submitted {
+			failToSubmit = append(failToSubmit, rescheduled)
 		} else {
-			delete(r.buckets, rescheduleTime)
+			numRescheduled++
+			if numRescheduled >= targetRescheduleSize {
+				break
+			}
 		}
+	}
+
+	for _, rescheduled := range failToSubmit {
+		r.pq.Add(rescheduled)
 	}
 }
 
@@ -159,5 +142,5 @@ func (r *reschedulerImpl) Len() int {
 	r.Lock()
 	defer r.Unlock()
 
-	return r.numExecutables
+	return r.pq.Len()
 }
