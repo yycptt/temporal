@@ -42,8 +42,8 @@ import (
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/persistence"
 	ctasks "go.temporal.io/server/common/tasks"
+	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
-	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 )
 
@@ -103,17 +103,18 @@ type (
 )
 
 func NewExecutable(
-	shard shard.Context,
 	task tasks.Task,
 	filter TaskFilter,
 	executor Executor,
 	scheduler Scheduler,
 	rescheduler Rescheduler,
+	timeSource clock.TimeSource,
+	namespaceRegistry namespace.Registry,
 	logger log.Logger,
+	metricsClient metrics.Client,
+	config *configs.Config,
 	queueType QueueType,
 ) Executable {
-	timeSource := shard.GetTimeSource()
-
 	logger = tasks.InitializeLogger(task, logger)
 
 	var scopeIdx int
@@ -129,8 +130,8 @@ func NewExecutable(
 	case QueueTypeVisibility:
 		scopeIdx = tasks.GetVisibilityTaskMetricsScope(task)
 	}
-	scope := shard.GetMetricsClient().Scope(scopeIdx, getNamespaceTagByID(
-		shard.GetNamespaceRegistry(),
+	scope := metricsClient.Scope(scopeIdx, getNamespaceTagByID(
+		namespaceRegistry,
 		namespace.ID(task.GetNamespaceID()),
 		logger,
 	))
@@ -148,7 +149,7 @@ func NewExecutable(
 		logger:             logger,
 		scope:              scope,
 		queueType:          queueType,
-		criticalRetryCount: shard.GetConfig().TransferTaskMaxRetryCount,
+		criticalRetryCount: config.TransferTaskMaxRetryCount,
 		filter:             filter,
 	}
 }
@@ -243,6 +244,8 @@ func (e *executableImpl) IsRetryableError(err error) bool {
 	// ErrTaskRetry means mutable state is not ready for standby task processing
 	// there's no point for retrying the task immediately which will hold the worker corouinte
 	// TODO: change ErrTaskRetry to a better name
+	// TODO: add workflow busy error (returned when workflow lock can't be grabbed within specified timeout)
+	// here after it's defined.
 	return err != consts.ErrTaskRetry
 }
 

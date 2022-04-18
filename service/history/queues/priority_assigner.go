@@ -112,6 +112,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 	// active tasks for active namespaces
 	switch executable.Task().GetType() {
 	case enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT:
+		// TODO: add more here
 		executable.SetPriority(tasks.PriorityDefault)
 		return nil
 	}

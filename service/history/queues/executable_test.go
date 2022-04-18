@@ -25,11 +25,26 @@
 package queues
 
 import (
+	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/server/common/clock"
+	"go.temporal.io/server/common/definition"
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/namespace"
+	"go.temporal.io/server/common/persistence"
+	ctasks "go.temporal.io/server/common/tasks"
+	"go.temporal.io/server/service/history/configs"
+	"go.temporal.io/server/service/history/consts"
+	"go.temporal.io/server/service/history/tasks"
+	"go.temporal.io/server/service/history/tests"
 )
 
 type (
@@ -37,11 +52,193 @@ type (
 		suite.Suite
 		*require.Assertions
 
-		controller *gomock.Controller
+		controller            *gomock.Controller
+		mockExecutor          *MockExecutor
+		mockScheduler         *MockScheduler
+		mockRescheduler       *MockRescheduler
+		mockNamespaceRegistry *namespace.MockRegistry
+
+		timeSource    *clock.EventTimeSource
+		logger        log.Logger
+		metricsClient metrics.Client
+		config        *configs.Config
 	}
 )
 
 func TestExecutableSuite(t *testing.T) {
 	s := new(executableSuite)
 	suite.Run(t, s)
+}
+
+func (s *executableSuite) SetupTest() {
+	s.Assertions = require.New(s.T())
+
+	s.controller = gomock.NewController(s.T())
+	s.mockExecutor = NewMockExecutor(s.controller)
+	s.mockScheduler = NewMockScheduler(s.controller)
+	s.mockRescheduler = NewMockRescheduler(s.controller)
+	s.mockNamespaceRegistry = namespace.NewMockRegistry(s.controller)
+
+	s.mockNamespaceRegistry.EXPECT().GetNamespaceName(tests.NamespaceID).Return(tests.Namespace, nil).AnyTimes()
+
+	s.timeSource = clock.NewEventTimeSource()
+	s.logger = log.NewTestLogger()
+	s.metricsClient = metrics.NoopClient
+	s.config = tests.NewDynamicConfig()
+}
+
+func (s *executableSuite) TearDownSuite() {
+	s.controller.Finish()
+}
+
+func (s *executableSuite) TestExecute_TaskFiltered() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return false
+	})
+
+	s.NoError(executable.Execute())
+}
+
+func (s *executableSuite) TestExecute_TaskExecuted() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.mockExecutor.EXPECT().Execute(gomock.Any(), executable).Return(errors.New("some random error"))
+	s.Error(executable.Execute())
+
+	s.mockExecutor.EXPECT().Execute(gomock.Any(), executable).Return(nil)
+	s.NoError(executable.Execute())
+}
+
+func (s *executableSuite) TestExecute_UserLatency() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	expectedUserLatency := int64(133)
+	updateContext := func(ctx context.Context, taskInfo interface{}) {
+		metrics.ContextCounterAdd(ctx, metrics.HistoryWorkflowExecutionCacheLatency, expectedUserLatency)
+	}
+
+	s.mockExecutor.EXPECT().Execute(gomock.Any(), executable).Do(updateContext).Return(nil)
+	s.NoError(executable.Execute())
+	s.Equal(time.Duration(expectedUserLatency), executable.(*executableImpl).userLatency)
+}
+
+func (s *executableSuite) TestHandleErr_EntityNotExists() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.NoError(executable.HandleErr(serviceerror.NewNotFound("")))
+}
+
+func (s *executableSuite) TestHandleErr_ErrTaskRetry() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.Equal(consts.ErrTaskRetry, executable.HandleErr(consts.ErrTaskRetry))
+}
+
+func (s *executableSuite) TestHandleErr_ErrTaskDiscarded() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.NoError(executable.HandleErr(consts.ErrTaskDiscarded))
+}
+
+func (s *executableSuite) TestHandleErr_NamespaceNotActiveError() {
+	now := time.Now().UTC()
+	err := serviceerror.NewNamespaceNotActive("", "", "")
+
+	s.timeSource.Update(now.Add(-namespace.CacheRefreshInterval * time.Duration(3)))
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+	s.timeSource.Update(now)
+	s.NoError(executable.HandleErr(err))
+
+	executable = s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.Equal(err, executable.HandleErr(err))
+}
+
+func (s *executableSuite) TestHandleErr_CurrentWorkflowConditionFailedError() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.NoError(executable.HandleErr(&persistence.CurrentWorkflowConditionFailedError{}))
+}
+
+func (s *executableSuite) TestHandleErr_RandomErr() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.Error(executable.HandleErr(errors.New("random error")))
+}
+
+func (s *executableSuite) TestTaskAck() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.Equal(ctasks.TaskStatePending, executable.State())
+
+	executable.Ack()
+	s.Equal(ctasks.TaskStateAcked, executable.State())
+}
+
+func (s *executableSuite) TestTaskNack_Resubmit() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.mockScheduler.EXPECT().TrySubmit(executable).Return(true, nil)
+
+	executable.Nack(errors.New("some random error"))
+	s.Equal(ctasks.TaskStatePending, executable.State())
+}
+
+func (s *executableSuite) TestTaskNack_Reschedule() {
+	executable := s.newTestExecutable(func(_ tasks.Task) bool {
+		return true
+	})
+
+	s.mockRescheduler.EXPECT().Add(executable, gomock.AssignableToTypeOf(time.Second))
+
+	executable.Nack(consts.ErrTaskRetry) // this error won't trigger re-submit
+	s.Equal(ctasks.TaskStatePending, executable.State())
+}
+
+func (s *executableSuite) newTestExecutable(
+	filter TaskFilter,
+) Executable {
+	return NewExecutable(
+		tasks.NewFakeTask(
+			definition.NewWorkflowKey(
+				tests.NamespaceID.String(),
+				tests.WorkflowID,
+				tests.RunID,
+			),
+			tasks.CategoryTransfer,
+			time.Now(),
+		),
+		filter,
+		s.mockExecutor,
+		s.mockScheduler,
+		s.mockRescheduler,
+		s.timeSource,
+		s.mockNamespaceRegistry,
+		s.logger,
+		s.metricsClient,
+		s.config,
+		QueueTypeActiveTransfer,
+	)
 }
