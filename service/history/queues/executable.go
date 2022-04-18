@@ -51,6 +51,7 @@ type (
 
 		Task() tasks.Task
 		Attempt() int
+		Logger() log.Logger
 
 		QueueType() QueueType
 	}
@@ -268,7 +269,10 @@ func (e *executableImpl) Nack(err error) {
 	submitted := false
 	attempt := e.Attempt()
 	if e.shouldResubmitOnNack(attempt, err) {
-		submitted = e.scheduler.TrySubmit(e)
+		// we do not need to know if there any error during submission
+		// as long as it's not submitted, the execuable should be add
+		// to the rescheduler
+		submitted, _ = e.scheduler.TrySubmit(e)
 	}
 
 	if !submitted {
@@ -310,6 +314,10 @@ func (e *executableImpl) Attempt() int {
 	defer e.Unlock()
 
 	return e.attempt
+}
+
+func (e *executableImpl) Logger() log.Logger {
+	return e.logger
 }
 
 func (e *executableImpl) QueueType() QueueType {
