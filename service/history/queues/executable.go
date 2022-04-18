@@ -57,9 +57,10 @@ type (
 	}
 
 	Executor interface {
-		Execute(context.Context, tasks.Task) error
+		Execute(context.Context, Executable) error
 	}
 
+	// TaskFilter determines if the given task should be executed
 	// TODO: remove after merging active/standby queue processor
 	// task should always be executed as active or verified as standby
 	TaskFilter func(task tasks.Task) bool
@@ -160,7 +161,7 @@ func (e *executableImpl) Execute() error {
 
 	ctx := metrics.AddMetricsContext(context.Background())
 	startTime := e.timeSource.Now()
-	err := e.executor.Execute(ctx, e.task)
+	err := e.executor.Execute(ctx, e)
 	var userLatency time.Duration
 	if duration, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency); ok {
 		userLatency = time.Duration(duration)

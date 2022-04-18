@@ -147,6 +147,8 @@ func (r *reschedulerImpl) Reschedule(
 		r.numExecutables += len(newBucket)
 		if len(newBucket) != 0 {
 			r.buckets[rescheduleTime] = newBucket
+		} else {
+			delete(r.buckets, rescheduleTime)
 		}
 	}
 }
