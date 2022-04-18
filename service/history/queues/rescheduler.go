@@ -24,21 +24,136 @@
 
 package queues
 
-import "time"
+import (
+	"sort"
+	"sync"
+	"time"
+
+	"go.temporal.io/server/common/clock"
+)
 
 type (
 	// Rescheduler buffers task executables that are failed to process and
-	// resubmit them to the task scheduler when the Reschedule method is called
-	// and the specified backoff duration has passed.
+	// resubmit them to the task scheduler when the Reschedule method is called.
 	// TODO: remove this component when implementing multi-cursor queue processor.
 	// Failed task executables can be tracke by task reader/queue range
 	Rescheduler interface {
+		// Add task executable to the rescheudler.
+		// The backoff duration is just a hint for how long the executable
+		// should be bufferred before rescheduling.
 		Add(task Executable, backoff time.Duration)
 
-		// Reschedule re-submit numTasks executables to the scheduler
-		// resubmit all if numTasks is 0
-		Reschedule(numTasks int)
+		// Reschedule re-submit numTasks executables to the scheduler.
+		// reschedule all if targetRescheduleSize is 0.
+		Reschedule(targetRescheduleSize int)
 
+		// Len returns the total number of task executables waiting to be rescheduled.
 		Len() int
 	}
+
+	reschedulerImpl struct {
+		scheduler  Scheduler
+		timeSource clock.TimeSource
+
+		sync.Mutex
+		buckets        map[time.Time][]Executable
+		numExecutables int
+
+		rescheduleTimes  []time.Time
+		priorityChanFull map[int]bool
+	}
 )
+
+const (
+	defaultRescheduleBucketDuration = 3 * time.Second
+)
+
+func NewRescheduler(
+	scheduler Scheduler,
+	timeSource clock.TimeSource,
+) *reschedulerImpl {
+	return &reschedulerImpl{
+		scheduler:      scheduler,
+		timeSource:     timeSource,
+		buckets:        make(map[time.Time][]Executable),
+		numExecutables: 0,
+	}
+}
+
+func (r *reschedulerImpl) Add(
+	executable Executable,
+	backoff time.Duration,
+) {
+	rescheduleTime := r.timeSource.Now().Add(backoff).Truncate(defaultRescheduleBucketDuration)
+
+	r.Lock()
+	defer r.Unlock()
+
+	if _, ok := r.buckets[rescheduleTime]; !ok {
+		r.rescheduleTimes = append(r.rescheduleTimes, rescheduleTime)
+	}
+	r.buckets[rescheduleTime] = append(r.buckets[rescheduleTime], executable)
+	r.numExecutables++
+}
+
+func (r *reschedulerImpl) Reschedule(
+	targetRescheduleSize int,
+) {
+	r.Lock()
+	defer r.Unlock()
+
+	if targetRescheduleSize == 0 {
+		targetRescheduleSize = r.numExecutables
+	}
+
+	sort.Slice(r.rescheduleTimes, func(i int, j int) bool {
+		return r.rescheduleTimes[i].Before(r.rescheduleTimes[j])
+	})
+	for priority := range r.priorityChanFull {
+		r.priorityChanFull[priority] = false
+	}
+
+	rescheduled := 0
+	for _, rescheduleTime := range r.rescheduleTimes {
+		if r.timeSource.Now().Before(rescheduleTime) {
+			break
+		}
+
+		var newBucket []Executable
+		oldBucket := r.buckets[rescheduleTime]
+		r.numExecutables -= len(oldBucket)
+		for idx, executable := range oldBucket {
+			if r.priorityChanFull[executable.GetPriority()] {
+				continue
+			}
+
+			submitted, err := r.scheduler.TrySubmit(executable)
+			if err != nil {
+				newBucket = append(newBucket, executable)
+			} else if !submitted {
+				r.priorityChanFull[executable.GetPriority()] = true
+				newBucket = append(newBucket, executable)
+			} else {
+				// successfully rescheduled
+				rescheduled++
+				if rescheduled >= targetRescheduleSize {
+					// skip the rest executables in the bucket
+					newBucket = append(newBucket, oldBucket[idx+1:]...)
+					break
+				}
+			}
+		}
+
+		r.numExecutables += len(newBucket)
+		if len(newBucket) != 0 {
+			r.buckets[rescheduleTime] = newBucket
+		}
+	}
+}
+
+func (r *reschedulerImpl) Len() int {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.numExecutables
+}
