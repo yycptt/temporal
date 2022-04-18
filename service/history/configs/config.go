@@ -80,6 +80,10 @@ type Config struct {
 	StandbyTaskMissingEventsResendDelay  dynamicconfig.DurationPropertyFn
 	StandbyTaskMissingEventsDiscardDelay dynamicconfig.DurationPropertyFn
 
+	TimerTaskRPS      dynamicconfig.IntPropertyFnWithNamespaceFilter
+	TransferTaskRPS   dynamicconfig.IntPropertyFnWithNamespaceFilter
+	VisibilityTaskRPS dynamicconfig.IntPropertyFnWithNamespaceFilter
+
 	// TimerQueueProcessor settings
 	TimerTaskBatchSize                                dynamicconfig.IntPropertyFn
 	TimerTaskWorkerCount                              dynamicconfig.IntPropertyFn
