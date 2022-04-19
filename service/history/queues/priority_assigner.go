@@ -33,7 +33,7 @@ import (
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/quotas"
-	"go.temporal.io/server/common/tasks"
+	"go.temporal.io/server/service/history/configs"
 )
 
 type (
@@ -77,8 +77,18 @@ func NewPriorityAssigner(
 
 func (a *priorityAssignerImpl) Assign(executable Executable) error {
 
+	/*
+		Summary:
+		- High priority: active tasks from active queue processor and no-op tasks (currently ignoring overrides)
+		- Default priority: throttled tasks and selected task types (e.g. delete history events)
+		- Low priority: standby tasks and tasks keep retrying
+
+		Only candidates for high priority will consume the token in the rate limiter for high priority tasks and
+		potentially be throttled.
+	*/
+
 	if executable.Attempt() > a.options.HighPriorityMaxAttempts() {
-		executable.SetPriority(tasks.PriorityLow)
+		executable.SetPriority(configs.TaskPriorityLow)
 		return nil
 	}
 
@@ -97,29 +107,30 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 
 	if !taskActive && !namespaceActive {
 		// standby tasks
-		executable.SetPriority(tasks.PriorityLow)
+		executable.SetPriority(configs.TaskPriorityLow)
 		return nil
 	}
 
 	if (taskActive && !namespaceActive) || (!taskActive && namespaceActive) {
 		// no-op tasks, set to high priority to ack them as soon as possible
 		// don't consume rps limit
-		// ignoring overrides for some no-op standby tasks here
-		executable.SetPriority(tasks.PriorityHigh)
+		// ignoring overrides for some no-op standby tasks for now
+		executable.SetPriority(configs.TaskPriorityHigh)
 		return nil
 	}
 
 	// active tasks for active namespaces
 	switch executable.Task().GetType() {
 	case enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT:
-		// TODO: add more here
-		executable.SetPriority(tasks.PriorityDefault)
+		// TODO: add more task types here if we believe it's ok to delay those tasks
+		// and assign them the same priority as throttled tasks
+		executable.SetPriority(configs.TaskPriorityDefault)
 		return nil
 	}
 
 	ratelimiter := a.getOrCreateRateLimiter(executable.Task().GetNamespaceID())
 	if !ratelimiter.Allow() {
-		executable.SetPriority(tasks.PriorityDefault)
+		executable.SetPriority(configs.TaskPriorityDefault)
 
 		category := executable.Task().GetCategory()
 		a.scope.Tagged(
@@ -129,7 +140,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 		return nil
 	}
 
-	executable.SetPriority(tasks.PriorityHigh)
+	executable.SetPriority(configs.TaskPriorityHigh)
 	return nil
 }
 

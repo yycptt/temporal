@@ -138,7 +138,6 @@ func NewExecutable(
 
 	return &executableImpl{
 		state:              ctasks.TaskStatePending,
-		priority:           ctasks.PriorityUnknown,
 		attempt:            1,
 		task:               task,
 		executor:           executor,
