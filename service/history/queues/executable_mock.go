@@ -31,8 +31,10 @@ package queues
 import (
 	context "context"
 	reflect "reflect"
+	time "time"
 
 	gomock "github.com/golang/mock/gomock"
+	v1 "go.temporal.io/server/api/enums/v1"
 	backoff "go.temporal.io/server/common/backoff"
 	log "go.temporal.io/server/common/log"
 	tasks "go.temporal.io/server/common/tasks"
@@ -102,6 +104,48 @@ func (mr *MockExecutableMockRecorder) Execute() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Execute", reflect.TypeOf((*MockExecutable)(nil).Execute))
 }
 
+// GetCategory mocks base method.
+func (m *MockExecutable) GetCategory() tasks0.Category {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCategory")
+	ret0, _ := ret[0].(tasks0.Category)
+	return ret0
+}
+
+// GetCategory indicates an expected call of GetCategory.
+func (mr *MockExecutableMockRecorder) GetCategory() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCategory", reflect.TypeOf((*MockExecutable)(nil).GetCategory))
+}
+
+// GetKey mocks base method.
+func (m *MockExecutable) GetKey() tasks0.Key {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetKey")
+	ret0, _ := ret[0].(tasks0.Key)
+	return ret0
+}
+
+// GetKey indicates an expected call of GetKey.
+func (mr *MockExecutableMockRecorder) GetKey() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKey", reflect.TypeOf((*MockExecutable)(nil).GetKey))
+}
+
+// GetNamespaceID mocks base method.
+func (m *MockExecutable) GetNamespaceID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespaceID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespaceID indicates an expected call of GetNamespaceID.
+func (mr *MockExecutableMockRecorder) GetNamespaceID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceID", reflect.TypeOf((*MockExecutable)(nil).GetNamespaceID))
+}
+
 // GetPriority mocks base method.
 func (m *MockExecutable) GetPriority() int {
 	m.ctrl.T.Helper()
@@ -114,6 +158,90 @@ func (m *MockExecutable) GetPriority() int {
 func (mr *MockExecutableMockRecorder) GetPriority() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPriority", reflect.TypeOf((*MockExecutable)(nil).GetPriority))
+}
+
+// GetRunID mocks base method.
+func (m *MockExecutable) GetRunID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRunID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetRunID indicates an expected call of GetRunID.
+func (mr *MockExecutableMockRecorder) GetRunID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRunID", reflect.TypeOf((*MockExecutable)(nil).GetRunID))
+}
+
+// GetTaskID mocks base method.
+func (m *MockExecutable) GetTaskID() int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTaskID")
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// GetTaskID indicates an expected call of GetTaskID.
+func (mr *MockExecutableMockRecorder) GetTaskID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTaskID", reflect.TypeOf((*MockExecutable)(nil).GetTaskID))
+}
+
+// GetType mocks base method.
+func (m *MockExecutable) GetType() v1.TaskType {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetType")
+	ret0, _ := ret[0].(v1.TaskType)
+	return ret0
+}
+
+// GetType indicates an expected call of GetType.
+func (mr *MockExecutableMockRecorder) GetType() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetType", reflect.TypeOf((*MockExecutable)(nil).GetType))
+}
+
+// GetVersion mocks base method.
+func (m *MockExecutable) GetVersion() int64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVersion")
+	ret0, _ := ret[0].(int64)
+	return ret0
+}
+
+// GetVersion indicates an expected call of GetVersion.
+func (mr *MockExecutableMockRecorder) GetVersion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVersion", reflect.TypeOf((*MockExecutable)(nil).GetVersion))
+}
+
+// GetVisibilityTime mocks base method.
+func (m *MockExecutable) GetVisibilityTime() time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVisibilityTime")
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// GetVisibilityTime indicates an expected call of GetVisibilityTime.
+func (mr *MockExecutableMockRecorder) GetVisibilityTime() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVisibilityTime", reflect.TypeOf((*MockExecutable)(nil).GetVisibilityTime))
+}
+
+// GetWorkflowID mocks base method.
+func (m *MockExecutable) GetWorkflowID() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWorkflowID")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetWorkflowID indicates an expected call of GetWorkflowID.
+func (mr *MockExecutableMockRecorder) GetWorkflowID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkflowID", reflect.TypeOf((*MockExecutable)(nil).GetWorkflowID))
 }
 
 // HandleErr mocks base method.
@@ -222,6 +350,42 @@ func (mr *MockExecutableMockRecorder) SetPriority(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPriority", reflect.TypeOf((*MockExecutable)(nil).SetPriority), arg0)
 }
 
+// SetTaskID mocks base method.
+func (m *MockExecutable) SetTaskID(id int64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetTaskID", id)
+}
+
+// SetTaskID indicates an expected call of SetTaskID.
+func (mr *MockExecutableMockRecorder) SetTaskID(id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetTaskID", reflect.TypeOf((*MockExecutable)(nil).SetTaskID), id)
+}
+
+// SetVersion mocks base method.
+func (m *MockExecutable) SetVersion(version int64) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetVersion", version)
+}
+
+// SetVersion indicates an expected call of SetVersion.
+func (mr *MockExecutableMockRecorder) SetVersion(version interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVersion", reflect.TypeOf((*MockExecutable)(nil).SetVersion), version)
+}
+
+// SetVisibilityTime mocks base method.
+func (m *MockExecutable) SetVisibilityTime(timestamp time.Time) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetVisibilityTime", timestamp)
+}
+
+// SetVisibilityTime indicates an expected call of SetVisibilityTime.
+func (mr *MockExecutableMockRecorder) SetVisibilityTime(timestamp interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetVisibilityTime", reflect.TypeOf((*MockExecutable)(nil).SetVisibilityTime), timestamp)
+}
+
 // State mocks base method.
 func (m *MockExecutable) State() tasks.State {
 	m.ctrl.T.Helper()
@@ -234,20 +398,6 @@ func (m *MockExecutable) State() tasks.State {
 func (mr *MockExecutableMockRecorder) State() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "State", reflect.TypeOf((*MockExecutable)(nil).State))
-}
-
-// Task mocks base method.
-func (m *MockExecutable) Task() tasks0.Task {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Task")
-	ret0, _ := ret[0].(tasks0.Task)
-	return ret0
-}
-
-// Task indicates an expected call of Task.
-func (mr *MockExecutableMockRecorder) Task() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Task", reflect.TypeOf((*MockExecutable)(nil).Task))
 }
 
 // MockExecutor is a mock of Executor interface.

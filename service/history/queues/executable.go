@@ -50,8 +50,8 @@ import (
 type (
 	Executable interface {
 		ctasks.PriorityTask
+		tasks.Task
 
-		Task() tasks.Task
 		Attempt() int
 		Logger() log.Logger
 
@@ -79,12 +79,13 @@ const (
 
 type (
 	executableImpl struct {
+		tasks.Task
+
 		sync.Mutex
 		state    ctasks.State
 		priority int
 		attempt  int
 
-		task        tasks.Task
 		executor    Executor
 		scheduler   Scheduler
 		rescheduler Rescheduler
@@ -137,9 +138,9 @@ func NewExecutable(
 	))
 
 	return &executableImpl{
+		Task:               task,
 		state:              ctasks.TaskStatePending,
 		attempt:            1,
-		task:               task,
 		executor:           executor,
 		scheduler:          scheduler,
 		rescheduler:        rescheduler,
@@ -156,7 +157,7 @@ func NewExecutable(
 func (e *executableImpl) Execute() error {
 	// this filter should also contain the logic for overriding
 	// results from task allocator (force executing some standby task types)
-	e.shouldProcess = e.filter(e.task)
+	e.shouldProcess = e.filter(e.Task)
 	if !e.shouldProcess {
 		return nil
 	}
@@ -263,10 +264,10 @@ func (e *executableImpl) Ack() {
 	if e.shouldProcess {
 		e.scope.RecordDistribution(metrics.TaskAttemptTimer, e.attempt)
 		e.scope.RecordTimer(metrics.TaskLatency, time.Since(e.loadTime))
-		e.scope.RecordTimer(metrics.TaskQueueLatency, time.Since(e.task.GetVisibilityTime()))
+		e.scope.RecordTimer(metrics.TaskQueueLatency, time.Since(e.GetVisibilityTime()))
 		e.scope.RecordTimer(metrics.TaskUserLatency, e.userLatency)
 		e.scope.RecordTimer(metrics.TaskNoUserLatency, time.Since(e.loadTime)-e.userLatency)
-		e.scope.RecordTimer(metrics.TaskNoUserQueueLatency, time.Since(e.task.GetVisibilityTime())-e.userLatency)
+		e.scope.RecordTimer(metrics.TaskNoUserQueueLatency, time.Since(e.GetVisibilityTime())-e.userLatency)
 	}
 }
 
@@ -308,10 +309,6 @@ func (e *executableImpl) SetPriority(priority int) {
 	defer e.Unlock()
 
 	e.priority = priority
-}
-
-func (e *executableImpl) Task() tasks.Task {
-	return e.task
 }
 
 func (e *executableImpl) Attempt() int {

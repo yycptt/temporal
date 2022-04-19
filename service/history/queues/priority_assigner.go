@@ -89,7 +89,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 		return nil
 	}
 
-	namespaceEntry, err := a.namespaceRegistry.GetNamespaceByID(namespace.ID(executable.Task().GetNamespaceID()))
+	namespaceEntry, err := a.namespaceRegistry.GetNamespaceByID(namespace.ID(executable.GetNamespaceID()))
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 	}
 
 	// active tasks for active namespaces
-	switch executable.Task().GetType() {
+	switch executable.GetType() {
 	case enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT:
 		// TODO: add more task types here if we believe it's ok to delay those tasks
 		// and assign them the same priority as throttled tasks
@@ -125,11 +125,11 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 		return nil
 	}
 
-	ratelimiter := a.getOrCreateRateLimiter(executable.Task().GetNamespaceID())
+	ratelimiter := a.getOrCreateRateLimiter(executable.GetNamespaceID())
 	if !ratelimiter.Allow() {
 		executable.SetPriority(configs.TaskPriorityDefault)
 
-		category := executable.Task().GetCategory()
+		category := executable.GetCategory()
 		a.scope.Tagged(
 			metrics.NamespaceTag(namespaceName),
 			metrics.TaskCategoryTag(category.Name()),

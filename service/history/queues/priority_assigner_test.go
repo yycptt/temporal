@@ -26,13 +26,12 @@ package queues
 
 import (
 	"testing"
-	"time"
 
 	gomock "github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	enumsspb "go.temporal.io/server/api/enums/v1"
 	"go.temporal.io/server/common/cluster"
-	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
@@ -93,15 +92,7 @@ func (s *priorityAssignerSuite) TestAssign_StandbyNamespaceStandbyQueue() {
 
 	mockExecutable := NewMockExecutable(s.controller)
 	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
-	mockExecutable.EXPECT().Task().Return(tasks.NewFakeTask(
-		definition.NewWorkflowKey(
-			tests.NamespaceID.String(),
-			tests.WorkflowID,
-			tests.RunID,
-		),
-		tasks.CategoryTransfer,
-		time.Now(),
-	)).AnyTimes()
+	mockExecutable.EXPECT().GetNamespaceID().Return(tests.NamespaceID.String()).AnyTimes()
 	mockExecutable.EXPECT().QueueType().Return(QueueTypeStandbyTransfer).AnyTimes()
 	mockExecutable.EXPECT().SetPriority(configs.TaskPriorityLow)
 
@@ -114,15 +105,7 @@ func (s *priorityAssignerSuite) TestAssign_NoopExecuable() {
 
 	mockExecutable := NewMockExecutable(s.controller)
 	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
-	mockExecutable.EXPECT().Task().Return(tasks.NewFakeTask(
-		definition.NewWorkflowKey(
-			tests.NamespaceID.String(),
-			tests.WorkflowID,
-			tests.RunID,
-		),
-		tasks.CategoryTransfer,
-		time.Now(),
-	)).AnyTimes()
+	mockExecutable.EXPECT().GetNamespaceID().Return(tests.NamespaceID.String()).AnyTimes()
 	mockExecutable.EXPECT().QueueType().Return(QueueTypeActiveTransfer).AnyTimes()
 	mockExecutable.EXPECT().SetPriority(configs.TaskPriorityHigh)
 
@@ -135,13 +118,8 @@ func (s *priorityAssignerSuite) TestAssign_SelectedTaskTypes() {
 
 	mockExecutable := NewMockExecutable(s.controller)
 	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
-	mockExecutable.EXPECT().Task().Return(&tasks.DeleteHistoryEventTask{
-		WorkflowKey: definition.NewWorkflowKey(
-			tests.NamespaceID.String(),
-			tests.WorkflowID,
-			tests.RunID,
-		),
-	}).AnyTimes()
+	mockExecutable.EXPECT().GetNamespaceID().Return(tests.NamespaceID.String()).AnyTimes()
+	mockExecutable.EXPECT().GetType().Return(enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT).AnyTimes()
 
 	mockExecutable.EXPECT().QueueType().Return(QueueTypeActiveTransfer).AnyTimes()
 	mockExecutable.EXPECT().SetPriority(configs.TaskPriorityDefault)
@@ -156,15 +134,9 @@ func (s *priorityAssignerSuite) TestAssign_Throttled() {
 	rps := s.priorityAssigner.options.HighPriorityRPS("")
 	mockExecutable := NewMockExecutable(s.controller)
 	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
-	mockExecutable.EXPECT().Task().Return(tasks.NewFakeTask(
-		definition.NewWorkflowKey(
-			tests.NamespaceID.String(),
-			tests.WorkflowID,
-			tests.RunID,
-		),
-		tasks.CategoryTransfer,
-		time.Now(),
-	)).AnyTimes()
+	mockExecutable.EXPECT().GetNamespaceID().Return(tests.NamespaceID.String()).AnyTimes()
+	mockExecutable.EXPECT().GetType().Return(enumsspb.TASK_TYPE_UNSPECIFIED).AnyTimes()
+	mockExecutable.EXPECT().GetCategory().Return(tasks.CategoryTransfer).AnyTimes()
 	mockExecutable.EXPECT().QueueType().Return(QueueTypeActiveTransfer).AnyTimes()
 
 	mockExecutable.EXPECT().SetPriority(configs.TaskPriorityHigh).Times(1)
