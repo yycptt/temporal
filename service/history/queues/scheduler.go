@@ -38,7 +38,7 @@ import (
 
 type (
 	// Scheduler is the component for scheduling and processing
-	// task executables. Ack(), Nack() or Reschedule() will eventually
+	// task executables. Ack(), Nack() or Reschedule() will always
 	// be called on all executables that have been successfully submited
 	Scheduler interface {
 		common.Daemon
