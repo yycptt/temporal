@@ -29,7 +29,6 @@ import (
 
 	enumsspb "go.temporal.io/server/api/enums/v1"
 	"go.temporal.io/server/common/dynamicconfig"
-	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/quotas"
@@ -43,14 +42,13 @@ type (
 	}
 
 	PriorityAssignerOptions struct {
-		HighPriorityRPS         dynamicconfig.IntPropertyFnWithNamespaceFilter
-		HighPriorityMaxAttempts dynamicconfig.IntPropertyFn
+		HighPriorityRPS       dynamicconfig.IntPropertyFnWithNamespaceFilter
+		CriticalRetryAttempts dynamicconfig.IntPropertyFn
 	}
 
 	priorityAssignerImpl struct {
 		currentClusterName string
 		namespaceRegistry  namespace.Registry
-		logger             log.Logger
 		scope              metrics.Scope
 		options            PriorityAssignerOptions
 
@@ -63,15 +61,14 @@ func NewPriorityAssigner(
 	currentClusterName string,
 	namespaceRegistry namespace.Registry,
 	options PriorityAssignerOptions,
-	logger log.Logger,
 	metricsClient metrics.Client,
 ) PriorityAssigner {
 	return &priorityAssignerImpl{
 		currentClusterName: currentClusterName,
 		namespaceRegistry:  namespaceRegistry,
-		logger:             logger,
 		scope:              metricsClient.Scope(metrics.TaskPriorityAssignerScope),
 		options:            options,
+		rateLimiters:       make(map[string]quotas.RateLimiter),
 	}
 }
 
@@ -87,7 +84,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 		potentially be throttled.
 	*/
 
-	if executable.Attempt() > a.options.HighPriorityMaxAttempts() {
+	if executable.Attempt() > a.options.CriticalRetryAttempts() {
 		executable.SetPriority(configs.TaskPriorityLow)
 		return nil
 	}

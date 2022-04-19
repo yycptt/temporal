@@ -70,7 +70,6 @@ func NewScheduler(
 		clusterMetadata.GetCurrentClusterName(),
 		namespaceRegistry,
 		options.PriorityAssignerOptions,
-		logger,
 		metricsClient,
 	)
 
