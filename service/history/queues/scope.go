@@ -22,64 +22,74 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package tasks
+package queues
 
 import (
-	enumsspb "go.temporal.io/server/api/enums/v1"
 	"go.temporal.io/server/common/predicates"
+	"go.temporal.io/server/service/history/tasks"
 )
 
 type (
-	Predicate = predicates.Predicate[Task]
-)
-
-var (
-	_ Predicate = (*NamespacePredicate)(nil)
-	_ Predicate = (*TypePredicate)(nil)
-)
-
-type (
-	NamespacePredicate struct {
-		namespaceIDs map[string]struct{}
-	}
-
-	TypePredicate struct {
-		types map[enumsspb.TaskType]struct{}
+	Scope struct {
+		Range     tasks.Range
+		Predicate tasks.Predicate
 	}
 )
 
-func NewNamespacePredicate(
-	namespaceIDs []string,
-) *NamespacePredicate {
-	namespaceIDMap := make(map[string]struct{}, len(namespaceIDs))
-	for _, id := range namespaceIDs {
-		namespaceIDMap[id] = struct{}{}
-	}
-
-	return &NamespacePredicate{
-		namespaceIDs: namespaceIDMap,
+func NewScope(
+	r tasks.Range,
+	predicate tasks.Predicate,
+) Scope {
+	return Scope{
+		Range:     r,
+		Predicate: predicate,
 	}
 }
 
-func (n *NamespacePredicate) Test(task Task) bool {
-	_, ok := n.namespaceIDs[task.GetNamespaceID()]
-	return ok
+func (s *Scope) CanSplitRange(
+	key tasks.Key,
+) bool {
+	return s.Range.CanSplit(key)
 }
 
-func NewTypePredicate(
-	types []enumsspb.TaskType,
-) *TypePredicate {
-	typeMap := make(map[enumsspb.TaskType]struct{}, len(types))
-	for _, taskType := range types {
-		typeMap[taskType] = struct{}{}
-	}
-
-	return &TypePredicate{
-		types: typeMap,
-	}
+func (s *Scope) SplitRange(
+	key tasks.Key,
+) (left Scope, right Scope) {
+	leftRange, rightRange := s.Range.Split(key)
+	return NewScope(leftRange, s.Predicate), NewScope(rightRange, s.Predicate)
 }
 
-func (t *TypePredicate) Test(task Task) bool {
-	_, ok := t.types[task.GetType()]
-	return ok
+func (s *Scope) SplitPredicate(
+	predicate tasks.Predicate,
+) (pass Scope, fail Scope) {
+	passScope := NewScope(
+		s.Range,
+		predicates.NewAnd(s.Predicate, predicate),
+	)
+	failScope := NewScope(
+		s.Range,
+		predicates.NewAnd[tasks.Task](
+			s.Predicate,
+			predicates.NewNot(predicate),
+		),
+	)
+	return passScope, failScope
+}
+
+func (s *Scope) CanMergeRange(
+	input tasks.Range,
+) bool {
+	return s.Range.CanMerge(input)
+}
+
+func (s *Scope) MergeRange(
+	input tasks.Range,
+) Scope {
+	return NewScope(s.Range.Merge(input), s.Predicate)
+}
+
+func (s *Scope) MergePredicate(
+	predicate tasks.Predicate,
+) Scope {
+	return NewScope(s.Range, predicates.NewOr(s.Predicate, predicate))
 }
