@@ -114,3 +114,10 @@ func (r *Range) Merge(
 		MaxKey(input.ExclusiveMax, input.ExclusiveMax),
 	)
 }
+
+func (r *Range) Equal(
+	input Range,
+) bool {
+	return r.InclusiveMin.CompareTo(input.InclusiveMin) == 0 &&
+		r.ExclusiveMax.CompareTo(input.ExclusiveMax) == 0
+}

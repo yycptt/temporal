@@ -40,11 +40,11 @@ var (
 
 type (
 	NamespacePredicate struct {
-		namespaceIDs map[string]struct{}
+		NamespaceIDs map[string]struct{}
 	}
 
 	TypePredicate struct {
-		types map[enumsspb.TaskType]struct{}
+		Types map[enumsspb.TaskType]struct{}
 	}
 )
 
@@ -57,12 +57,12 @@ func NewNamespacePredicate(
 	}
 
 	return &NamespacePredicate{
-		namespaceIDs: namespaceIDMap,
+		NamespaceIDs: namespaceIDMap,
 	}
 }
 
 func (n *NamespacePredicate) Test(task Task) bool {
-	_, ok := n.namespaceIDs[task.GetNamespaceID()]
+	_, ok := n.NamespaceIDs[task.GetNamespaceID()]
 	return ok
 }
 
@@ -75,11 +75,11 @@ func NewTypePredicate(
 	}
 
 	return &TypePredicate{
-		types: typeMap,
+		Types: typeMap,
 	}
 }
 
 func (t *TypePredicate) Test(task Task) bool {
-	_, ok := t.types[task.GetType()]
+	_, ok := t.Types[task.GetType()]
 	return ok
 }

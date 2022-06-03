@@ -46,6 +46,11 @@ func NewScope(
 	}
 }
 
+func (s *Scope) Contains(task tasks.Task) bool {
+	return s.Range.ContainsKey(task.GetKey()) &&
+		s.Predicate.Test(task)
+}
+
 func (s *Scope) CanSplitRange(
 	key tasks.Key,
 ) bool {
@@ -62,15 +67,17 @@ func (s *Scope) SplitRange(
 func (s *Scope) SplitPredicate(
 	predicate tasks.Predicate,
 ) (pass Scope, fail Scope) {
+	// TODO: special check if the predicates are the same type
+
 	passScope := NewScope(
 		s.Range,
-		predicates.NewAnd(s.Predicate, predicate),
+		predicates.And(s.Predicate, predicate),
 	)
 	failScope := NewScope(
 		s.Range,
-		predicates.NewAnd[tasks.Task](
+		predicates.And(
 			s.Predicate,
-			predicates.NewNot(predicate),
+			predicates.Not(predicate),
 		),
 	)
 	return passScope, failScope
@@ -91,5 +98,6 @@ func (s *Scope) MergeRange(
 func (s *Scope) MergePredicate(
 	predicate tasks.Predicate,
 ) Scope {
-	return NewScope(s.Range, predicates.NewOr(s.Predicate, predicate))
+	// TODO: special check if the predicates are the same type
+	return NewScope(s.Range, predicates.Or(s.Predicate, predicate))
 }

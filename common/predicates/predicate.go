@@ -29,28 +29,38 @@ type (
 		Test(T) bool
 	}
 
-	And[T any] struct {
+	AndImpl[T any] struct {
 		Predicates []Predicate[T]
 	}
 
-	Or[T any] struct {
+	OrImpl[T any] struct {
 		Predicates []Predicate[T]
 	}
 
-	Not[T any] struct {
+	NotImpl[T any] struct {
 		Predicate Predicate[T]
 	}
 )
 
-func NewAnd[T any](
+func And[T any](
 	predicates ...Predicate[T],
-) *And[T] {
-	return &And[T]{
-		Predicates: predicates,
+) Predicate[T] {
+	flattened := make([]Predicate[T], 0, len(predicates))
+	for _, p := range predicates {
+		switch p := p.(type) {
+		case *AndImpl[T]:
+			flattened = append(flattened, p.Predicates...)
+		default:
+			flattened = append(flattened, p)
+		}
+	}
+
+	return &AndImpl[T]{
+		Predicates: flattened,
 	}
 }
 
-func (a *And[T]) Test(t T) bool {
+func (a *AndImpl[T]) Test(t T) bool {
 	for _, p := range a.Predicates {
 		if !p.Test(t) {
 			return false
@@ -60,15 +70,25 @@ func (a *And[T]) Test(t T) bool {
 	return true
 }
 
-func NewOr[T any](
+func Or[T any](
 	predicates ...Predicate[T],
-) *Or[T] {
-	return &Or[T]{
-		Predicates: predicates,
+) Predicate[T] {
+	flattened := make([]Predicate[T], 0, len(predicates))
+	for _, p := range predicates {
+		switch p := p.(type) {
+		case *OrImpl[T]:
+			flattened = append(flattened, p.Predicates...)
+		default:
+			flattened = append(flattened, p)
+		}
+	}
+
+	return &OrImpl[T]{
+		Predicates: flattened,
 	}
 }
 
-func (o *Or[T]) Test(t T) bool {
+func (o *OrImpl[T]) Test(t T) bool {
 	for _, p := range o.Predicates {
 		if p.Test(t) {
 			return true
@@ -78,14 +98,19 @@ func (o *Or[T]) Test(t T) bool {
 	return false
 }
 
-func NewNot[T any](
+func Not[T any](
 	predicate Predicate[T],
-) *Not[T] {
-	return &Not[T]{
-		Predicate: predicate,
+) Predicate[T] {
+	switch p := predicate.(type) {
+	case *NotImpl[T]:
+		return p.Predicate
+	default:
+		return &NotImpl[T]{
+			Predicate: predicate,
+		}
 	}
 }
 
-func (n *Not[T]) Test(t T) bool {
+func (n *NotImpl[T]) Test(t T) bool {
 	return !n.Predicate.Test(t)
 }
