@@ -64,18 +64,10 @@ func (r *Range) ContainsRange(
 	input Range,
 ) bool {
 	containsMin := r.ContainsKey(input.InclusiveMin)
-	containsMax := r.ContainsKey(input.ExclusiveMax)
-	// TODO: note we consider empty range = to max as contains
+	containsMax := r.ContainsKey(input.ExclusiveMax) || r.ExclusiveMax.CompareTo(input.ExclusiveMax) == 0
+	// Note we consider empty range = to max as contains
 	return (containsMin && containsMax) ||
 		(input.IsEmpty() && input.InclusiveMin.CompareTo(r.ExclusiveMax) == 0)
-}
-
-func (r *Range) OverlapsRange(
-	input Range,
-) bool {
-	overlapLeft := r.InclusiveMin.CompareTo(input.ExclusiveMax) < 0
-	overlapRight := r.ExclusiveMax.CompareTo(input.InclusiveMin) > 0
-	return overlapLeft || overlapRight
 }
 
 func (r *Range) CanSplit(
@@ -97,9 +89,8 @@ func (r *Range) Split(
 func (r *Range) CanMerge(
 	input Range,
 ) bool {
-	return r.OverlapsRange(input) ||
-		r.InclusiveMin.CompareTo(input.ExclusiveMax) == 0 ||
-		r.ExclusiveMax.CompareTo(input.InclusiveMin) == 0
+	return r.InclusiveMin.CompareTo(input.ExclusiveMax) <= 0 &&
+		r.ExclusiveMax.CompareTo(input.InclusiveMin) >= 0
 }
 
 func (r *Range) Merge(
@@ -110,8 +101,8 @@ func (r *Range) Merge(
 	}
 
 	return NewRange(
-		MinKey(input.InclusiveMin, input.InclusiveMin),
-		MaxKey(input.ExclusiveMax, input.ExclusiveMax),
+		MinKey(r.InclusiveMin, input.InclusiveMin),
+		MaxKey(r.ExclusiveMax, input.ExclusiveMax),
 	)
 }
 
