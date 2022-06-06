@@ -24,43 +24,64 @@
 
 package predicates
 
+import "fmt"
+
 type (
 	Predicate[T any] interface {
 		Test(T) bool
 	}
 
-	AndImpl[T any] struct {
+	And[T any] struct {
 		Predicates []Predicate[T]
 	}
 
-	OrImpl[T any] struct {
+	Or[T any] struct {
 		Predicates []Predicate[T]
 	}
 
-	NotImpl[T any] struct {
+	Not[T any] struct {
 		Predicate Predicate[T]
 	}
+
+	All[T any] struct{}
+
+	None[T any] struct{}
 )
 
-func And[T any](
+func NewAnd[T any](
 	predicates ...Predicate[T],
 ) Predicate[T] {
+	if len(predicates) < 2 {
+		panic(fmt.Sprintf("And  requires at least 2 predicates, got %v", len(predicates)))
+	}
+
 	flattened := make([]Predicate[T], 0, len(predicates))
 	for _, p := range predicates {
 		switch p := p.(type) {
-		case *AndImpl[T]:
+		case *And[T]:
 			flattened = append(flattened, p.Predicates...)
+		case *All[T]:
+			continue
+		case *None[T]:
+			return p
 		default:
 			flattened = append(flattened, p)
 		}
 	}
 
-	return &AndImpl[T]{
-		Predicates: flattened,
+	switch len(flattened) {
+	case 0:
+		return NewAll[T]()
+	case 1:
+		return flattened[0]
+	default:
+		return &And[T]{
+			Predicates: flattened,
+		}
 	}
 }
 
-func (a *AndImpl[T]) Test(t T) bool {
+func (a *And[T]) Test(t T) bool {
 	for _, p := range a.Predicates {
 		if !p.Test(t) {
 			return false
@@ -70,25 +91,40 @@ func (a *AndImpl[T]) Test(t T) bool {
 	return true
 }
 
-func Or[T any](
+func NewOr[T any](
 	predicates ...Predicate[T],
 ) Predicate[T] {
+	if len(predicates) < 2 {
+		panic(fmt.Sprintf("Or requires at least 2 predicates, got %v", len(predicates)))
+	}
+
 	flattened := make([]Predicate[T], 0, len(predicates))
 	for _, p := range predicates {
 		switch p := p.(type) {
-		case *OrImpl[T]:
+		case *Or[T]:
 			flattened = append(flattened, p.Predicates...)
+		case *All[T]:
+			return p
+		case *None[T]:
+			continue
 		default:
 			flattened = append(flattened, p)
 		}
 	}
 
-	return &OrImpl[T]{
-		Predicates: flattened,
+	switch len(flattened) {
+	case 0:
+		return NewNone[T]()
+	case 1:
+		return flattened[0]
+	default:
+		return &Or[T]{
+			Predicates: flattened,
+		}
 	}
 }
 
-func (o *OrImpl[T]) Test(t T) bool {
+func (o *Or[T]) Test(t T) bool {
 	for _, p := range o.Predicates {
 		if p.Test(t) {
 			return true
@@ -98,19 +134,39 @@ func (o *OrImpl[T]) Test(t T) bool {
 	return false
 }
 
-func Not[T any](
+func NewNot[T any](
 	predicate Predicate[T],
 ) Predicate[T] {
 	switch p := predicate.(type) {
-	case *NotImpl[T]:
+	case *Not[T]:
 		return p.Predicate
+	case *All[T]:
+		return NewNone[T]()
+	case *None[T]:
+		return NewAll[T]()
 	default:
-		return &NotImpl[T]{
+		return &Not[T]{
 			Predicate: predicate,
 		}
 	}
 }
 
-func (n *NotImpl[T]) Test(t T) bool {
+func (n *Not[T]) Test(t T) bool {
 	return !n.Predicate.Test(t)
+}
+
+func NewAll[T any]() Predicate[T] {
+	return &All[T]{}
+}
+
+func (a *All[T]) Test(t T) bool {
+	return true
+}
+
+func NewNone[T any]() Predicate[T] {
+	return &None[T]{}
+}
+
+func (n *None[T]) Test(t T) bool {
+	return false
 }
