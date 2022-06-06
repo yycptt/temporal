@@ -55,11 +55,11 @@ func (s *predicatesSuite) SetupTest() {
 
 func (s *predicatesSuite) TestAnd_Normal() {
 	p1 := newTestPredicate(1, 2, 6)
-	p2 := NewAnd[int](
+	p2 := And[int](
 		newTestPredicate(3, 4, 6),
 		newTestPredicate(4, 5, 6),
 	)
-	p := NewAnd[int](p1, p2)
+	p := And[int](p1, p2)
 
 	for i := 1; i != 6; i++ {
 		s.False(p.Test(i))
@@ -68,9 +68,9 @@ func (s *predicatesSuite) TestAnd_Normal() {
 }
 
 func (s *predicatesSuite) TestAnd_All() {
-	p := NewAnd[int](
+	p := And[int](
 		newTestPredicate(1, 2, 3),
-		NewAll[int](),
+		All[int](),
 	)
 
 	for i := 1; i != 4; i++ {
@@ -80,9 +80,9 @@ func (s *predicatesSuite) TestAnd_All() {
 		s.False(p.Test(i))
 	}
 
-	p = NewAnd(
-		NewAll[int](),
-		NewAll[int](),
+	p = And(
+		All[int](),
+		All[int](),
 	)
 	for i := 1; i != 7; i++ {
 		s.True(p.Test(i))
@@ -90,9 +90,9 @@ func (s *predicatesSuite) TestAnd_All() {
 }
 
 func (s *predicatesSuite) TestAnd_None() {
-	p := NewAnd[int](
+	p := And[int](
 		newTestPredicate(1, 2, 3),
-		NewNone[int](),
+		None[int](),
 	)
 
 	for i := 1; i != 7; i++ {
@@ -102,11 +102,11 @@ func (s *predicatesSuite) TestAnd_None() {
 
 func (s *predicatesSuite) TestOr_Normal() {
 	p1 := newTestPredicate(1, 2, 6)
-	p2 := NewOr[int](
+	p2 := Or[int](
 		newTestPredicate(3, 4, 6),
 		newTestPredicate(4, 5, 6),
 	)
-	p := NewOr[int](p1, p2)
+	p := Or[int](p1, p2)
 
 	for i := 1; i != 7; i++ {
 		s.True(p.Test(i))
@@ -115,9 +115,9 @@ func (s *predicatesSuite) TestOr_Normal() {
 }
 
 func (s *predicatesSuite) TestOr_All() {
-	p := NewOr[int](
+	p := Or[int](
 		newTestPredicate(1, 2, 3),
-		NewAll[int](),
+		All[int](),
 	)
 
 	for i := 1; i != 7; i++ {
@@ -126,9 +126,9 @@ func (s *predicatesSuite) TestOr_All() {
 }
 
 func (s *predicatesSuite) TestOr_None() {
-	p := NewOr[int](
+	p := Or[int](
 		newTestPredicate(1, 2, 3),
-		NewNone[int](),
+		None[int](),
 	)
 
 	for i := 1; i != 4; i++ {
@@ -138,9 +138,9 @@ func (s *predicatesSuite) TestOr_None() {
 		s.False(p.Test(i))
 	}
 
-	p = NewOr(
-		NewNone[int](),
-		NewNone[int](),
+	p = Or(
+		None[int](),
+		None[int](),
 	)
 	for i := 1; i != 7; i++ {
 		s.False(p.Test(i))
@@ -149,7 +149,7 @@ func (s *predicatesSuite) TestOr_None() {
 
 func (s *predicatesSuite) TestNot() {
 	p1 := newTestPredicate(1, 2, 3)
-	p := NewNot[int](p1)
+	p := Not[int](p1)
 
 	for i := 1; i != 4; i++ {
 		s.False(p.Test(i))
@@ -158,7 +158,7 @@ func (s *predicatesSuite) TestNot() {
 		s.True(p.Test(i))
 	}
 
-	p = NewNot(p)
+	p = Not(p)
 	for i := 1; i != 4; i++ {
 		s.True(p.Test(i))
 	}
@@ -166,19 +166,19 @@ func (s *predicatesSuite) TestNot() {
 		s.False(p.Test(i))
 	}
 
-	p = NewNot(NewAll[int]())
+	p = Not(All[int]())
 	for i := 1; i != 7; i++ {
 		s.False(p.Test(i))
 	}
 
-	p = NewNot(NewNone[int]())
+	p = Not(None[int]())
 	for i := 1; i != 7; i++ {
 		s.True(p.Test(i))
 	}
 }
 
 func (s *predicatesSuite) TestAll() {
-	p := NewAll[int]()
+	p := All[int]()
 
 	for i := 1; i != 10; i++ {
 		s.True(p.Test(i))
@@ -186,7 +186,7 @@ func (s *predicatesSuite) TestAll() {
 }
 
 func (s *predicatesSuite) TestNone() {
-	p := NewNone[int]()
+	p := None[int]()
 
 	for i := 1; i != 10; i++ {
 		s.False(p.Test(i))

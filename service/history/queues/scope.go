@@ -71,13 +71,13 @@ func (s *Scope) SplitPredicate(
 
 	passScope := NewScope(
 		s.Range,
-		predicates.NewAnd(s.Predicate, predicate),
+		predicates.And(s.Predicate, predicate),
 	)
 	failScope := NewScope(
 		s.Range,
-		predicates.NewAnd(
+		predicates.And(
 			s.Predicate,
-			predicates.NewNot(predicate),
+			predicates.Not(predicate),
 		),
 	)
 	return passScope, failScope
@@ -99,5 +99,5 @@ func (s *Scope) MergePredicate(
 	predicate tasks.Predicate,
 ) Scope {
 	// TODO: special check if the predicates are the same type
-	return NewScope(s.Range, predicates.NewOr(s.Predicate, predicate))
+	return NewScope(s.Range, predicates.Or(s.Predicate, predicate))
 }
