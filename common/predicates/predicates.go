@@ -24,11 +24,14 @@
 
 package predicates
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type (
 	Predicate[T any] interface {
 		Test(T) bool
+		Equals(Predicate[T]) bool
 	}
 
 	AndImpl[T any] struct {
@@ -91,6 +94,17 @@ func (a *AndImpl[T]) Test(t T) bool {
 	return true
 }
 
+func (a *AndImpl[T]) Equals(
+	predicate Predicate[T],
+) bool {
+	andPredicate, ok := predicate.(*AndImpl[T])
+	if !ok {
+		return false
+	}
+
+	return predicatesEqual(a.Predicates, andPredicate.Predicates)
+}
+
 func Or[T any](
 	predicates ...Predicate[T],
 ) Predicate[T] {
@@ -134,6 +148,17 @@ func (o *OrImpl[T]) Test(t T) bool {
 	return false
 }
 
+func (o *OrImpl[T]) Equals(
+	predicate Predicate[T],
+) bool {
+	orPredicate, ok := predicate.(*OrImpl[T])
+	if !ok {
+		return false
+	}
+
+	return predicatesEqual(o.Predicates, orPredicate.Predicates)
+}
+
 func Not[T any](
 	predicate Predicate[T],
 ) Predicate[T] {
@@ -155,6 +180,16 @@ func (n *NotImpl[T]) Test(t T) bool {
 	return !n.Predicate.Test(t)
 }
 
+func (n *NotImpl[T]) Equals(
+	predicate Predicate[T],
+) bool {
+	notPredicate, ok := predicate.(*NotImpl[T])
+	if !ok {
+		return false
+	}
+	return n.Predicate.Equals(notPredicate.Predicate)
+}
+
 func All[T any]() Predicate[T] {
 	return &AllImpl[T]{}
 }
@@ -163,10 +198,56 @@ func (a *AllImpl[T]) Test(t T) bool {
 	return true
 }
 
+func (a *AllImpl[T]) Equals(
+	predicate Predicate[T],
+) bool {
+	_, ok := predicate.(*AllImpl[T])
+	return ok
+}
+
 func None[T any]() Predicate[T] {
 	return &NoneImpl[T]{}
 }
 
 func (n *NoneImpl[T]) Test(t T) bool {
 	return false
+}
+
+func (n *NoneImpl[T]) Equals(
+	predicate Predicate[T],
+) bool {
+	_, ok := predicate.(*NoneImpl[T])
+	return ok
+}
+
+func predicatesEqual[T any](
+	this []Predicate[T],
+	that []Predicate[T],
+) bool {
+	if len(this) != len(that) {
+		return false
+	}
+
+	matchedThatIndex := make(map[int]struct{}, len(that))
+	for _, thisPredicate := range this {
+		foundEqual := false
+
+		for idx, thatPredicate := range that {
+			if _, ok := matchedThatIndex[idx]; ok {
+				continue
+			}
+
+			if thisPredicate.Equals(thatPredicate) {
+				matchedThatIndex[idx] = struct{}{}
+				foundEqual = true
+				break
+			}
+		}
+
+		if !foundEqual {
+			return false
+		}
+	}
+
+	return true
 }

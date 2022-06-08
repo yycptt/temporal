@@ -29,6 +29,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/exp/maps"
 )
 
 var _ Predicate[int] = (*testPredicate)(nil)
@@ -206,4 +207,13 @@ func newTestPredicate(nums ...int) *testPredicate {
 func (p *testPredicate) Test(x int) bool {
 	_, ok := p.nums[x]
 	return ok
+}
+
+func (p *testPredicate) Equals(predicate Predicate[int]) bool {
+	testPrediate, ok := predicate.(*testPredicate)
+	if !ok {
+		return false
+	}
+
+	return maps.Equal(p.nums, testPrediate.nums)
 }
