@@ -25,6 +25,8 @@
 package queues
 
 import (
+	"fmt"
+
 	"go.temporal.io/server/common/predicates"
 	"go.temporal.io/server/service/history/tasks"
 )
@@ -60,6 +62,10 @@ func (s *Scope) CanSplitRange(
 func (s *Scope) SplitRange(
 	key tasks.Key,
 ) (left Scope, right Scope) {
+	if !s.CanSplitRange(key) {
+		panic(fmt.Sprintf("Unable to split scope with range %v at %v", s.Range, key))
+	}
+
 	leftRange, rightRange := s.Range.Split(key)
 	return NewScope(leftRange, s.Predicate), NewScope(rightRange, s.Predicate)
 }
@@ -68,7 +74,6 @@ func (s *Scope) SplitPredicate(
 	predicate tasks.Predicate,
 ) (pass Scope, fail Scope) {
 	// TODO: special check if the predicates are the same type
-
 	passScope := NewScope(
 		s.Range,
 		predicates.And(s.Predicate, predicate),
@@ -92,6 +97,10 @@ func (s *Scope) CanMergeRange(
 func (s *Scope) MergeRange(
 	input tasks.Range,
 ) Scope {
+	if !s.CanMergeRange(input) {
+		panic(fmt.Sprintf("Unable to merge scope with range %v with range %v", s.Range, input))
+	}
+
 	return NewScope(s.Range.Merge(input), s.Predicate)
 }
 
