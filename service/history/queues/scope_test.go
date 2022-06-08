@@ -219,26 +219,11 @@ func (s *scopeSuite) TestCanMergeRange() {
 	scope := NewScope(r, predicate)
 
 	s.True(scope.CanMergeRange(r))
-	s.True(scope.CanMergeRange(tasks.NewRange(
-		tasks.MinimumKey,
-		r.InclusiveMin,
-	)))
-	s.True(scope.CanMergeRange(tasks.NewRange(
-		r.ExclusiveMax,
-		tasks.MaximumKey,
-	)))
-	s.True(scope.CanMergeRange(tasks.NewRange(
-		tasks.MinimumKey,
-		tasks.NewRandomKeyInRange(r),
-	)))
-	s.True(scope.CanMergeRange(tasks.NewRange(
-		tasks.NewRandomKeyInRange(r),
-		tasks.MaximumKey,
-	)))
-	s.True(scope.CanMergeRange(tasks.NewRange(
-		tasks.MinimumKey,
-		tasks.MaximumKey,
-	)))
+	s.True(scope.CanMergeRange(tasks.NewRange(tasks.MinimumKey, r.InclusiveMin)))
+	s.True(scope.CanMergeRange(tasks.NewRange(r.ExclusiveMax, tasks.MaximumKey)))
+	s.True(scope.CanMergeRange(tasks.NewRange(tasks.MinimumKey, tasks.NewRandomKeyInRange(r))))
+	s.True(scope.CanMergeRange(tasks.NewRange(tasks.NewRandomKeyInRange(r), tasks.MaximumKey)))
+	s.True(scope.CanMergeRange(tasks.NewRange(tasks.MinimumKey, tasks.MaximumKey)))
 
 	s.False(scope.CanMergeRange(tasks.NewRange(
 		tasks.MinimumKey,
@@ -260,54 +245,27 @@ func (s *scopeSuite) TestMergeRange() {
 	s.Equal(predicate, mergedScope.Predicate)
 	s.Equal(r, mergedScope.Range)
 
-	mergeRange = tasks.NewRange(
-		tasks.MinimumKey,
-		r.InclusiveMin,
-	)
+	mergeRange = tasks.NewRange(tasks.MinimumKey, r.InclusiveMin)
 	mergedScope = scope.MergeRange(mergeRange)
 	s.Equal(predicate, mergedScope.Predicate)
-	s.Equal(tasks.NewRange(
-		tasks.MinimumKey,
-		r.ExclusiveMax,
-	), mergedScope.Range)
+	s.Equal(tasks.NewRange(tasks.MinimumKey, r.ExclusiveMax), mergedScope.Range)
 
-	mergeRange = tasks.NewRange(
-		r.ExclusiveMax,
-		tasks.MaximumKey,
-	)
+	mergeRange = tasks.NewRange(r.ExclusiveMax, tasks.MaximumKey)
 	mergedScope = scope.MergeRange(mergeRange)
 	s.Equal(predicate, mergedScope.Predicate)
-	s.Equal(tasks.NewRange(
-		r.InclusiveMin,
-		tasks.MaximumKey,
-	), mergedScope.Range)
+	s.Equal(tasks.NewRange(r.InclusiveMin, tasks.MaximumKey), mergedScope.Range)
 
-	mergeRange = tasks.NewRange(
-		tasks.MinimumKey,
-		tasks.NewRandomKeyInRange(r),
-	)
+	mergeRange = tasks.NewRange(tasks.MinimumKey, tasks.NewRandomKeyInRange(r))
 	mergedScope = scope.MergeRange(mergeRange)
 	s.Equal(predicate, mergedScope.Predicate)
-	s.Equal(tasks.NewRange(
-		tasks.MinimumKey,
-		r.ExclusiveMax,
-	), mergedScope.Range)
+	s.Equal(tasks.NewRange(tasks.MinimumKey, r.ExclusiveMax), mergedScope.Range)
 
-	mergeRange = tasks.NewRange(
-		tasks.NewRandomKeyInRange(r),
-		tasks.MaximumKey,
-	)
+	mergeRange = tasks.NewRange(tasks.NewRandomKeyInRange(r), tasks.MaximumKey)
 	mergedScope = scope.MergeRange(mergeRange)
 	s.Equal(predicate, mergedScope.Predicate)
-	s.Equal(tasks.NewRange(
-		r.InclusiveMin,
-		tasks.MaximumKey,
-	), mergedScope.Range)
+	s.Equal(tasks.NewRange(r.InclusiveMin, tasks.MaximumKey), mergedScope.Range)
 
-	mergeRange = tasks.NewRange(
-		tasks.MinimumKey,
-		tasks.MaximumKey,
-	)
+	mergeRange = tasks.NewRange(tasks.MinimumKey, tasks.MaximumKey)
 	mergedScope = scope.MergeRange(mergeRange)
 	s.Equal(predicate, mergedScope.Predicate)
 	s.Equal(mergeRange, mergedScope.Range)

@@ -43,7 +43,7 @@ func NewRandomRange() Range {
 	maxKey := NewRandomKey()
 	minKey := NewKey(
 		time.Unix(0, rand.Int63n(maxKey.FireTime.UnixNano())),
-		rand.Int63(),
+		rand.Int63n(maxKey.TaskID),
 	)
 	return NewRange(minKey, maxKey)
 }

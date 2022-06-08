@@ -86,10 +86,8 @@ func (i *IteratorImpl) Next() (tasks.Task, error) {
 
 	taskKey := task.GetKey()
 	taskID := taskKey.TaskID
-	if taskID != 0 {
+	if taskKey.FireTime.UnixNano() <= 0 {
 		// only increase taskID for immediate task category
-		// otherwise the sanity check in persistence layer will fail,
-		// since taskID is specified when reading tasks for a scheduled task category
 		taskID++
 	}
 	i.remainingRange.InclusiveMin = tasks.NewKey(
