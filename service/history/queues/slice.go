@@ -70,6 +70,7 @@ func NewSlice(
 		iterators: []Iterator{
 			NewIterator(paginationFnProvider, scope.Range),
 		},
+		destroyed: false,
 	}
 }
 
@@ -251,7 +252,7 @@ func (s *SliceImpl) mergeIterators(incomingSlice *SliceImpl) []Iterator {
 	incomingIterIdx := 0
 	for currentIterIdx < len(s.iterators) && incomingIterIdx < len(incomingSlice.iterators) {
 		currentIter := s.iterators[currentIterIdx]
-		incomingIter := incomingSlice.iterators[currentIterIdx]
+		incomingIter := incomingSlice.iterators[incomingIterIdx]
 
 		if currentIter.Range().InclusiveMin.CompareTo(incomingIter.Range().InclusiveMin) < 0 {
 			mergedIterators = s.appendIterator(mergedIterators, currentIter)
@@ -310,7 +311,11 @@ func (s *SliceImpl) ShrinkRange() {
 	}
 
 	if len(s.outstandingExecutables) == 0 {
-		s.scope.Range.InclusiveMin = s.scope.Range.ExclusiveMax
+		if len(s.iterators) == 0 {
+			s.scope.Range.InclusiveMin = s.scope.Range.ExclusiveMax
+		} else {
+			s.scope.Range.InclusiveMin = s.iterators[0].Range().InclusiveMin
+		}
 	}
 }
 
@@ -331,7 +336,7 @@ func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
 			}
 
 			taskKey := task.GetKey()
-			if s.scope.Range.ContainsKey(taskKey) {
+			if !s.scope.Range.ContainsKey(taskKey) {
 				panic(fmt.Sprintf("Queue slice get task from iterator doesn't belong to its range, range: %v, task key %v",
 					s.scope.Range, taskKey))
 			}
