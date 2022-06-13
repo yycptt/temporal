@@ -35,12 +35,12 @@ import (
 type (
 	Slice interface {
 		Scope() Scope
-		CanSplitRange(tasks.Key) bool
-		SplitRange(tasks.Key) (left Slice, right Slice)
-		SplitPredicate(tasks.Predicate) (pass Slice, fail Slice)
-		CanMergeRange(Slice) bool
-		MergeRange(Slice) Slice
-		MergePredicate(Slice) Slice
+		CanSplitByRange(tasks.Key) bool
+		SplitByRange(tasks.Key) (left Slice, right Slice)
+		SplitByPredicate(tasks.Predicate) (pass Slice, fail Slice)
+		CanMergeByRange(Slice) bool
+		MergeByRange(Slice) Slice
+		MergeByPredicate(Slice) Slice
 		ShrinkRange()
 		SelectTasks(int) ([]Executable, error)
 	}
@@ -79,17 +79,17 @@ func (s *SliceImpl) Scope() Scope {
 	return s.scope
 }
 
-func (s *SliceImpl) CanSplitRange(key tasks.Key) bool {
+func (s *SliceImpl) CanSplitByRange(key tasks.Key) bool {
 	s.validateNotDestroyed()
-	return s.scope.CanSplitRange(key)
+	return s.scope.CanSplitByRange(key)
 }
 
-func (s *SliceImpl) SplitRange(key tasks.Key) (leftSlice Slice, rightSlice Slice) {
-	if !s.CanSplitRange(key) {
+func (s *SliceImpl) SplitByRange(key tasks.Key) (leftSlice Slice, rightSlice Slice) {
+	if !s.CanSplitByRange(key) {
 		panic(fmt.Sprintf("Unable to split queue slice with range %v at %v", s.scope.Range, key))
 	}
 
-	leftScope, rightScope := s.scope.SplitRange(key)
+	leftScope, rightScope := s.scope.SplitByRange(key)
 	leftExecutables, rightExecutables := s.splitExecutables(leftScope, rightScope)
 
 	leftIterators := make([]Iterator, 0, len(s.iterators)/2)
@@ -128,10 +128,10 @@ func (s *SliceImpl) SplitRange(key tasks.Key) (leftSlice Slice, rightSlice Slice
 	return leftSlice, rightSlice
 }
 
-func (s *SliceImpl) SplitPredicate(predicate tasks.Predicate) (passSlice Slice, failSlice Slice) {
+func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (passSlice Slice, failSlice Slice) {
 	s.validateNotDestroyed()
 
-	passScope, failScope := s.scope.SplitPredicate(predicate)
+	passScope, failScope := s.scope.SplitByPredicate(predicate)
 	passExecutables, failExecutables := s.splitExecutables(passScope, failScope)
 
 	passIterators := make([]Iterator, 0, len(s.iterators))
@@ -179,15 +179,15 @@ func (s *SliceImpl) splitExecutables(
 	return thisExecutable, thatExecutables
 }
 
-func (s *SliceImpl) CanMergeRange(slice Slice) bool {
+func (s *SliceImpl) CanMergeByRange(slice Slice) bool {
 	s.validateNotDestroyed()
 
-	return s.scope.CanMergeRange(slice.Scope().Range) &&
+	return s.scope.CanMergeByRange(slice.Scope()) &&
 		s.scope.Predicate.Equals(slice.Scope().Predicate)
 }
 
-func (s *SliceImpl) MergeRange(slice Slice) Slice {
-	if !s.CanMergeRange(slice) {
+func (s *SliceImpl) MergeByRange(slice Slice) Slice {
+	if !s.CanMergeByRange(slice) {
 		panic(fmt.Sprintf("Unalbed to merge queue slice having scope %v with slice having scope %v", s.scope, slice.Scope()))
 	}
 
@@ -196,7 +196,7 @@ func (s *SliceImpl) MergeRange(slice Slice) Slice {
 		panic(fmt.Sprintf("Unabled to merge queue slice of type %T with type %T", s, slice))
 	}
 
-	mergedScope := s.scope.MergeRange(incomingSlice.scope.Range)
+	mergedScope := s.scope.MergeByRange(incomingSlice.scope)
 
 	s.destroy()
 	incomingSlice.destroy()
@@ -208,7 +208,7 @@ func (s *SliceImpl) MergeRange(slice Slice) Slice {
 	}
 }
 
-func (s *SliceImpl) MergePredicate(slice Slice) Slice {
+func (s *SliceImpl) MergeByPredicate(slice Slice) Slice {
 	s.validateNotDestroyed()
 
 	incomingSlice, ok := slice.(*SliceImpl)
@@ -220,7 +220,7 @@ func (s *SliceImpl) MergePredicate(slice Slice) Slice {
 		panic(fmt.Sprintf("Unabled to merge queue slice having range %v with slice having range %v", s.scope, incomingSlice.scope))
 	}
 
-	mergedScope := s.scope.MergePredicate(incomingSlice.scope.Predicate)
+	mergedScope := s.scope.MergeByPredicate(incomingSlice.scope)
 
 	s.destroy()
 	incomingSlice.destroy()
