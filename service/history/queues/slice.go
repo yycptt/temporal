@@ -50,11 +50,15 @@ type (
 	SliceImpl struct {
 		executableInitializer executableInitializer
 
-		scope                  Scope
-		outstandingExecutables map[tasks.Key]Executable // TODO: evaluate performance of using a btree
-		iterators              []Iterator
-
 		destroyed bool
+
+		scope     Scope
+		iterators []Iterator
+
+		// TODO: make task tracking a separate component
+		// and evaluate the performance of using a btree
+		// for storing executables
+		outstandingExecutables map[tasks.Key]Executable
 	}
 )
 
@@ -182,8 +186,7 @@ func (s *SliceImpl) splitExecutables(
 func (s *SliceImpl) CanMergeByRange(slice Slice) bool {
 	s.validateNotDestroyed()
 
-	return s.scope.CanMergeByRange(slice.Scope()) &&
-		s.scope.Predicate.Equals(slice.Scope().Predicate)
+	return s.scope.CanMergeByRange(slice.Scope())
 }
 
 func (s *SliceImpl) MergeByRange(slice Slice) Slice {
