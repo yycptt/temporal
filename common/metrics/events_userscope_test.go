@@ -22,54 +22,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package predicates
+package metrics
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
+	"time"
 )
 
-type (
-	emptySuite struct {
-		suite.Suite
-		*require.Assertions
+func BenchmarkAllTheMetricsUserScope(b *testing.B) {
+	var emp MetricProvider = NewEventsMetricProvider(NoopMetricHandler).WithTags(OperationTag("everything-is-awesome-3"))
+	var us UserScope = newEventsUserScope(emp, defaultConfig.Tags)
 
-		emtpy Predicate[int]
-	}
-)
+	b.ResetTimer()
+	b.ReportAllocs()
 
-func TestNoneSuite(t *testing.T) {
-	s := new(emptySuite)
-	suite.Run(t, s)
-}
-
-func (s *emptySuite) SetupTest() {
-	s.Assertions = require.New(s.T())
-
-	s.emtpy = Empty[int]()
-}
-
-func (s *emptySuite) TestEmpty_Test() {
-	for i := 0; i != 10; i++ {
-		s.False(s.emtpy.Test(i))
-	}
-}
-
-func (s *emptySuite) TestEmpty_Equals() {
-	s.True(s.emtpy.Equals(s.emtpy))
-	s.True(s.emtpy.Equals(Empty[int]()))
-
-	s.False(s.emtpy.Equals(newTestPredicate(1, 2, 3)))
-	s.False(s.emtpy.Equals(And[int](
-		newTestPredicate(1, 2, 3),
-		newTestPredicate(2, 3, 4),
-	)))
-	s.False(s.emtpy.Equals(Or[int](
-		newTestPredicate(1, 2, 3),
-		newTestPredicate(4, 5, 6),
-	)))
-	s.False(s.emtpy.Equals(Not[int](newTestPredicate(1, 2, 3))))
-	s.False(s.emtpy.Equals(All[int]()))
+	b.RunParallel(
+		func(p *testing.PB) {
+			for p.Next() {
+				stp := us.StartTimer("stopwatch-1")
+				us.AddCounter("counter-1", 1)
+				us.IncCounter("counter-2")
+				us.RecordDistribution("dist-1", Bytes, 1024)
+				us.RecordTimer("timer-1", time.Hour*100)
+				us.UpdateGauge("gauge-1", 120.435)
+				stp.Stop()
+				stp = us.StartTimer("stopwatch-1")
+				us.AddCounter("counter-1", 1)
+				us.IncCounter("counter-2")
+				us.RecordDistribution("dist-1", Bytes, 1024)
+				us.RecordTimer("timer-1", time.Hour*100)
+				us.UpdateGauge("gauge-1", 120.435)
+				stp.Stop()
+				stp = us.StartTimer("stopwatch-1")
+				us.AddCounter("counter-1", 1)
+				us.IncCounter("counter-2")
+				us.RecordDistribution("dist-1", Bytes, 1024)
+				us.RecordTimer("timer-1", time.Hour*100)
+				us.UpdateGauge("gauge-1", 120.435)
+				stp.Stop()
+			}
+		},
+	)
 }

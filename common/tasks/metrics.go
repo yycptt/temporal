@@ -22,30 +22,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package metrics
+package tasks
 
-import (
-	"time"
+// TODO: Following is a copy of existing metrics scope and name definition
+// for using the new MetricProvider interface. We should probably move them
+// to a common place once all the metrics refactoring work is done.
+
+const (
+	OperationTaskScheduler          = "TaskScheduler"
+	OperationParallelTaskProcessing = "ParallelTaskProcessing"
 )
-
-type CompositeStopwatch struct {
-	items []Stopwatch
-}
-
-func NewCompositeStopwatch(items ...Stopwatch) *CompositeStopwatch {
-	return &CompositeStopwatch{
-		items: items,
-	}
-}
-
-func (c CompositeStopwatch) Stop() {
-	for _, stopwatch := range c.items {
-		stopwatch.Stop()
-	}
-}
-
-func (c CompositeStopwatch) Subtract(d time.Duration) {
-	for _, stopwatch := range c.items {
-		stopwatch.Subtract(d)
-	}
-}

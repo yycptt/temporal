@@ -25,9 +25,10 @@
 package tasks
 
 import (
-	enumsspb "go.temporal.io/server/api/enums/v1"
 	"go.temporal.io/server/common/predicates"
 	"golang.org/x/exp/maps"
+
+	enumsspb "go.temporal.io/server/api/enums/v1"
 )
 
 type (

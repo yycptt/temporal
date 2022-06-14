@@ -31,10 +31,11 @@ import (
 	"github.com/pborman/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-	enumsspb "go.temporal.io/server/api/enums/v1"
-	"go.temporal.io/server/common/predicates"
 	"golang.org/x/exp/rand"
 	"golang.org/x/exp/slices"
+
+	enumsspb "go.temporal.io/server/api/enums/v1"
+	"go.temporal.io/server/common/predicates"
 )
 
 type (
