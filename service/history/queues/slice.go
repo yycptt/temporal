@@ -26,7 +26,6 @@ package queues
 
 import (
 	"fmt"
-	"sort"
 
 	ctasks "go.temporal.io/server/common/tasks"
 	"go.temporal.io/server/service/history/tasks"
@@ -297,30 +296,30 @@ func (s *SliceImpl) appendIterator(
 func (s *SliceImpl) ShrinkRange() {
 	s.validateNotDestroyed()
 
-	var taskKeys tasks.Keys
-	taskKeys = make([]tasks.Key, 0, len(s.outstandingExecutables))
+	minTaskKey := tasks.MaximumKey
 	for key := range s.outstandingExecutables {
-		taskKeys = append(taskKeys, key)
-	}
-	sort.Sort(taskKeys)
-
-	for _, key := range taskKeys {
 		if s.outstandingExecutables[key].State() == ctasks.TaskStateAcked {
 			delete(s.outstandingExecutables, key)
 			continue
 		}
 
-		s.scope.Range.InclusiveMin = key
-		break
+		minTaskKey = tasks.MinKey(minTaskKey, key)
 	}
 
-	if len(s.outstandingExecutables) == 0 {
-		if len(s.iterators) == 0 {
-			s.scope.Range.InclusiveMin = s.scope.Range.ExclusiveMax
-		} else {
-			s.scope.Range.InclusiveMin = s.iterators[0].Range().InclusiveMin
-		}
+	// still has pending task in memory
+	if len(s.outstandingExecutables) != 0 {
+		s.scope.Range.InclusiveMin = minTaskKey
+		return
 	}
+
+	// no more pending task in memory, but has more tasks to read from persistence
+	if len(s.iterators) != 0 {
+		s.scope.Range.InclusiveMin = s.iterators[0].Range().InclusiveMin
+		return
+	}
+
+	// no pending task in memory and persistence
+	s.scope.Range.InclusiveMin = s.scope.Range.ExclusiveMax
 }
 
 func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
