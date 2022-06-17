@@ -27,6 +27,7 @@ package shard
 import (
 	"context"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -357,6 +358,11 @@ func (s *ContextImpl) UpdateQueueAckLevel(
 		}
 	}
 
+	// when this method is called, it means multi-cursor is disabled.
+	// clear processor state field, so that next time multi-cursor is enabled,
+	// it won't start from an very old state
+	s.shardInfo.QueueAckLevels[category.ID()].ProcessorState = nil
+
 	s.shardInfo.StolenSinceRenew = 0
 	return s.updateShardInfoLocked()
 }
@@ -406,6 +412,56 @@ func (s *ContextImpl) UpdateQueueClusterAckLevel(
 		}
 	}
 	s.shardInfo.QueueAckLevels[category.ID()].ClusterAckLevel[cluster] = convertTaskKeyToPersistenceAckLevel(category.Type(), ackLevel)
+
+	s.shardInfo.StolenSinceRenew = 0
+	return s.updateShardInfoLocked()
+}
+
+func (s *ContextImpl) GetQueueState(
+	category tasks.Category,
+) (*persistencespb.QueueProcessorState, bool) {
+	s.rLock()
+	defer s.rUnlock()
+
+	if queueAckLevel, ok := s.shardInfo.QueueAckLevels[category.ID()]; ok {
+		if state := queueAckLevel.ProcessorState; state != nil {
+			return state, true
+		}
+	}
+
+	return nil, false
+}
+
+func (s *ContextImpl) UpdateQueueState(
+	category tasks.Category,
+	state *persistencespb.QueueProcessorState,
+) error {
+	s.wLock()
+	defer s.wUnlock()
+
+	categoryID := category.ID()
+	if _, ok := s.shardInfo.QueueAckLevels[categoryID]; !ok {
+		s.shardInfo.QueueAckLevels[categoryID] = &persistencespb.QueueAckLevel{
+			ClusterAckLevel: make(map[string]int64),
+		}
+	}
+	s.shardInfo.QueueAckLevels[categoryID].ProcessorState = state
+
+	// for compatability, update ack level and cluster ack level as well
+	// so after rollback or disabling the feature, we won't load too many tombstones
+	minAckLevel := int64(math.MaxInt64)
+	for _, readerState := range state.ReaderStates {
+		for _, scope := range readerState.Scopes {
+			minAckLevel = common.MinInt64(minAckLevel, scope.Range.InclusiveMin)
+		}
+	}
+
+	s.shardInfo.QueueAckLevels[categoryID].AckLevel = minAckLevel
+
+	clusterAckLevel := s.shardInfo.QueueAckLevels[categoryID].ClusterAckLevel
+	for clusterName := range clusterAckLevel {
+		clusterAckLevel[clusterName] = minAckLevel
+	}
 
 	s.shardInfo.StolenSinceRenew = 0
 	return s.updateShardInfoLocked()
@@ -1650,6 +1706,15 @@ func (s *ContextImpl) loadShardMetadata(ownershipChanged *bool) error {
 					maxReadTime = common.MaxTime(maxReadTime, currentTime)
 				}
 			}
+
+			// TODO: add some comment here
+			if queueAckLevels.ProcessorState != nil {
+				for _, readerState := range queueAckLevels.ProcessorState.ReaderStates {
+					for _, scope := range readerState.Scopes {
+						maxReadTime = common.MaxTime(maxReadTime, timestamp.UnixOrZeroTime(scope.Range.ExclusiveMax))
+					}
+				}
+			}
 		}
 
 		scheduledTaskMaxReadLevelMap[clusterName] = maxReadTime.Truncate(time.Millisecond)
@@ -1863,6 +1928,7 @@ func newContext(
 	return shardContext, nil
 }
 
+// TODO: remove this function?
 func copyShardInfo(shardInfo *persistence.ShardInfoWithFailover) *persistence.ShardInfoWithFailover {
 	failoverLevels := make(map[tasks.Category]map[string]persistence.FailoverLevel)
 	for category, levels := range shardInfo.FailoverLevels {
@@ -1882,6 +1948,7 @@ func copyShardInfo(shardInfo *persistence.ShardInfoWithFailover) *persistence.Sh
 		copiedLevel := &persistencespb.QueueAckLevel{
 			AckLevel:        ackLevels.AckLevel,
 			ClusterAckLevel: make(map[string]int64),
+			ProcessorState:  ackLevels.ProcessorState,
 		}
 		for k, v := range ackLevels.ClusterAckLevel {
 			copiedLevel.ClusterAckLevel[k] = v

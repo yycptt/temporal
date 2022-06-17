@@ -299,15 +299,16 @@ func (t *serializerImpl) ShardInfoFromBlob(data *commonpb.DataBlob, clusterName 
 	if shardInfo.GetQueueAckLevels() == nil {
 		shardInfo.QueueAckLevels = make(map[int32]*persistencespb.QueueAckLevel)
 	}
-	for category, ackLevels := range shardInfo.QueueAckLevels {
-		if ackLevels == nil {
-			ackLevels = &persistencespb.QueueAckLevel{}
-			shardInfo.QueueAckLevels[category] = ackLevels
-		}
-		if ackLevels.ClusterAckLevel == nil {
-			ackLevels.ClusterAckLevel = make(map[string]int64)
-		}
-	}
+	// TODO: I think we don't need this, the persisted queueAckLevel should never be nil
+	// for category, ackLevels := range shardInfo.QueueAckLevels {
+	// 	if ackLevels == nil {
+	// 		ackLevels = &persistencespb.QueueAckLevel{}
+	// 		shardInfo.QueueAckLevels[category] = ackLevels
+	// 	}
+	// 	if ackLevels.ClusterAckLevel == nil {
+	// 		ackLevels.ClusterAckLevel = make(map[string]int64)
+	// 	}
+	// }
 
 	return shardInfo, nil
 }

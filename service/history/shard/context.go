@@ -33,8 +33,7 @@ import (
 	"go.temporal.io/server/api/adminservice/v1"
 	clockspb "go.temporal.io/server/api/clock/v1"
 	"go.temporal.io/server/api/historyservice/v1"
-
-	// persistencespb "go.temporal.io/server/api/persistence/v1"
+	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common/archiver"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/cluster"
@@ -82,9 +81,8 @@ type (
 		UpdateQueueAckLevel(category tasks.Category, ackLevel tasks.Key) error
 		GetQueueClusterAckLevel(category tasks.Category, cluster string) tasks.Key
 		UpdateQueueClusterAckLevel(category tasks.Category, cluster string, ackLevel tasks.Key) error
-		// TODO: ideally range and scope should live in tasks package and context impl should handle the ser/deser
-		// GetQueueScope(category tasks.Category) map[int]persistencespb.QueueSliceScopes
-		// UpdateQueueScope(category tasks.Category, readerScopes map[int]persistencespb.QueueSliceScopes) error
+		GetQueueState(category tasks.Category) (*persistencespb.QueueProcessorState, bool)
+		UpdateQueueState(category tasks.Category, state *persistencespb.QueueProcessorState) error
 
 		GetReplicatorDLQAckLevel(sourceCluster string) int64
 		UpdateReplicatorDLQAckLevel(sourCluster string, ackLevel int64) error

@@ -34,7 +34,7 @@ message Predicate {
         AndPredicateAttributes and_predicate_attributes = 4;
         OrPredicateAttributes or_predicate_attributes = 5;
         NotPredicateAttributes not_predicate_attributes = 6;
-        NamespaceIDPredicateAttributes namespace_id_predicate_attributes = 7;
+        NamespaceIdPredicateAttributes namespace_id_predicate_attributes = 7;
         TaskTypePredicateAttributes task_type_predicate_attributes = 8;
     }
 }
@@ -57,7 +57,7 @@ message NotPredicateAttributes {
     Predicate predicate = 1;
 }
 
-message NamespaceIDPredicateAttributes {
+message NamespaceIdPredicateAttributes {
     repeated string namespace_ids = 1;
 }
 
