@@ -320,7 +320,7 @@ func (s *sliceSuite) TestShrinkRange() {
 			mockExecutable.EXPECT().State().Return(ctasks.TaskStateAcked).MaxTimes(1)
 			numAcked++
 		} else {
-			mockExecutable.EXPECT().State().Return(ctasks.TaskStatePending).MaxTimes(1)
+			mockExecutable.EXPECT().State().Return(ctasks.TaskStateLoaded).MaxTimes(1)
 			if firstPendingIdx == len(executables) {
 				firstPendingIdx = idx
 			}

@@ -53,9 +53,9 @@ type (
 		suite.Suite
 		*require.Assertions
 
-		controller *gomock.Controller
-		mockShard  *shard.ContextTest
-
+		controller    *gomock.Controller
+		mockShard     *shard.ContextTest
+		mockScheduler *queues.MockScheduler
 		mockProcessor *Mockprocessor
 
 		logger      log.Logger
@@ -66,8 +66,9 @@ type (
 		suite.Suite
 		*require.Assertions
 
-		controller *gomock.Controller
-		mockShard  *shard.ContextTest
+		controller    *gomock.Controller
+		mockShard     *shard.ContextTest
+		mockScheduler *queues.MockScheduler
 
 		mockProcessor *Mockprocessor
 
@@ -119,6 +120,8 @@ func (s *queueAckMgrSuite) SetupTest() {
 		},
 		config,
 	)
+	s.mockScheduler = queues.NewMockScheduler(s.controller)
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).Return(true, nil).AnyTimes()
 
 	s.mockProcessor = NewMockprocessor(s.controller)
 
@@ -133,7 +136,7 @@ func (s *queueAckMgrSuite) SetupTest() {
 		0,
 		s.logger,
 		func(task tasks.Task) queues.Executable {
-			return queues.NewExecutable(task, nil, nil, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTransfer, nil)
+			return queues.NewExecutable(task, nil, nil, s.mockScheduler, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTransfer, nil)
 		},
 	)
 }
@@ -171,7 +174,7 @@ func (s *queueAckMgrSuite) TestReadTimerTasks() {
 	tasksOutput := make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
@@ -200,7 +203,7 @@ func (s *queueAckMgrSuite) TestReadTimerTasks() {
 	tasksOutput = make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
@@ -235,12 +238,13 @@ func (s *queueAckMgrSuite) TestReadCompleteTimerTasks() {
 	tasksOutput := make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
 	s.Len(s.queueAckMgr.outstandingExecutables, 1)
 
+	taskExecutables[0].Submit()
 	taskExecutables[0].Ack()
 	s.Equal(ctasks.TaskStateAcked, s.queueAckMgr.outstandingExecutables[taskID].State())
 }
@@ -295,7 +299,8 @@ func (s *queueAckMgrSuite) TestReadCompleteUpdateTimerTasks() {
 	tasksOutput := make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		executable.Submit()
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
@@ -351,6 +356,8 @@ func (s *queueFailoverAckMgrSuite) SetupTest() {
 		},
 		config,
 	)
+	s.mockScheduler = queues.NewMockScheduler(s.controller)
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).Return(true, nil).AnyTimes()
 
 	s.mockProcessor = NewMockprocessor(s.controller)
 
@@ -365,7 +372,7 @@ func (s *queueFailoverAckMgrSuite) SetupTest() {
 		0,
 		s.logger,
 		func(task tasks.Task) queues.Executable {
-			return queues.NewExecutable(task, nil, nil, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTransfer, nil)
+			return queues.NewExecutable(task, nil, nil, s.mockScheduler, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTransfer, nil)
 		},
 	)
 }
@@ -403,7 +410,7 @@ func (s *queueFailoverAckMgrSuite) TestReadQueueTasks() {
 	tasksOutput := make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
@@ -433,7 +440,7 @@ func (s *queueFailoverAckMgrSuite) TestReadQueueTasks() {
 	tasksOutput = make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)
@@ -480,7 +487,8 @@ func (s *queueFailoverAckMgrSuite) TestReadCompleteQueueTasks() {
 	tasksOutput := make([]tasks.Task, 0, len(taskExecutables))
 	for _, executable := range taskExecutables {
 		tasksOutput = append(tasksOutput, executable.GetTask())
-		s.Equal(ctasks.TaskStatePending, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		s.Equal(ctasks.TaskStateLoaded, s.queueFailoverAckMgr.outstandingExecutables[executable.GetTaskID()].State())
+		executable.Submit()
 	}
 	s.Equal(tasksOutput, tasksInput)
 	s.Equal(moreOutput, moreInput)

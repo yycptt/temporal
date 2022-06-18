@@ -415,6 +415,18 @@ func (mr *MockExecutableMockRecorder) State() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "State", reflect.TypeOf((*MockExecutable)(nil).State))
 }
 
+// Submit mocks base method.
+func (m *MockExecutable) Submit() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Submit")
+}
+
+// Submit indicates an expected call of Submit.
+func (mr *MockExecutableMockRecorder) Submit() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Submit", reflect.TypeOf((*MockExecutable)(nil).Submit))
+}
+
 // MockExecutor is a mock of Executor interface.
 type MockExecutor struct {
 	ctrl     *gomock.Controller
