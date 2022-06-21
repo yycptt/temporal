@@ -32,26 +32,26 @@ import (
 )
 
 type (
+
+	// Slice ... TODO add comments
 	Slice interface {
 		Scope() Scope
 		CanSplitByRange(tasks.Key) bool
 		SplitByRange(tasks.Key) (left Slice, right Slice)
 		SplitByPredicate(tasks.Predicate) (pass Slice, fail Slice)
-		CanMergeByRange(Slice) bool
-		MergeByRange(Slice) Slice
-		CanMergeByPredicate(Slice) bool
-		MergeByPredicate(Slice) Slice
+		CanMergeWithSlice(Slice) bool
+		MergeWithSlice(Slice) []Slice
 		ShrinkRange()
 		SelectTasks(int) ([]Executable, error)
 		MoreTasks() bool
 		Clear()
 	}
 
-	executableInitializer func(tasks.Task) Executable
+	ExecutableInitializer func(tasks.Task) Executable
 
 	SliceImpl struct {
-		paginationFnProvider  paginationFnProvider
-		executableInitializer executableInitializer
+		paginationFnProvider  PaginationFnProvider
+		executableInitializer ExecutableInitializer
 
 		destroyed bool
 
@@ -64,8 +64,8 @@ type (
 )
 
 func NewSlice(
-	paginationFnProvider paginationFnProvider,
-	executableInitializer executableInitializer,
+	paginationFnProvider PaginationFnProvider,
+	executableInitializer ExecutableInitializer,
 	scope Scope,
 ) *SliceImpl {
 	return &SliceImpl{
@@ -76,7 +76,6 @@ func NewSlice(
 		iterators: []Iterator{
 			NewIterator(paginationFnProvider, scope.Range),
 		},
-		destroyed: false,
 	}
 }
 
@@ -90,10 +89,15 @@ func (s *SliceImpl) CanSplitByRange(key tasks.Key) bool {
 	return s.scope.CanSplitByRange(key)
 }
 
-func (s *SliceImpl) SplitByRange(key tasks.Key) (leftSlice Slice, rightSlice Slice) {
+func (s *SliceImpl) SplitByRange(key tasks.Key) (left Slice, right Slice) {
 	if !s.CanSplitByRange(key) {
 		panic(fmt.Sprintf("Unable to split queue slice with range %v at %v", s.scope.Range, key))
 	}
+
+	return s.splitByRange(key)
+}
+
+func (s *SliceImpl) splitByRange(key tasks.Key) (left *SliceImpl, right *SliceImpl) {
 
 	leftScope, rightScope := s.scope.SplitByRange(key)
 	leftExecutables, rightExecutables := s.splitExecutables(leftScope, rightScope)
@@ -117,14 +121,14 @@ func (s *SliceImpl) SplitByRange(key tasks.Key) (leftSlice Slice, rightSlice Sli
 		rightIterators = append(rightIterators, rightIter)
 	}
 
-	leftSlice = &SliceImpl{
+	left = &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  leftScope,
 		outstandingExecutables: leftExecutables,
 		iterators:              leftIterators,
 	}
-	rightSlice = &SliceImpl{
+	right = &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  rightScope,
@@ -133,10 +137,10 @@ func (s *SliceImpl) SplitByRange(key tasks.Key) (leftSlice Slice, rightSlice Sli
 	}
 
 	s.destroy()
-	return leftSlice, rightSlice
+	return left, right
 }
 
-func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (passSlice Slice, failSlice Slice) {
+func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (pass Slice, fail Slice) {
 	s.validateNotDestroyed()
 
 	passScope, failScope := s.scope.SplitByPredicate(predicate)
@@ -145,18 +149,19 @@ func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (passSlice Slice
 	passIterators := make([]Iterator, 0, len(s.iterators))
 	failIterators := make([]Iterator, 0, len(s.iterators))
 	for _, iter := range s.iterators {
+		// iter.Remaining() is basically a deep copy of iter
 		passIterators = append(passIterators, iter)
 		failIterators = append(failIterators, iter.Remaining())
 	}
 
-	passSlice = &SliceImpl{
+	pass = &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  passScope,
 		outstandingExecutables: passExecutables,
 		iterators:              passIterators,
 	}
-	failSlice = &SliceImpl{
+	fail = &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  failScope,
@@ -165,7 +170,7 @@ func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (passSlice Slice
 	}
 
 	s.destroy()
-	return passSlice, failSlice
+	return pass, fail
 }
 
 func (s *SliceImpl) splitExecutables(
@@ -189,15 +194,19 @@ func (s *SliceImpl) splitExecutables(
 	return thisExecutable, thatExecutables
 }
 
-func (s *SliceImpl) CanMergeByRange(slice Slice) bool {
+func (s *SliceImpl) CanMergeWithSlice(slice Slice) bool {
 	s.validateNotDestroyed()
 
 	return s != slice && s.scope.CanMergeByRange(slice.Scope())
 }
 
-func (s *SliceImpl) MergeByRange(slice Slice) Slice {
-	if !s.CanMergeByRange(slice) {
-		panic(fmt.Sprintf("Unable to merge queue slice having scope %v with slice having scope %v by range", s.scope, slice.Scope()))
+func (s *SliceImpl) MergeWithSlice(slice Slice) []Slice {
+	if s.scope.Range.InclusiveMin.CompareTo(slice.Scope().Range.InclusiveMin) > 0 {
+		return slice.MergeWithSlice(s)
+	}
+
+	if !s.CanMergeWithSlice(slice) {
+		panic(fmt.Sprintf("Unable to merge queue slice having scope %v with slice having scope %v", s.scope, slice.Scope()))
 	}
 
 	incomingSlice, ok := slice.(*SliceImpl)
@@ -205,6 +214,45 @@ func (s *SliceImpl) MergeByRange(slice Slice) Slice {
 		panic(fmt.Sprintf("Unable to merge queue slice of type %T with type %T", s, slice))
 	}
 
+	if s.canMergeByRange(incomingSlice) {
+		return []Slice{s.mergeByRange(incomingSlice)}
+	}
+
+	mergedSlices := make([]Slice, 0, 3)
+	currentLeftSlice, currentRightSlice := s.splitByRange(incomingSlice.Scope().Range.InclusiveMin)
+	if !currentLeftSlice.scope.IsEmpty() {
+		mergedSlices = append(mergedSlices, currentLeftSlice)
+	}
+
+	if currentRightMax := currentRightSlice.Scope().Range.ExclusiveMax; incomingSlice.CanSplitByRange(currentRightMax) {
+		leftIncomingSlice, rightIncomingSlice := incomingSlice.splitByRange(currentRightMax)
+		mergedMidSlice := currentRightSlice.mergeByPredicate(leftIncomingSlice)
+		if !mergedMidSlice.scope.IsEmpty() {
+			mergedSlices = append(mergedSlices, mergedMidSlice)
+		}
+		if !rightIncomingSlice.scope.IsEmpty() {
+			mergedSlices = append(mergedSlices, rightIncomingSlice)
+		}
+	} else {
+		currentMidSlice, currentRightSlice := currentRightSlice.splitByRange(incomingSlice.Scope().Range.ExclusiveMax)
+		mergedMidSlice := currentMidSlice.mergeByPredicate(incomingSlice)
+		if !mergedMidSlice.scope.IsEmpty() {
+			mergedSlices = append(mergedSlices, mergedMidSlice)
+		}
+		if !currentRightSlice.scope.IsEmpty() {
+			mergedSlices = append(mergedSlices, currentRightSlice)
+		}
+	}
+
+	return mergedSlices
+
+}
+
+func (s *SliceImpl) canMergeByRange(slice *SliceImpl) bool {
+	return s.scope.CanMergeByRange(slice.scope)
+}
+
+func (s *SliceImpl) mergeByRange(incomingSlice *SliceImpl) *SliceImpl {
 	s.destroy()
 	incomingSlice.destroy()
 	return &SliceImpl{
@@ -216,22 +264,11 @@ func (s *SliceImpl) MergeByRange(slice Slice) Slice {
 	}
 }
 
-func (s *SliceImpl) CanMergeByPredicate(slice Slice) bool {
-	s.validateNotDestroyed()
-
-	return s != slice && s.scope.CanMergeByPredicate(slice.Scope())
+func (s *SliceImpl) canMergeByPredicate(slice *SliceImpl) bool {
+	return s.scope.CanMergeByPredicate(slice.scope)
 }
 
-func (s *SliceImpl) MergeByPredicate(slice Slice) Slice {
-	if !s.CanMergeByPredicate(slice) {
-		panic(fmt.Sprintf("Unable to merge queue slice having scope %v with slice having scope %v by predicate", s.scope, slice.Scope()))
-	}
-
-	incomingSlice, ok := slice.(*SliceImpl)
-	if !ok {
-		panic(fmt.Sprintf("Unable to merge queue slice of type %T with type %T", s, slice))
-	}
-
+func (s *SliceImpl) mergeByPredicate(incomingSlice *SliceImpl) *SliceImpl {
 	s.destroy()
 	incomingSlice.destroy()
 	return &SliceImpl{
@@ -281,6 +318,8 @@ func (s *SliceImpl) mergeIterators(incomingSlice *SliceImpl) []Iterator {
 		mergedIterators = s.appendIterator(mergedIterators, iterator)
 	}
 
+	validateIteratorsOrderedDisjoint(mergedIterators)
+
 	return mergedIterators
 }
 
@@ -315,7 +354,7 @@ func (s *SliceImpl) ShrinkRange() {
 	}
 
 	// still has pending task in memory
-	if len(s.outstandingExecutables) != 0 {
+	if minTaskKey != tasks.MaximumKey {
 		s.scope.Range.InclusiveMin = minTaskKey
 		return
 	}
@@ -385,6 +424,10 @@ func (s *SliceImpl) Clear() {
 
 	s.ShrinkRange()
 
+	for _, executable := range s.outstandingExecutables {
+		executable.Cancel()
+	}
+
 	s.outstandingExecutables = make(map[tasks.Key]Executable)
 	s.iterators = []Iterator{
 		NewIterator(s.paginationFnProvider, s.scope.Range),
@@ -393,10 +436,31 @@ func (s *SliceImpl) Clear() {
 
 func (s *SliceImpl) destroy() {
 	s.destroyed = true
+	s.iterators = nil
+	s.outstandingExecutables = nil
 }
 
 func (s *SliceImpl) validateNotDestroyed() {
 	if s.destroyed {
 		panic("Can not invoke method on destroyed queue slice")
+	}
+}
+
+func validateIteratorsOrderedDisjoint(
+	iterators []Iterator,
+) {
+	if len(iterators) <= 1 {
+		return
+	}
+
+	for idx, iterator := range iterators[:len(iterators)-1] {
+		nextIterator := iterators[idx+1]
+		if iterator.Range().ExclusiveMax.CompareTo(nextIterator.Range().InclusiveMin) >= 0 {
+			panic(fmt.Sprintf(
+				"Found overlapping iterators in iterator list, left range: %v, right range: %v",
+				iterator.Range(),
+				nextIterator.Range(),
+			))
+		}
 	}
 }

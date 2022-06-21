@@ -49,7 +49,7 @@ type (
 
 		controller *gomock.Controller
 
-		executableInitializer executableInitializer
+		executableInitializer ExecutableInitializer
 	}
 )
 
@@ -168,37 +168,37 @@ func (s *sliceSuite) TestCanMergeByRange() {
 		canMerge := predicate.Equals(mergePredicate)
 
 		testSlice := NewSlice(nil, nil, NewScope(r, mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, r.InclusiveMin), mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(r.ExclusiveMax, tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, NewRandomKeyInRange(r)), mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(NewRandomKeyInRange(r), tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.CanMergeByRange(testSlice))
+		s.Equal(canMerge, slice.canMergeByRange(testSlice))
 	}
 
-	s.False(slice.CanMergeByRange(slice))
+	s.False(slice.canMergeByRange(slice))
 
 	testSlice := NewSlice(nil, nil, NewScope(NewRange(
 		tasks.MinimumKey,
 		tasks.NewKey(r.InclusiveMin.FireTime, r.InclusiveMin.TaskID-1),
 	), predicate))
-	s.False(slice.CanMergeByRange(testSlice))
+	s.False(slice.canMergeByRange(testSlice))
 
 	testSlice = NewSlice(nil, nil, NewScope(NewRange(
 		tasks.NewKey(r.ExclusiveMax.FireTime, r.ExclusiveMax.TaskID+1),
 		tasks.MaximumKey,
 	), predicate))
-	s.False(slice.CanMergeByRange(testSlice))
+	s.False(slice.canMergeByRange(testSlice))
 }
 
 func (s *sliceSuite) TestMergeByRange() {
@@ -220,16 +220,15 @@ func (s *sliceSuite) TestMergeByRange() {
 	totalExecutables += len(incomingSlice.outstandingExecutables)
 	incomingSlice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
-	mergedSlice := slice.MergeByRange(incomingSlice)
-	mergedSliceImpl := mergedSlice.(*SliceImpl)
+	mergedSlice := slice.mergeByRange(incomingSlice)
 
 	s.Equal(NewScope(
 		NewRange(tasks.MinimumKey, r.ExclusiveMax),
 		predicate,
 	), mergedSlice.Scope())
 
-	s.validateSliceState(mergedSliceImpl)
-	s.Len(mergedSliceImpl.outstandingExecutables, totalExecutables)
+	s.validateSliceState(mergedSlice)
+	s.Len(mergedSlice.outstandingExecutables, totalExecutables)
 
 	s.Panics(func() { slice.validateNotDestroyed() })
 	s.Panics(func() { incomingSlice.validateNotDestroyed() })
@@ -242,18 +241,18 @@ func (s *sliceSuite) TestCanMergeByPredicate() {
 	slice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
 
 	testSlice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
-	s.True(slice.CanMergeByPredicate(testSlice))
+	s.True(slice.canMergeByPredicate(testSlice))
 
 	testSlice = NewSlice(nil, s.executableInitializer, NewScope(r, tasks.NewTypePredicate([]enumsspb.TaskType{})))
-	s.True(slice.CanMergeByPredicate(testSlice))
+	s.True(slice.canMergeByPredicate(testSlice))
 
-	s.False(slice.CanMergeByPredicate(slice))
+	s.False(slice.canMergeByPredicate(slice))
 
 	testSlice = NewSlice(nil, s.executableInitializer, NewScope(NewRandomRange(), predicate))
-	s.False(slice.CanMergeByPredicate(testSlice))
+	s.False(slice.canMergeByPredicate(testSlice))
 
 	testSlice = NewSlice(nil, s.executableInitializer, NewScope(NewRandomRange(), predicates.All[tasks.Task]()))
-	s.False(slice.CanMergeByPredicate(testSlice))
+	s.False(slice.canMergeByPredicate(testSlice))
 }
 
 func (s *sliceSuite) TestMergeByPredicate() {
@@ -286,18 +285,19 @@ func (s *sliceSuite) TestMergeByPredicate() {
 	totalExecutables += len(incomingSlice.outstandingExecutables)
 	incomingSlice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
-	mergedSlice := slice.MergeByPredicate(incomingSlice)
-	mergedSliceImpl := mergedSlice.(*SliceImpl)
+	mergedSlice := slice.mergeByPredicate(incomingSlice)
 
 	s.Equal(r, mergedSlice.Scope().Range)
 	s.True(predicates.Or[tasks.Task](predicate, incomingPredicate).Equals(mergedSlice.Scope().Predicate))
 
-	s.validateSliceState(mergedSliceImpl)
-	s.Len(mergedSliceImpl.outstandingExecutables, totalExecutables)
+	s.validateSliceState(mergedSlice)
+	s.Len(mergedSlice.outstandingExecutables, totalExecutables)
 
 	s.Panics(func() { slice.validateNotDestroyed() })
 	s.Panics(func() { incomingSlice.validateNotDestroyed() })
 }
+
+// TODO: add test for CanMergeWithSlice and MergeWithSlice
 
 func (s *sliceSuite) TestShrinkRange() {
 	r := NewRandomRange()
@@ -474,7 +474,7 @@ func (s *sliceSuite) randomExecutablesInRange(
 func (s *sliceSuite) randomIteratorsInRange(
 	r Range,
 	numIterators int,
-	paginationFnProvider paginationFnProvider,
+	paginationFnProvider PaginationFnProvider,
 ) []Iterator {
 	ranges := []Range{r}
 	for len(ranges) < numIterators {

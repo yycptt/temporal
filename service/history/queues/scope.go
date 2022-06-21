@@ -121,3 +121,15 @@ func (s *Scope) MergeByPredicate(
 	// TODO: special check if the predicates are the same type
 	return NewScope(s.Range, predicates.Or(s.Predicate, incomingScope.Predicate))
 }
+
+func (s *Scope) IsEmpty() bool {
+	if s.Range.IsEmpty() {
+		return true
+	}
+
+	if _, ok := s.Predicate.(*predicates.EmptyImpl[tasks.Task]); ok {
+		return true
+	}
+
+	return false
+}

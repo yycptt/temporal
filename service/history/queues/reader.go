@@ -64,8 +64,8 @@ type (
 	ReaderImpl struct {
 		sync.Mutex
 
-		paginationFnProvider  paginationFnProvider
-		executableInitializer executableInitializer
+		paginationFnProvider  PaginationFnProvider
+		executableInitializer ExecutableInitializer
 		options               *ReaderOptions
 		scheduler             Scheduler
 		rescheduler           Rescheduler
@@ -87,8 +87,8 @@ type (
 )
 
 func NewReader(
-	paginationFnProvider paginationFnProvider,
-	executableInitializer executableInitializer,
+	paginationFnProvider PaginationFnProvider,
+	executableInitializer ExecutableInitializer,
 	scopes []Scope,
 	options *ReaderOptions,
 	scheduler Scheduler,
@@ -367,7 +367,6 @@ func (r *ReaderImpl) verifyReschedulerSize() {
 	}
 }
 
-// TODO: move to slice interface
 func appendSlice(
 	slices []Slice,
 	incomingSlice Slice,
@@ -377,44 +376,12 @@ func appendSlice(
 	}
 
 	lastSlice := slices[len(slices)-1]
-
-	if lastSlice.Scope().Range.ExclusiveMax.CompareTo(incomingSlice.Scope().Range.InclusiveMin) < 0 {
-		// no overlap in terms of range
+	if !lastSlice.CanMergeWithSlice(incomingSlice) {
 		slices = append(slices, incomingSlice)
 		return slices
 	}
 
-	if lastSlice.CanMergeByRange(incomingSlice) {
-		lastSlice = lastSlice.MergeByRange(incomingSlice)
-		slices[len(slices)-1] = lastSlice
-		return slices
-	}
-
+	mergedSlices := lastSlice.MergeWithSlice(incomingSlice)
 	slices = slices[:len(slices)-1]
-	leftLastSlice, rightLastSlice := lastSlice.SplitByRange(incomingSlice.Scope().Range.InclusiveMin)
-	if r := leftLastSlice.Scope().Range; !r.IsEmpty() {
-		slices = append(slices, leftLastSlice)
-	}
-
-	if incomingSlice.CanSplitByRange(rightLastSlice.Scope().Range.ExclusiveMax) {
-		leftIncomingSlice, rightIncomingSlice := incomingSlice.SplitByRange(rightLastSlice.Scope().Range.ExclusiveMax)
-		mergedSlice := rightLastSlice.MergeByPredicate(leftIncomingSlice)
-		if r := mergedSlice.Scope().Range; !r.IsEmpty() {
-			slices = append(slices, mergedSlice)
-		}
-		if r := rightIncomingSlice.Scope().Range; !r.IsEmpty() {
-			slices = append(slices, rightIncomingSlice)
-		}
-	} else {
-		midLastSlice, rightLastSlice := rightLastSlice.SplitByRange(incomingSlice.Scope().Range.ExclusiveMax)
-		mergedSlice := midLastSlice.MergeByPredicate(incomingSlice)
-		if r := mergedSlice.Scope().Range; !r.IsEmpty() {
-			slices = append(slices, mergedSlice)
-		}
-		if r := rightLastSlice.Scope().Range; !r.IsEmpty() {
-			slices = append(slices, rightLastSlice)
-		}
-	}
-
-	return slices
+	return append(slices, mergedSlices...)
 }
