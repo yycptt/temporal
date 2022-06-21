@@ -76,16 +76,14 @@ func newTransferQueueActiveProcessor(
 
 	config := shard.GetConfig()
 	options := &QueueProcessorOptions{
-		BatchSize:                           config.TransferTaskBatchSize,
-		MaxPollInterval:                     config.TransferProcessorMaxPollInterval,
-		MaxPollIntervalJitterCoefficient:    config.TransferProcessorMaxPollIntervalJitterCoefficient,
-		UpdateAckInterval:                   config.TransferProcessorUpdateAckInterval,
-		UpdateAckIntervalJitterCoefficient:  config.TransferProcessorUpdateAckIntervalJitterCoefficient,
-		RescheduleInterval:                  config.TransferProcessorRescheduleInterval,
-		RescheduleIntervalJitterCoefficient: config.TransferProcessorRescheduleIntervalJitterCoefficient,
-		MaxReschdulerSize:                   config.TransferProcessorMaxReschedulerSize,
-		PollBackoffInterval:                 config.TransferProcessorPollBackoffInterval,
-		MetricScope:                         metrics.TransferActiveQueueProcessorScope,
+		BatchSize:                          config.TransferTaskBatchSize,
+		MaxPollInterval:                    config.TransferProcessorMaxPollInterval,
+		MaxPollIntervalJitterCoefficient:   config.TransferProcessorMaxPollIntervalJitterCoefficient,
+		UpdateAckInterval:                  config.TransferProcessorUpdateAckInterval,
+		UpdateAckIntervalJitterCoefficient: config.TransferProcessorUpdateAckIntervalJitterCoefficient,
+		MaxReschdulerSize:                  config.TransferProcessorMaxReschedulerSize,
+		PollBackoffInterval:                config.TransferProcessorPollBackoffInterval,
+		MetricScope:                        metrics.TransferActiveQueueProcessorScope,
 	}
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 	logger = log.With(logger, tag.ClusterName(currentClusterName))
@@ -128,6 +126,7 @@ func newTransferQueueActiveProcessor(
 	rescheduler := queues.NewRescheduler(
 		scheduler,
 		shard.GetTimeSource(),
+		logger,
 		metricProvider.WithTags(metrics.OperationTag(queues.OperationTransferActiveQueueProcessor)),
 	)
 
@@ -250,16 +249,14 @@ func newTransferQueueFailoverProcessor(
 
 	config := shard.GetConfig()
 	options := &QueueProcessorOptions{
-		BatchSize:                           config.TransferTaskBatchSize,
-		MaxPollInterval:                     config.TransferProcessorMaxPollInterval,
-		MaxPollIntervalJitterCoefficient:    config.TransferProcessorMaxPollIntervalJitterCoefficient,
-		UpdateAckInterval:                   config.TransferProcessorUpdateAckInterval,
-		UpdateAckIntervalJitterCoefficient:  config.TransferProcessorUpdateAckIntervalJitterCoefficient,
-		RescheduleInterval:                  config.TransferProcessorRescheduleInterval,
-		RescheduleIntervalJitterCoefficient: config.TransferProcessorRescheduleIntervalJitterCoefficient,
-		MaxReschdulerSize:                   config.TransferProcessorMaxReschedulerSize,
-		PollBackoffInterval:                 config.TransferProcessorPollBackoffInterval,
-		MetricScope:                         metrics.TransferActiveQueueProcessorScope,
+		BatchSize:                          config.TransferTaskBatchSize,
+		MaxPollInterval:                    config.TransferProcessorMaxPollInterval,
+		MaxPollIntervalJitterCoefficient:   config.TransferProcessorMaxPollIntervalJitterCoefficient,
+		UpdateAckInterval:                  config.TransferProcessorUpdateAckInterval,
+		UpdateAckIntervalJitterCoefficient: config.TransferProcessorUpdateAckIntervalJitterCoefficient,
+		MaxReschdulerSize:                  config.TransferProcessorMaxReschedulerSize,
+		PollBackoffInterval:                config.TransferProcessorPollBackoffInterval,
+		MetricScope:                        metrics.TransferActiveQueueProcessorScope,
 	}
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
 	failoverUUID := uuid.New()
@@ -324,6 +321,7 @@ func newTransferQueueFailoverProcessor(
 	rescheduler := queues.NewRescheduler(
 		scheduler,
 		shard.GetTimeSource(),
+		logger,
 		metricProvider.WithTags(metrics.OperationTag(queues.OperationTransferActiveQueueProcessor)),
 	)
 

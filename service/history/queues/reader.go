@@ -54,11 +54,9 @@ type (
 		MaxPollIntervalJitterCoefficient     dynamicconfig.FloatPropertyFn
 		ShrinkRangeInterval                  dynamicconfig.DurationPropertyFn
 		ShrinkRangeIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
-		RescheduleInterval                   dynamicconfig.DurationPropertyFn
-		RescheduleIntervalJitterCoefficient  dynamicconfig.FloatPropertyFn
-		// MaxReschdulerSize                   dynamicconfig.IntPropertyFn
-		// PollBackoffInterval                 dynamicconfig.DurationPropertyFn
-		MetricScope int
+		MaxReschdulerSize                    dynamicconfig.IntPropertyFn
+		PollBackoffInterval                  dynamicconfig.DurationPropertyFn
+		MetricScope                          int
 	}
 
 	SliceSplitter func(s Slice) (remaining []Slice)
@@ -70,6 +68,7 @@ type (
 		executableInitializer executableInitializer
 		options               *ReaderOptions
 		scheduler             Scheduler
+		rescheduler           Rescheduler
 		timeSource            clock.TimeSource
 		logger                log.Logger
 		metricsProvider       metrics.MetricProvider
@@ -78,7 +77,7 @@ type (
 		shutdownCh chan struct{}
 		shutdownWG sync.WaitGroup
 
-		slices           []Slice
+		slices           []Slice // TODO: use linked list instead
 		nextLoadSliceIdx int
 		notifyCh         chan struct{}
 		lastPollTime     time.Time
@@ -93,6 +92,7 @@ func NewReader(
 	scopes []Scope,
 	options *ReaderOptions,
 	scheduler Scheduler,
+	rescheduler Rescheduler,
 	timeSource clock.TimeSource,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
@@ -116,6 +116,7 @@ func NewReader(
 		executableInitializer: executableInitializer,
 		options:               options,
 		scheduler:             scheduler,
+		rescheduler:           rescheduler,
 		timeSource:            timeSource,
 		logger:                logger,
 		metricsProvider:       metricsProvider,
@@ -137,10 +138,12 @@ func (r *ReaderImpl) Start() {
 		return
 	}
 
+	r.rescheduler.Start()
+
 	r.shutdownWG.Add(1)
 	go r.eventLoop()
 
-	r.logger.Info("queue reader started")
+	r.logger.Info("queue reader started", tag.LifeCycleStarted)
 }
 
 func (r *ReaderImpl) Stop() {
@@ -152,11 +155,13 @@ func (r *ReaderImpl) Stop() {
 		return
 	}
 
+	r.rescheduler.Stop()
+
 	close(r.shutdownCh)
 	if success := common.AwaitWaitGroup(&r.shutdownWG, time.Minute); !success {
-		r.logger.Warn("queue reader shutdown timed out waiting for event loop")
+		r.logger.Warn("queue reader shutdown timed out waiting for event loop", tag.LifeCycleStopTimedout)
 	}
-	r.logger.Info("queue reader stopped")
+	r.logger.Info("queue reader stopped", tag.LifeCycleStopped)
 }
 
 func (r *ReaderImpl) Scopes() []Scope {
@@ -219,6 +224,10 @@ func (r *ReaderImpl) Throttle(backoff time.Duration) {
 	r.Lock()
 	defer r.Unlock()
 
+	r.throttleLocked(backoff)
+}
+
+func (r *ReaderImpl) throttleLocked(backoff time.Duration) {
 	r.throttleTimer = time.AfterFunc(backoff, func() {
 		r.Lock()
 		defer r.Unlock()
@@ -243,12 +252,6 @@ func (r *ReaderImpl) eventLoop() {
 	))
 	defer shrinkRangeTimer.Stop()
 
-	rescheduleTimer := time.NewTimer(backoff.JitDuration(
-		r.options.RescheduleInterval(),
-		r.options.RescheduleIntervalJitterCoefficient(),
-	))
-	defer rescheduleTimer.Stop()
-
 	for {
 		select {
 		case <-r.shutdownCh:
@@ -263,12 +266,6 @@ func (r *ReaderImpl) eventLoop() {
 				r.options.MaxPollInterval(),
 				r.options.MaxPollIntervalJitterCoefficient(),
 			))
-		case <-rescheduleTimer.C:
-			r.rescheduleTasks()
-			rescheduleTimer.Reset(backoff.JitDuration(
-				r.options.RescheduleInterval(),
-				r.options.RescheduleIntervalJitterCoefficient(),
-			))
 		case <-shrinkRangeTimer.C:
 			r.shrinkRanges()
 			shrinkRangeTimer.Reset(backoff.JitDuration(
@@ -282,6 +279,8 @@ func (r *ReaderImpl) eventLoop() {
 func (r *ReaderImpl) loadAndSubmitTasks() {
 	r.Lock()
 	defer r.Unlock()
+
+	r.verifyReschedulerSize()
 
 	if r.throttleTimer != nil {
 		return
@@ -309,13 +308,6 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 		r.nextLoadSliceIdx++
 		r.notify()
 	}
-}
-
-func (r *ReaderImpl) rescheduleTasks() {
-	r.Lock()
-	defer r.Unlock()
-
-	// TODO: use rescheduler in reader
 }
 
 func (r *ReaderImpl) shrinkRanges() {
@@ -366,6 +358,12 @@ func (r *ReaderImpl) submit(
 		executable.Reschedule()
 	} else if !submitted {
 		executable.Reschedule()
+	}
+}
+
+func (r *ReaderImpl) verifyReschedulerSize() {
+	if r.rescheduler.Len() >= r.options.MaxReschdulerSize() {
+		r.throttleLocked(r.options.PollBackoffInterval())
 	}
 }
 

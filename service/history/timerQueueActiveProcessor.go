@@ -99,6 +99,7 @@ func newTimerQueueActiveProcessor(
 	rescheduler := queues.NewRescheduler(
 		scheduler,
 		shard.GetTimeSource(),
+		logger,
 		metricProvider.WithTags(metrics.OperationTag(queues.OperationTimerActiveQueueProcessor)),
 	)
 
@@ -273,6 +274,7 @@ func newTimerQueueFailoverProcessor(
 	rescheduler := queues.NewRescheduler(
 		scheduler,
 		shard.GetTimeSource(),
+		logger,
 		metricProvider.WithTags(metrics.OperationTag(queues.OperationTimerActiveQueueProcessor)),
 	)
 

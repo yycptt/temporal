@@ -132,6 +132,8 @@ func (t *timerQueueProcessorBase) Start() {
 		return
 	}
 
+	t.rescheduler.Start()
+
 	t.shutdownWG.Add(1)
 	// notify a initial scan
 	t.notifyNewTimer(time.Time{})
@@ -144,6 +146,8 @@ func (t *timerQueueProcessorBase) Stop() {
 	if !atomic.CompareAndSwapInt32(&t.status, common.DaemonStatusStarted, common.DaemonStatusStopped) {
 		return
 	}
+
+	t.rescheduler.Stop()
 
 	t.timerGate.Close()
 	close(t.shutdownCh)
@@ -226,12 +230,6 @@ func (t *timerQueueProcessorBase) internalProcessor() error {
 	))
 	defer updateAckTimer.Stop()
 
-	rescheduleTimer := time.NewTimer(backoff.JitDuration(
-		t.config.TimerProcessorRescheduleInterval(),
-		t.config.TimerProcessorRescheduleIntervalJitterCoefficient(),
-	))
-	defer rescheduleTimer.Stop()
-
 	for {
 		// Wait until one of four things occurs:
 		// 1. we get notified of a new message
@@ -289,12 +287,6 @@ func (t *timerQueueProcessorBase) internalProcessor() error {
 			// New Timer has arrived.
 			t.metricsClient.IncCounter(t.scope, metrics.NewTimerNotifyCounter)
 			t.timerGate.Update(newTime)
-		case <-rescheduleTimer.C:
-			t.rescheduler.Reschedule(0) // reschedule all
-			rescheduleTimer.Reset(backoff.JitDuration(
-				t.config.TimerProcessorRescheduleInterval(),
-				t.config.TimerProcessorRescheduleIntervalJitterCoefficient(),
-			))
 		}
 	}
 }
@@ -340,13 +332,7 @@ func (t *timerQueueProcessorBase) readAndFanoutTimerTasks() (*time.Time, error) 
 }
 
 func (t *timerQueueProcessorBase) verifyReschedulerSize() bool {
-	length := t.rescheduler.Len()
-	maxLength := t.config.TimerProcessorMaxReschedulerSize()
-	if length > maxLength {
-		t.rescheduler.Reschedule(length - maxLength + t.config.TimerTaskBatchSize()*2)
-	}
-
-	passed := t.rescheduler.Len() < maxLength
+	passed := t.rescheduler.Len() < t.config.TimerProcessorMaxReschedulerSize()
 	if !passed {
 		// set backoff timer
 		t.notifyNewTimer(t.timeSource.Now().Add(t.config.TimerProcessorPollBackoffInterval()))
