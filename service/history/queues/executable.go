@@ -151,6 +151,9 @@ func (e *executableImpl) Execute() error {
 		return nil
 	}
 
+	// TODO: add check for visibility timestamp
+	// and either wait for reschedule (return special non-retryable error)
+
 	// this filter should also contain the logic for overriding
 	// results from task allocator (force executing some standby task types)
 	e.shouldProcess = e.filter(e.Task)

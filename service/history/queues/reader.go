@@ -25,6 +25,7 @@
 package queues
 
 import (
+	"container/list"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,8 +51,6 @@ type (
 
 	ReaderOptions struct {
 		BatchSize                            dynamicconfig.IntPropertyFn
-		MaxPollInterval                      dynamicconfig.DurationPropertyFn
-		MaxPollIntervalJitterCoefficient     dynamicconfig.FloatPropertyFn
 		ShrinkRangeInterval                  dynamicconfig.DurationPropertyFn
 		ShrinkRangeIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
 		MaxReschdulerSize                    dynamicconfig.IntPropertyFn
@@ -77,10 +76,9 @@ type (
 		shutdownCh chan struct{}
 		shutdownWG sync.WaitGroup
 
-		slices           []Slice // TODO: use linked list instead
-		nextLoadSliceIdx int
-		notifyCh         chan struct{}
-		lastPollTime     time.Time
+		slices        *list.List
+		nextLoadSlice *list.Element
+		notifyCh      chan struct{}
 
 		throttleTimer *time.Timer
 	}
@@ -97,18 +95,13 @@ func NewReader(
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
 ) *ReaderImpl {
-	slices := make([]Slice, 0, len(scopes))
+	slices := list.New()
 	for _, scope := range scopes {
-		slices = append(slices, NewSlice(
+		slices.PushBack(NewSlice(
 			paginationFnProvider,
 			executableInitializer,
 			scope,
 		))
-	}
-
-	nextLoadSliceIdx := -1
-	if len(slices) != 0 {
-		nextLoadSliceIdx = 0
 	}
 
 	return &ReaderImpl{
@@ -124,8 +117,8 @@ func NewReader(
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
 
-		slices:           slices,
-		nextLoadSliceIdx: nextLoadSliceIdx,
+		slices:        slices,
+		nextLoadSlice: slices.Front(),
 	}
 }
 
@@ -168,10 +161,11 @@ func (r *ReaderImpl) Scopes() []Scope {
 	r.Lock()
 	defer r.Unlock()
 
-	scopes := make([]Scope, 0, len(r.slices))
-	for _, slice := range r.slices {
-		scopes = append(scopes, slice.Scope())
+	scopes := make([]Scope, 0, r.slices.Len())
+	for element := r.slices.Front(); element != nil; element = element.Next() {
+		scopes = append(scopes, element.Value.(Slice).Scope())
 	}
+
 	return scopes
 }
 
@@ -179,45 +173,50 @@ func (r *ReaderImpl) MergeSlices(incomingSlices []Slice) {
 	r.Lock()
 	defer r.Unlock()
 
-	mergedSlices := make([]Slice, 0, len(r.slices)+len(incomingSlices))
-	currentSliceIdx := 0
+	mergedSlices := make([]Slice, 0, r.slices.Len()+len(incomingSlices))
+	currentSliceElement := r.slices.Front()
 	incomingSliceIdx := 0
 
-	for currentSliceIdx < len(r.slices) && incomingSliceIdx < len(incomingSlices) {
-		currentSlice := r.slices[currentSliceIdx]
+	for currentSliceElement != nil && incomingSliceIdx < len(incomingSlices) {
+		currentSlice := currentSliceElement.Value.(Slice)
 		incomingSlice := incomingSlices[incomingSliceIdx]
 
 		if currentSlice.Scope().Range.InclusiveMin.CompareTo(incomingSlice.Scope().Range.InclusiveMin) < 0 {
 			mergedSlices = appendSlice(mergedSlices, currentSlice)
-			currentSliceIdx++
+			currentSliceElement = currentSliceElement.Next()
 		} else {
 			mergedSlices = appendSlice(mergedSlices, incomingSlice)
 			incomingSliceIdx++
 		}
 	}
 
-	for _, slice := range r.slices[currentSliceIdx:] {
-		mergedSlices = appendSlice(mergedSlices, slice)
+	for currentSliceElement != nil {
+		mergedSlices = appendSlice(mergedSlices, currentSliceElement.Value.(Slice))
+		currentSliceElement = currentSliceElement.Next()
 	}
 	for _, slice := range incomingSlices[incomingSliceIdx:] {
 		mergedSlices = appendSlice(mergedSlices, slice)
 	}
 
-	r.slices = mergedSlices
-	r.resetNextLoadSliceIdxLocked()
+	r.resetNextLoadSliceLocked()
 }
 
 func (r *ReaderImpl) SplitSlices(splitter SliceSplitter) {
 	r.Lock()
 	defer r.Unlock()
 
-	newSlices := make([]Slice, 0, len(r.slices))
-	for _, slice := range r.slices {
-		newSlices = append(newSlices, splitter(slice)...)
+	var next *list.Element
+	for element := r.slices.Front(); element != nil; element = next {
+		next = element.Next()
+
+		for _, newSlice := range splitter(element.Value.(Slice)) {
+			r.slices.InsertAfter(newSlice, element)
+		}
+
+		r.slices.Remove(element)
 	}
 
-	r.slices = newSlices
-	r.resetNextLoadSliceIdxLocked()
+	r.resetNextLoadSliceLocked()
 }
 
 func (r *ReaderImpl) Throttle(backoff time.Duration) {
@@ -240,12 +239,6 @@ func (r *ReaderImpl) throttleLocked(backoff time.Duration) {
 func (r *ReaderImpl) eventLoop() {
 	defer r.shutdownWG.Done()
 
-	pollTimer := time.NewTimer(backoff.JitDuration(
-		r.options.MaxPollInterval(),
-		r.options.MaxPollIntervalJitterCoefficient(),
-	))
-	defer pollTimer.Stop()
-
 	shrinkRangeTimer := time.NewTimer(backoff.JitDuration(
 		r.options.ShrinkRangeInterval(),
 		r.options.ShrinkRangeIntervalJitterCoefficient(),
@@ -258,14 +251,6 @@ func (r *ReaderImpl) eventLoop() {
 			return
 		case <-r.notifyCh:
 			r.loadAndSubmitTasks()
-		case <-pollTimer.C:
-			if r.lastPollTime.Add(r.options.MaxPollInterval()).Before(r.timeSource.Now()) {
-				r.notify()
-			}
-			pollTimer.Reset(backoff.JitDuration(
-				r.options.MaxPollInterval(),
-				r.options.MaxPollIntervalJitterCoefficient(),
-			))
 		case <-shrinkRangeTimer.C:
 			r.shrinkRanges()
 			shrinkRangeTimer.Reset(backoff.JitDuration(
@@ -286,13 +271,12 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 		return
 	}
 
-	if r.nextLoadSliceIdx == -1 {
+	if r.nextLoadSlice == nil {
 		return
 	}
 
-	r.lastPollTime = r.timeSource.Now()
-
-	tasks, err := r.slices[r.nextLoadSliceIdx].SelectTasks(r.options.BatchSize())
+	loadSlice := r.nextLoadSlice.Value.(Slice)
+	tasks, err := loadSlice.SelectTasks(r.options.BatchSize())
 	if err != nil {
 		r.logger.Error("Queue reader unable to retrieve tasks", tag.Error(err))
 		r.notify()
@@ -302,10 +286,12 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 		r.submit(task)
 	}
 
-	if r.slices[r.nextLoadSliceIdx].MoreTasks() {
+	if loadSlice.MoreTasks() {
 		r.notify()
-	} else if r.nextLoadSliceIdx+1 < len(r.slices) {
-		r.nextLoadSliceIdx++
+		return
+	}
+
+	if r.nextLoadSlice = r.nextLoadSlice.Next(); r.nextLoadSlice != nil {
 		r.notify()
 	}
 }
@@ -314,29 +300,28 @@ func (r *ReaderImpl) shrinkRanges() {
 	r.Lock()
 	defer r.Unlock()
 
-	slices := make([]Slice, 0, len(r.slices))
-	for idx, slice := range r.slices {
+	var next *list.Element
+	for element := r.slices.Front(); element != nil; element = next {
+		next = element.Next()
+
+		slice := element.Value.(Slice)
 		slice.ShrinkRange()
-		if scopeRange := slice.Scope().Range; !scopeRange.IsEmpty() {
-			slices = append(slices, slice)
-		} else if idx < r.nextLoadSliceIdx {
-			r.nextLoadSliceIdx--
+		if scope := slice.Scope(); scope.IsEmpty() {
+			r.slices.Remove(element)
 		}
 	}
-
-	r.slices = slices
 }
 
-func (r *ReaderImpl) resetNextLoadSliceIdxLocked() {
-	r.nextLoadSliceIdx = -1
-	for idx, slice := range r.slices {
-		if slice.MoreTasks() {
-			r.nextLoadSliceIdx = idx
-			return
+func (r *ReaderImpl) resetNextLoadSliceLocked() {
+	r.nextLoadSlice = nil
+	for element := r.slices.Front(); element != nil; element = element.Next() {
+		if element.Value.(Slice).MoreTasks() {
+			r.nextLoadSlice = element
+			break
 		}
 	}
 
-	if r.nextLoadSliceIdx != -1 {
+	if r.nextLoadSlice != nil {
 		r.notify()
 	}
 }
