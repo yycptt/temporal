@@ -147,6 +147,10 @@ func NewExecutable(
 }
 
 func (e *executableImpl) Execute() error {
+	if e.State() == ctasks.TaskStateCancelled {
+		return nil
+	}
+
 	// this filter should also contain the logic for overriding
 	// results from task allocator (force executing some standby task types)
 	e.shouldProcess = e.filter(e.Task)
@@ -233,6 +237,10 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 }
 
 func (e *executableImpl) IsRetryableError(err error) bool {
+	if e.State() == ctasks.TaskStateCancelled {
+		return false
+	}
+
 	// this determines if the executable should be retried within one submission to scheduler
 
 	if shard.IsShardOwnershipLostError(err) {
@@ -257,9 +265,22 @@ func (e *executableImpl) RetryPolicy() backoff.RetryPolicy {
 	return schedulerRetryPolicy
 }
 
+func (e *executableImpl) Cancel() {
+	e.Lock()
+	defer e.Unlock()
+
+	if e.state == ctasks.TaskStatePending {
+		e.state = ctasks.TaskStateCancelled
+	}
+}
+
 func (e *executableImpl) Ack() {
 	e.Lock()
 	defer e.Unlock()
+
+	if e.state == ctasks.TaskStateCancelled {
+		return
+	}
 
 	e.state = ctasks.TaskStateAcked
 
@@ -276,9 +297,12 @@ func (e *executableImpl) Ack() {
 }
 
 func (e *executableImpl) Nack(err error) {
+	if e.State() == ctasks.TaskStateCancelled {
+		return
+	}
+
 	submitted := false
-	attempt := e.Attempt()
-	if e.shouldResubmitOnNack(attempt, err) {
+	if e.shouldResubmitOnNack(e.Attempt(), err) {
 		// we do not need to know if there any error during submission
 		// as long as it's not submitted, the execuable should be add
 		// to the rescheduler
@@ -286,11 +310,15 @@ func (e *executableImpl) Nack(err error) {
 	}
 
 	if !submitted {
-		e.rescheduler.Add(e, e.rescheduleBackoff(attempt))
+		e.Reschedule()
 	}
 }
 
 func (e *executableImpl) Reschedule() {
+	if e.State() == ctasks.TaskStateCancelled {
+		return
+	}
+
 	e.rescheduler.Add(e, e.rescheduleBackoff(e.Attempt()))
 }
 

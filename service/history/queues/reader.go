@@ -69,6 +69,7 @@ type (
 		paginationFnProvider  paginationFnProvider
 		executableInitializer executableInitializer
 		options               *ReaderOptions
+		scheduler             Scheduler
 		timeSource            clock.TimeSource
 		logger                log.Logger
 		metricsProvider       metrics.MetricProvider
@@ -91,6 +92,7 @@ func NewReader(
 	executableInitializer executableInitializer,
 	scopes []Scope,
 	options *ReaderOptions,
+	scheduler Scheduler,
 	timeSource clock.TimeSource,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
@@ -113,6 +115,7 @@ func NewReader(
 		paginationFnProvider:  paginationFnProvider,
 		executableInitializer: executableInitializer,
 		options:               options,
+		scheduler:             scheduler,
 		timeSource:            timeSource,
 		logger:                logger,
 		metricsProvider:       metricsProvider,
@@ -297,7 +300,7 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 	}
 
 	for _, task := range tasks {
-		task.Submit()
+		r.submit(task)
 	}
 
 	if r.slices[r.nextLoadSliceIdx].MoreTasks() {
@@ -312,12 +315,7 @@ func (r *ReaderImpl) rescheduleTasks() {
 	r.Lock()
 	defer r.Unlock()
 
-	for _, slice := range r.slices {
-		rescheduleTasks := slice.RescheduleTasks()
-		for _, task := range rescheduleTasks {
-			task.Submit()
-		}
-	}
+	// TODO: use rescheduler in reader
 }
 
 func (r *ReaderImpl) shrinkRanges() {
@@ -355,6 +353,19 @@ func (r *ReaderImpl) notify() {
 	select {
 	case r.notifyCh <- struct{}{}:
 	default:
+	}
+}
+
+func (r *ReaderImpl) submit(
+	executable Executable,
+) {
+
+	submitted, err := r.scheduler.TrySubmit(executable)
+	if err != nil {
+		r.logger.Error("Failed to submit task", tag.Error(err))
+		executable.Reschedule()
+	} else if !submitted {
+		executable.Reschedule()
 	}
 }
 

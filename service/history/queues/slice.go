@@ -43,7 +43,6 @@ type (
 		MergeByPredicate(Slice) Slice
 		ShrinkRange()
 		SelectTasks(int) ([]Executable, error)
-		RescheduleTasks() []Executable
 		MoreTasks() bool
 		Clear()
 	}
@@ -366,19 +365,6 @@ func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
 	}
 
 	return executables, nil
-}
-
-func (s *SliceImpl) RescheduleTasks() []Executable {
-	s.validateNotDestroyed()
-
-	var rescheduleTasks []Executable
-	for _, executable := range s.outstandingExecutables {
-		if executable.State() == ctasks.TaskStateLoaded {
-			rescheduleTasks = append(rescheduleTasks, executable)
-		}
-	}
-
-	return rescheduleTasks
 }
 
 func (s *SliceImpl) MoreTasks() bool {
