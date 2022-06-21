@@ -35,7 +35,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.temporal.io/api/serviceerror"
 
-	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/dynamicconfig"
@@ -74,7 +73,6 @@ func (s *executableSuite) SetupTest() {
 	s.controller = gomock.NewController(s.T())
 	s.mockExecutor = NewMockExecutor(s.controller)
 	s.mockScheduler = NewMockScheduler(s.controller)
-	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).Return(true, nil).AnyTimes()
 	s.mockRescheduler = NewMockRescheduler(s.controller)
 
 	s.timeSource = clock.NewEventTimeSource()
@@ -174,11 +172,10 @@ func (s *executableSuite) TestTaskAck() {
 		return true
 	})
 
-	s.Equal(ctasks.TaskStateLoaded, executable.State())
+	s.Equal(ctasks.TaskStatePending, executable.State())
 
-	executable.Submit()
 	executable.Ack()
-	s.Equal(ctasks.TaskStateAcked, executable.State()) // TODO: fix test
+	s.Equal(ctasks.TaskStateAcked, executable.State())
 }
 
 func (s *executableSuite) TestTaskNack_Resubmit() {
@@ -186,9 +183,10 @@ func (s *executableSuite) TestTaskNack_Resubmit() {
 		return true
 	})
 
-	executable.Submit()
+	s.mockScheduler.EXPECT().TrySubmit(executable).Return(true, nil)
+
 	executable.Nack(errors.New("some random error"))
-	s.Equal(ctasks.TaskStateSubmitted, executable.State())
+	s.Equal(ctasks.TaskStatePending, executable.State())
 }
 
 func (s *executableSuite) TestTaskNack_Reschedule() {
@@ -198,21 +196,8 @@ func (s *executableSuite) TestTaskNack_Reschedule() {
 
 	s.mockRescheduler.EXPECT().Add(executable, gomock.AssignableToTypeOf(time.Second))
 
-	initialBackoff := time.Millisecond * 100
-	reschedulePolicy = backoff.NewExponentialRetryPolicy(initialBackoff)
-
-	executable.Submit()
-
-	now := time.Now()
-	s.timeSource.Update(now)
 	executable.Nack(consts.ErrTaskRetry) // this error won't trigger re-submit
-	s.Equal(ctasks.TaskStateBackoff, executable.State())
-
-	s.timeSource.Update(now.Add(initialBackoff / 2))
-	s.Equal(ctasks.TaskStateBackoff, executable.State())
-
-	s.timeSource.Update(now.Add(initialBackoff * 2))
-	s.Equal(ctasks.TaskStateLoaded, executable.State())
+	s.Equal(ctasks.TaskStatePending, executable.State())
 }
 
 func (s *executableSuite) newTestExecutable(

@@ -245,7 +245,7 @@ func (p *queueProcessorBase) processBatch() {
 	}
 
 	for _, task := range tasks {
-		task.Submit()
+		p.submitTask(task)
 		select {
 		case <-p.shutdownCh:
 			return
@@ -280,4 +280,17 @@ func (p *queueProcessorBase) verifyReschedulerSize() bool {
 	}
 
 	return passed
+}
+
+func (p *queueProcessorBase) submitTask(
+	executable queues.Executable,
+) {
+
+	submitted, err := p.scheduler.TrySubmit(executable)
+	if err != nil {
+		p.logger.Error("Failed to submit task", tag.Error(err))
+		executable.Reschedule()
+	} else if !submitted {
+		executable.Reschedule()
+	}
 }

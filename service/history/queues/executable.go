@@ -51,7 +51,6 @@ type (
 		ctasks.PriorityTask
 		tasks.Task
 
-		Submit() (bool, error)
 		Attempt() int
 		Logger() log.Logger
 		GetTask() tasks.Task
@@ -94,7 +93,6 @@ type (
 		priority       ctasks.Priority // priority for the current attempt
 		lowestPriority ctasks.Priority // priority for emitting metrics across multiple attempts
 		attempt        int
-		backoffEndTime time.Time
 
 		executor    Executor
 		scheduler   Scheduler
@@ -127,7 +125,7 @@ func NewExecutable(
 ) Executable {
 	return &executableImpl{
 		Task:        task,
-		state:       ctasks.TaskStateLoaded,
+		state:       ctasks.TaskStatePending,
 		attempt:     1,
 		executor:    executor,
 		scheduler:   scheduler,
@@ -146,22 +144,6 @@ func NewExecutable(
 		filter:                        filter,
 		namespaceCacheRefreshInterval: namespaceCacheRefreshInterval,
 	}
-}
-
-func (e *executableImpl) Submit() (bool, error) {
-	e.state.Transit(ctasks.TaskStateSubmitted)
-	submitted, err := e.scheduler.TrySubmit(e)
-	if err != nil {
-		e.logger.Error("Failed to submit task", tag.Error(err))
-		e.Reschedule()
-		return false, err
-	}
-	if !submitted {
-		e.Reschedule()
-		return false, nil
-	}
-
-	return true, nil
 }
 
 func (e *executableImpl) Execute() error {
@@ -279,7 +261,7 @@ func (e *executableImpl) Ack() {
 	e.Lock()
 	defer e.Unlock()
 
-	e.state.Transit(ctasks.TaskStateAcked)
+	e.state = ctasks.TaskStateAcked
 
 	if e.shouldProcess {
 		e.metricsProvider.Histogram(TaskAttempt, nil).Record(int64(e.attempt))
@@ -295,7 +277,8 @@ func (e *executableImpl) Ack() {
 
 func (e *executableImpl) Nack(err error) {
 	submitted := false
-	if e.shouldResubmitOnNack(e.Attempt(), err) {
+	attempt := e.Attempt()
+	if e.shouldResubmitOnNack(attempt, err) {
 		// we do not need to know if there any error during submission
 		// as long as it's not submitted, the execuable should be add
 		// to the rescheduler
@@ -303,25 +286,17 @@ func (e *executableImpl) Nack(err error) {
 	}
 
 	if !submitted {
-		e.Reschedule()
+		e.rescheduler.Add(e, e.rescheduleBackoff(attempt))
 	}
 }
 
 func (e *executableImpl) Reschedule() {
-	backoff := e.rescheduleBackoff(e.Attempt())
-	if e.rescheduler != nil {
-		e.rescheduler.Add(e, backoff)
-	}
+	e.rescheduler.Add(e, e.rescheduleBackoff(e.Attempt()))
 }
 
 func (e *executableImpl) State() ctasks.State {
 	e.Lock()
 	defer e.Unlock()
-
-	if e.state == ctasks.TaskStateBackoff &&
-		e.timeSource.Now().After(e.backoffEndTime) {
-		e.state.Transit(ctasks.TaskStateLoaded)
-	}
 
 	return e.state
 }
@@ -376,8 +351,5 @@ func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 func (e *executableImpl) rescheduleBackoff(attempt int) time.Duration {
 	// elapsedTime (the first parameter) is not relevant here since reschedule policy
 	// has no expiration interval.
-	backoffDuration := reschedulePolicy.ComputeNextDelay(0, attempt)
-	e.backoffEndTime = e.timeSource.Now().Add(backoffDuration)
-	e.state.Transit(ctasks.TaskStateBackoff)
-	return backoffDuration
+	return reschedulePolicy.ComputeNextDelay(0, attempt)
 }

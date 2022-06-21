@@ -320,7 +320,7 @@ func (t *timerQueueProcessorBase) readAndFanoutTimerTasks() (*time.Time, error) 
 	}
 
 	for _, task := range timerTasks {
-		task.Submit()
+		t.submitTask(task)
 		select {
 		case <-t.shutdownCh:
 			return nil, nil
@@ -353,6 +353,19 @@ func (t *timerQueueProcessorBase) verifyReschedulerSize() bool {
 	}
 
 	return passed
+}
+
+func (t *timerQueueProcessorBase) submitTask(
+	executable queues.Executable,
+) {
+
+	submitted, err := t.scheduler.TrySubmit(executable)
+	if err != nil {
+		t.logger.Error("Failed to submit task", tag.Error(err))
+		executable.Reschedule()
+	} else if !submitted {
+		executable.Reschedule()
+	}
 }
 
 func newTimerTaskScheduler(

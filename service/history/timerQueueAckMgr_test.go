@@ -57,9 +57,9 @@ type (
 		controller          *gomock.Controller
 		mockShard           *shard.ContextTest
 		mockClusterMetadata *cluster.MockMetadata
-		mockExecutionMgr    *persistence.MockExecutionManager
-		mockShardMgr        *persistence.MockShardManager
-		mockScheduler       *queues.MockScheduler
+
+		mockExecutionMgr *persistence.MockExecutionManager
+		mockShardMgr     *persistence.MockShardManager
 
 		logger           log.Logger
 		clusterName      string
@@ -73,9 +73,9 @@ type (
 		controller          *gomock.Controller
 		mockShard           *shard.ContextTest
 		mockClusterMetadata *cluster.MockMetadata
-		mockExecutionMgr    *persistence.MockExecutionManager
-		mockShardMgr        *persistence.MockShardManager
-		mockScheduler       *queues.MockScheduler
+
+		mockExecutionMgr *persistence.MockExecutionManager
+		mockShardMgr     *persistence.MockShardManager
 
 		logger                   log.Logger
 		namespaceID              string
@@ -136,8 +136,6 @@ func (s *timerQueueAckMgrSuite) SetupTest() {
 	s.mockShardMgr = s.mockShard.Resource.ShardMgr
 	s.mockExecutionMgr = s.mockShard.Resource.ExecutionMgr
 	s.mockClusterMetadata = s.mockShard.Resource.ClusterMetadata
-	s.mockScheduler = queues.NewMockScheduler(s.controller)
-	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).Return(true, nil).AnyTimes()
 
 	s.logger = s.mockShard.GetLogger()
 
@@ -160,7 +158,7 @@ func (s *timerQueueAckMgrSuite) SetupTest() {
 		s.logger,
 		s.clusterName,
 		func(task tasks.Task) queues.Executable {
-			return queues.NewExecutable(task, nil, nil, s.mockScheduler, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTimer, nil)
+			return queues.NewExecutable(task, nil, nil, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTimer, nil)
 		},
 	)
 }
@@ -311,7 +309,7 @@ func (s *timerQueueAckMgrSuite) TestReadTimerTasks_NoLookAhead_NoNextPage() {
 
 	timerSequenceID := tasks.NewKey(timer.VisibilityTimestamp, timer.TaskID)
 	s.Len(s.timerQueueAckMgr.outstandingExecutables, 1)
-	s.Equal(ctasks.TaskStateLoaded, s.timerQueueAckMgr.outstandingExecutables[timerSequenceID].State())
+	s.Equal(ctasks.TaskStatePending, s.timerQueueAckMgr.outstandingExecutables[timerSequenceID].State())
 	s.Equal(ackLevel, s.timerQueueAckMgr.ackLevel)
 	s.Empty(s.timerQueueAckMgr.pageToken)
 	s.Equal(s.timerQueueAckMgr.minQueryLevel, s.timerQueueAckMgr.maxQueryLevel)
@@ -362,7 +360,7 @@ func (s *timerQueueAckMgrSuite) TestReadTimerTasks_NoLookAhead_HasNextPage() {
 	s.True(moreTasks)
 	timerSequenceID := tasks.NewKey(timer.VisibilityTimestamp, timer.TaskID)
 	s.Len(s.timerQueueAckMgr.outstandingExecutables, 1)
-	s.Equal(ctasks.TaskStateLoaded, s.timerQueueAckMgr.outstandingExecutables[timerSequenceID].State())
+	s.Equal(ctasks.TaskStatePending, s.timerQueueAckMgr.outstandingExecutables[timerSequenceID].State())
 	s.Equal(ackLevel, s.timerQueueAckMgr.ackLevel)
 	s.Equal(minQueryLevel, s.timerQueueAckMgr.minQueryLevel)
 	s.Equal(response.NextPageToken, s.timerQueueAckMgr.pageToken)
@@ -518,7 +516,6 @@ func (s *timerQueueAckMgrSuite) TestReadCompleteUpdateTimerTasks() {
 	filteredTasks := make([]tasks.Task, 0, len(filteredExecutables))
 	for _, executable := range filteredExecutables {
 		filteredTasks = append(filteredTasks, executable.GetTask())
-		executable.Submit()
 	}
 	s.Equal([]tasks.Task{timer1, timer2, timer3}, filteredTasks)
 	s.Equal(s.timerQueueAckMgr.maxQueryLevel.Add(s.timerQueueAckMgr.config.TimerProcessorMaxPollInterval()), *nextFireTime)
@@ -620,8 +617,6 @@ func (s *timerQueueFailoverAckMgrSuite) SetupTest() {
 	s.mockExecutionMgr = s.mockShard.Resource.ExecutionMgr
 	s.mockClusterMetadata = s.mockShard.Resource.ClusterMetadata
 	s.mockClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
-	s.mockScheduler = queues.NewMockScheduler(s.controller)
-	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).Return(true, nil).AnyTimes()
 
 	s.logger = s.mockShard.GetLogger()
 
@@ -651,7 +646,7 @@ func (s *timerQueueFailoverAckMgrSuite) SetupTest() {
 		},
 		s.logger,
 		func(task tasks.Task) queues.Executable {
-			return queues.NewExecutable(task, nil, nil, s.mockScheduler, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTimer, nil)
+			return queues.NewExecutable(task, nil, nil, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTimer, nil)
 		},
 	)
 }
@@ -846,7 +841,6 @@ func (s *timerQueueFailoverAckMgrSuite) TestReadCompleteUpdateTimerTasks() {
 	filteredTasks := make([]tasks.Task, 0, len(filteredExecutables))
 	for _, executable := range filteredExecutables {
 		filteredTasks = append(filteredTasks, executable.GetTask())
-		executable.Submit()
 	}
 	s.Equal([]tasks.Task{timer1, timer2, timer3}, filteredTasks)
 	s.Nil(nextFireTime)
