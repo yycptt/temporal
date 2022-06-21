@@ -416,9 +416,12 @@ func (mr *MockExecutableMockRecorder) State() *gomock.Call {
 }
 
 // Submit mocks base method.
-func (m *MockExecutable) Submit() {
+func (m *MockExecutable) Submit() (bool, error) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Submit")
+	ret := m.ctrl.Call(m, "Submit")
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Submit indicates an expected call of Submit.

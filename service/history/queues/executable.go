@@ -51,7 +51,7 @@ type (
 		ctasks.PriorityTask
 		tasks.Task
 
-		Submit()
+		Submit() (bool, error)
 		Attempt() int
 		Logger() log.Logger
 		GetTask() tasks.Task
@@ -148,15 +148,20 @@ func NewExecutable(
 	}
 }
 
-func (e *executableImpl) Submit() {
+func (e *executableImpl) Submit() (bool, error) {
 	e.state.Transit(ctasks.TaskStateSubmitted)
 	submitted, err := e.scheduler.TrySubmit(e)
 	if err != nil {
 		e.logger.Error("Failed to submit task", tag.Error(err))
 		e.Reschedule()
-	} else if !submitted {
-		e.Reschedule()
+		return false, err
 	}
+	if !submitted {
+		e.Reschedule()
+		return false, nil
+	}
+
+	return true, nil
 }
 
 func (e *executableImpl) Execute() error {

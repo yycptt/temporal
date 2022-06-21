@@ -43,11 +43,15 @@ type (
 		MergeByPredicate(Slice) Slice
 		ShrinkRange()
 		SelectTasks(int) ([]Executable, error)
+		RescheduleTasks() []Executable
+		MoreTasks() bool
+		Clear()
 	}
 
 	executableInitializer func(tasks.Task) Executable
 
 	SliceImpl struct {
+		paginationFnProvider  paginationFnProvider
 		executableInitializer executableInitializer
 
 		destroyed bool
@@ -56,8 +60,6 @@ type (
 		iterators []Iterator
 
 		// TODO: make task tracking a separate component
-		// and evaluate the performance of using a btree
-		// for storing executables
 		outstandingExecutables map[tasks.Key]Executable
 	}
 )
@@ -68,6 +70,7 @@ func NewSlice(
 	scope Scope,
 ) *SliceImpl {
 	return &SliceImpl{
+		paginationFnProvider:   paginationFnProvider,
 		executableInitializer:  executableInitializer,
 		scope:                  scope,
 		outstandingExecutables: make(map[tasks.Key]Executable),
@@ -116,12 +119,14 @@ func (s *SliceImpl) SplitByRange(key tasks.Key) (leftSlice Slice, rightSlice Sli
 	}
 
 	leftSlice = &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  leftScope,
 		outstandingExecutables: leftExecutables,
 		iterators:              leftIterators,
 	}
 	rightSlice = &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  rightScope,
 		outstandingExecutables: rightExecutables,
@@ -146,12 +151,14 @@ func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (passSlice Slice
 	}
 
 	passSlice = &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  passScope,
 		outstandingExecutables: passExecutables,
 		iterators:              passIterators,
 	}
 	failSlice = &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  failScope,
 		outstandingExecutables: failExecutables,
@@ -202,6 +209,7 @@ func (s *SliceImpl) MergeByRange(slice Slice) Slice {
 	s.destroy()
 	incomingSlice.destroy()
 	return &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  s.scope.MergeByRange(incomingSlice.scope),
 		outstandingExecutables: s.mergeExecutables(incomingSlice),
@@ -228,6 +236,7 @@ func (s *SliceImpl) MergeByPredicate(slice Slice) Slice {
 	s.destroy()
 	incomingSlice.destroy()
 	return &SliceImpl{
+		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  s.scope.MergeByPredicate(incomingSlice.scope),
 		outstandingExecutables: s.mergeExecutables(incomingSlice),
@@ -357,6 +366,43 @@ func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
 	}
 
 	return executables, nil
+}
+
+func (s *SliceImpl) RescheduleTasks() []Executable {
+	s.validateNotDestroyed()
+
+	var rescheduleTasks []Executable
+	for _, executable := range s.outstandingExecutables {
+		if executable.State() == ctasks.TaskStateLoaded {
+			rescheduleTasks = append(rescheduleTasks, executable)
+		}
+	}
+
+	return rescheduleTasks
+}
+
+func (s *SliceImpl) MoreTasks() bool {
+	s.validateNotDestroyed()
+
+	for _, iter := range s.iterators {
+		if iter.HasNext() {
+			break
+		}
+		s.iterators = s.iterators[1:]
+	}
+
+	return len(s.iterators) != 0
+}
+
+func (s *SliceImpl) Clear() {
+	s.validateNotDestroyed()
+
+	s.ShrinkRange()
+
+	s.outstandingExecutables = make(map[tasks.Key]Executable)
+	s.iterators = []Iterator{
+		NewIterator(s.paginationFnProvider, s.scope.Range),
+	}
 }
 
 func (s *SliceImpl) destroy() {
