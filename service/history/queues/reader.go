@@ -37,6 +37,7 @@ import (
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/service/history/configs"
 )
 
 type (
@@ -44,7 +45,7 @@ type (
 		common.Daemon
 
 		Scopes() []Scope
-		MergeSlices([]Slice)
+		MergeSlices(...Slice)
 		SplitSlices(SliceSplitter)
 		Throttle(time.Duration)
 	}
@@ -55,7 +56,8 @@ type (
 		ShrinkRangeIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
 		MaxReschdulerSize                    dynamicconfig.IntPropertyFn
 		PollBackoffInterval                  dynamicconfig.DurationPropertyFn
-		MetricScope                          int
+		TaskMaxRetryCount                    dynamicconfig.IntPropertyFn
+		QueueType                            QueueType
 	}
 
 	SliceSplitter func(s Slice) (remaining []Slice)
@@ -63,14 +65,13 @@ type (
 	ReaderImpl struct {
 		sync.Mutex
 
-		paginationFnProvider  PaginationFnProvider
-		executableInitializer ExecutableInitializer
-		options               *ReaderOptions
-		scheduler             Scheduler
-		rescheduler           Rescheduler
-		timeSource            clock.TimeSource
-		logger                log.Logger
-		metricsProvider       metrics.MetricProvider
+		paginationFnProvider PaginationFnProvider
+		options              *ReaderOptions
+		scheduler            Scheduler
+		rescheduler          Rescheduler
+		timeSource           clock.TimeSource
+		logger               log.Logger
+		metricsProvider      metrics.MetricProvider
 
 		status     int32
 		shutdownCh chan struct{}
@@ -91,10 +92,13 @@ func NewReader(
 	options *ReaderOptions,
 	scheduler Scheduler,
 	rescheduler Rescheduler,
+	executor Executor,
 	timeSource clock.TimeSource,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
+	config *configs.Config,
 ) *ReaderImpl {
+
 	slices := list.New()
 	for _, scope := range scopes {
 		slices.PushBack(NewSlice(
@@ -105,14 +109,13 @@ func NewReader(
 	}
 
 	return &ReaderImpl{
-		paginationFnProvider:  paginationFnProvider,
-		executableInitializer: executableInitializer,
-		options:               options,
-		scheduler:             scheduler,
-		rescheduler:           rescheduler,
-		timeSource:            timeSource,
-		logger:                logger,
-		metricsProvider:       metricsProvider,
+		paginationFnProvider: paginationFnProvider,
+		options:              options,
+		scheduler:            scheduler,
+		rescheduler:          rescheduler,
+		timeSource:           timeSource,
+		logger:               logger,
+		metricsProvider:      metricsProvider,
 
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
@@ -131,8 +134,6 @@ func (r *ReaderImpl) Start() {
 		return
 	}
 
-	r.rescheduler.Start()
-
 	r.shutdownWG.Add(1)
 	go r.eventLoop()
 
@@ -147,8 +148,6 @@ func (r *ReaderImpl) Stop() {
 	) {
 		return
 	}
-
-	r.rescheduler.Stop()
 
 	close(r.shutdownCh)
 	if success := common.AwaitWaitGroup(&r.shutdownWG, time.Minute); !success {
@@ -169,7 +168,7 @@ func (r *ReaderImpl) Scopes() []Scope {
 	return scopes
 }
 
-func (r *ReaderImpl) MergeSlices(incomingSlices []Slice) {
+func (r *ReaderImpl) MergeSlices(incomingSlices ...Slice) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -265,7 +264,7 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.verifyReschedulerSize()
+	r.verifyPendingTaskSize()
 
 	if r.throttleTimer != nil {
 		return
@@ -346,7 +345,9 @@ func (r *ReaderImpl) submit(
 	}
 }
 
-func (r *ReaderImpl) verifyReschedulerSize() {
+func (r *ReaderImpl) verifyPendingTaskSize() {
+	// TODO: get # of pending task from a separate statistics gathering
+	// component, instead of relying rescheduler.
 	if r.rescheduler.Len() >= r.options.MaxReschdulerSize() {
 		r.throttleLocked(r.options.PollBackoffInterval())
 	}
