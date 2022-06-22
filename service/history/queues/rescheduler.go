@@ -51,10 +51,8 @@ type (
 	Rescheduler interface {
 		common.Daemon
 
-		// Add task executable to the rescheudler.
-		// The backoff duration is just a hint for how long the executable
-		// should be bufferred before rescheduling.
-		Add(task Executable, backoff time.Duration)
+		// Add task executable to the rescheduler.
+		Add(task Executable, rescheduleTime time.Time)
 
 		// Len returns the total number of task executables waiting to be rescheduled.
 		Len() int
@@ -133,10 +131,8 @@ func (r *reschedulerImpl) Stop() {
 
 func (r *reschedulerImpl) Add(
 	executable Executable,
-	backoff time.Duration,
+	rescheduleTime time.Time,
 ) {
-	rescheduleTime := r.timeSource.Now().Add(backoff)
-
 	r.Lock()
 	r.pq.Add(rescheduledExecuable{
 		executable:     executable,
@@ -204,6 +200,10 @@ func (r *reschedulerImpl) reschedule() {
 
 	for _, rescheduled := range failToSubmit {
 		r.pq.Add(rescheduled)
+	}
+
+	if !r.pq.IsEmpty() {
+		r.timerGate.Update(r.pq.Peek().rescheduleTime)
 	}
 }
 

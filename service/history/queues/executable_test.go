@@ -145,18 +145,14 @@ func (s *executableSuite) TestHandleErr_NamespaceNotActiveError() {
 	now := time.Now().UTC()
 	err := serviceerror.NewNamespaceNotActive("", "", "")
 
-	s.timeSource.Update(now.Add(-namespaceCacheRefreshInterval * time.Duration(3)))
+	s.timeSource.Update(now)
 	executable := s.newTestExecutable(func(_ tasks.Task) bool {
 		return true
 	})
-	s.timeSource.Update(now)
-	s.NoError(executable.HandleErr(err))
-
-	executable = s.newTestExecutable(func(_ tasks.Task) bool {
-		return true
-	})
-
 	s.Equal(err, executable.HandleErr(err))
+
+	s.timeSource.Update(now.Add(namespaceCacheRefreshInterval * time.Duration(3)))
+	s.NoError(executable.HandleErr(err))
 }
 
 func (s *executableSuite) TestHandleErr_RandomErr() {
@@ -194,11 +190,13 @@ func (s *executableSuite) TestTaskNack_Reschedule() {
 		return true
 	})
 
-	s.mockRescheduler.EXPECT().Add(executable, gomock.AssignableToTypeOf(time.Second))
+	s.mockRescheduler.EXPECT().Add(executable, gomock.AssignableToTypeOf(time.Now()))
 
 	executable.Nack(consts.ErrTaskRetry) // this error won't trigger re-submit
 	s.Equal(ctasks.TaskStatePending, executable.State())
 }
+
+// TODO: add test for handling not ready scheduled task
 
 func (s *executableSuite) newTestExecutable(
 	filter TaskFilter,
@@ -211,7 +209,7 @@ func (s *executableSuite) newTestExecutable(
 				tests.RunID,
 			),
 			tasks.CategoryTransfer,
-			time.Now(),
+			s.timeSource.Now(),
 		),
 		filter,
 		s.mockExecutor,

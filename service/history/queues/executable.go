@@ -28,6 +28,7 @@ package queues
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -82,6 +83,14 @@ const (
 	// resubmitMaxAttempts is the max number of attempts we may skip rescheduler when a task is Nacked.
 	// check the comment in shouldResubmitOnNack() for more details
 	resubmitMaxAttempts = 20
+
+	// maxTaskWaitDuration is the maximum duration the execution logic is willing to wait for a task to become
+	// ready for processing
+	maxTaskWaitDuration = 100 * time.Millisecond
+)
+
+var (
+	errScheduledTaskNotReady = errors.New("scheduled task is not ready for execution")
 )
 
 type (
@@ -131,7 +140,7 @@ func NewExecutable(
 		scheduler:   scheduler,
 		rescheduler: rescheduler,
 		timeSource:  timeSource,
-		loadTime:    timeSource.Now(),
+		loadTime:    common.MaxTime(timeSource.Now(), task.GetVisibilityTime()),
 		logger: log.NewLazyLogger(
 			logger,
 			func() []tag.Tag {
@@ -151,14 +160,20 @@ func (e *executableImpl) Execute() error {
 		return nil
 	}
 
-	// TODO: add check for visibility timestamp
-	// and either wait for reschedule (return special non-retryable error)
+	if waitTime, ready := e.readyForProcess(); !ready {
+		if waitTime <= maxTaskWaitDuration {
+			time.Sleep(waitTime)
+		} else {
+			return errScheduledTaskNotReady
+		}
+	}
 
 	// this filter should also contain the logic for overriding
 	// results from task allocator (force executing some standby task types)
-	e.shouldProcess = e.filter(e.Task)
-	if !e.shouldProcess {
-		return nil
+	if e.filter != nil {
+		if e.shouldProcess = e.filter(e.Task); !e.shouldProcess {
+			return nil
+		}
 	}
 
 	ctx := metrics.AddMetricsContext(context.Background())
@@ -206,6 +221,10 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 		return nil
 	}
 
+	if err == errScheduledTaskNotReady {
+		return err
+	}
+
 	if err == consts.ErrTaskRetry {
 		e.metricsProvider.Counter(TaskStandbyRetryCounter, nil).Record(1)
 		return err
@@ -240,11 +259,11 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 }
 
 func (e *executableImpl) IsRetryableError(err error) bool {
+	// this determines if the executable should be retried within one submission to scheduler
+
 	if e.State() == ctasks.TaskStateCancelled {
 		return false
 	}
-
-	// this determines if the executable should be retried within one submission to scheduler
 
 	if shard.IsShardOwnershipLostError(err) {
 		return false
@@ -259,7 +278,7 @@ func (e *executableImpl) IsRetryableError(err error) bool {
 	// ErrTaskRetry means mutable state is not ready for standby task processing
 	// there's no point for retrying the task immediately which will hold the worker corouinte
 	// TODO: change ErrTaskRetry to a better name
-	return err != consts.ErrTaskRetry && err != consts.ErrWorkflowBusy
+	return err != consts.ErrTaskRetry && err != consts.ErrWorkflowBusy && err != errScheduledTaskNotReady
 }
 
 func (e *executableImpl) RetryPolicy() backoff.RetryPolicy {
@@ -313,7 +332,7 @@ func (e *executableImpl) Nack(err error) {
 	}
 
 	if !submitted {
-		e.Reschedule()
+		e.rescheduler.Add(e, e.rescheduleTime(e.Attempt(), err))
 	}
 }
 
@@ -322,7 +341,7 @@ func (e *executableImpl) Reschedule() {
 		return
 	}
 
-	e.rescheduler.Add(e, e.rescheduleBackoff(e.Attempt()))
+	e.rescheduler.Add(e, e.rescheduleTime(e.Attempt(), nil))
 }
 
 func (e *executableImpl) State() ctasks.State {
@@ -368,6 +387,20 @@ func (e *executableImpl) QueueType() QueueType {
 	return e.queueType
 }
 
+func (e *executableImpl) readyForProcess() (time.Duration, bool) {
+	if category := e.GetCategory(); category.Type() != tasks.CategoryTypeScheduled {
+		return 0, true
+	}
+
+	now := e.timeSource.Now()
+	fireTime := e.GetVisibilityTime()
+	if !fireTime.After(now) {
+		return 0, true
+	}
+
+	return fireTime.Sub(now), false
+}
+
 func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 	// this is an optimization for skipping rescheduler and retry the task sooner
 	// this can be useful for errors like unable to get workflow lock, which doesn't
@@ -376,11 +409,17 @@ func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 		return false
 	}
 
-	return err == consts.ErrWorkflowBusy || common.IsContextDeadlineExceededErr(err) || e.IsRetryableError(err)
+	return err == consts.ErrWorkflowBusy ||
+		common.IsContextDeadlineExceededErr(err) ||
+		e.IsRetryableError(err)
 }
 
-func (e *executableImpl) rescheduleBackoff(attempt int) time.Duration {
+func (e *executableImpl) rescheduleTime(attempt int, err error) time.Time {
 	// elapsedTime (the first parameter) is not relevant here since reschedule policy
 	// has no expiration interval.
-	return reschedulePolicy.ComputeNextDelay(0, attempt)
+	if err == errScheduledTaskNotReady {
+		return e.GetVisibilityTime()
+	}
+
+	return e.timeSource.Now().Add(reschedulePolicy.ComputeNextDelay(0, attempt))
 }

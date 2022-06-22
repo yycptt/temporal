@@ -36,6 +36,7 @@ import (
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
+	ctasks "go.temporal.io/server/common/tasks"
 )
 
 type (
@@ -84,13 +85,16 @@ func (s *rescheudulerSuite) TestReschedule_NoRescheduleLimit() {
 
 	numExecutable := 10
 	for i := 0; i != numExecutable/2; i++ {
+		mockTask := NewMockExecutable(s.controller)
+		mockTask.EXPECT().State().Return(ctasks.TaskStatePending).Times(1)
 		s.rescheduler.Add(
-			NewMockExecutable(s.controller),
-			time.Duration(rand.Int63n(rescheduleInterval.Nanoseconds())),
+			mockTask,
+			now.Add(time.Duration(rand.Int63n(rescheduleInterval.Nanoseconds()))),
 		)
+
 		s.rescheduler.Add(
 			NewMockExecutable(s.controller),
-			rescheduleInterval+time.Duration(rand.Int63n(time.Minute.Nanoseconds())),
+			now.Add(rescheduleInterval+time.Duration(rand.Int63n(time.Minute.Nanoseconds()))),
 		)
 	}
 	s.Equal(numExecutable, s.rescheduler.Len())
@@ -109,9 +113,11 @@ func (s *rescheudulerSuite) TestReschedule_SubmissionFailed() {
 
 	numExecutable := 10
 	for i := 0; i != numExecutable; i++ {
+		mockTask := NewMockExecutable(s.controller)
+		mockTask.EXPECT().State().Return(ctasks.TaskStatePending).Times(1)
 		s.rescheduler.Add(
-			NewMockExecutable(s.controller),
-			time.Duration(rand.Int63n(rescheduleInterval.Nanoseconds())),
+			mockTask,
+			now.Add(time.Duration(rand.Int63n(rescheduleInterval.Nanoseconds()))),
 		)
 	}
 	s.Equal(numExecutable, s.rescheduler.Len())
