@@ -515,7 +515,7 @@ func (s *sliceSuite) validateMergedSlice(
 		}
 
 	}
-	s.True(expectedMergedRange.Equal(actualMergedRange))
+	s.True(expectedMergedRange.Equals(actualMergedRange))
 
 	actualTotalExecutables := 0
 	for _, mergedSlice := range mergedSlices {
@@ -571,18 +571,7 @@ func (s *sliceSuite) randomIteratorsInRange(
 	numIterators int,
 	paginationFnProvider PaginationFnProvider,
 ) []Iterator {
-	ranges := []Range{r}
-	for len(ranges) < numIterators {
-		r := ranges[0]
-		left, right := r.Split(NewRandomKeyInRange(r))
-		left.ExclusiveMax.FireTime.Add(-time.Nanosecond)
-		right.InclusiveMin.FireTime.Add(time.Nanosecond)
-		ranges = append(ranges[1:], left, right)
-	}
-
-	slices.SortFunc(ranges, func(a, b Range) bool {
-		return a.InclusiveMin.CompareTo(b.InclusiveMin) < 0
-	})
+	ranges := NewRandomOrderedRangesInRange(r, numIterators)
 
 	iterators := make([]Iterator, 0, numIterators)
 	for _, r := range ranges {

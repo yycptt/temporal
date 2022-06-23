@@ -108,7 +108,7 @@ func (s *Scope) MergeByRange(
 func (s *Scope) CanMergeByPredicate(
 	incomingScope Scope,
 ) bool {
-	return s.Range.Equal(incomingScope.Range)
+	return s.Range.Equals(incomingScope.Range)
 }
 
 func (s *Scope) MergeByPredicate(
@@ -132,4 +132,9 @@ func (s *Scope) IsEmpty() bool {
 	}
 
 	return false
+}
+
+func (s *Scope) Equals(scope Scope) bool {
+	return s.Range.Equals(scope.Range) &&
+		s.Predicate.Equals(scope.Predicate)
 }

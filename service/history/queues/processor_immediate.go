@@ -94,7 +94,7 @@ func newImmediateProcessor(
 			metricsProvider,
 		),
 
-		notifyCh: make(chan struct{}),
+		notifyCh: make(chan struct{}, 1),
 	}
 }
 

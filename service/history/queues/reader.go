@@ -32,12 +32,10 @@ import (
 
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
-	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
-	"go.temporal.io/server/service/history/configs"
 )
 
 type (
@@ -56,8 +54,6 @@ type (
 		ShrinkRangeIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
 		MaxReschdulerSize                    dynamicconfig.IntPropertyFn
 		PollBackoffInterval                  dynamicconfig.DurationPropertyFn
-		TaskMaxRetryCount                    dynamicconfig.IntPropertyFn
-		QueueType                            QueueType
 	}
 
 	SliceSplitter func(s Slice) (remaining []Slice)
@@ -65,13 +61,11 @@ type (
 	ReaderImpl struct {
 		sync.Mutex
 
-		paginationFnProvider PaginationFnProvider
-		options              *ReaderOptions
-		scheduler            Scheduler
-		rescheduler          Rescheduler
-		timeSource           clock.TimeSource
-		logger               log.Logger
-		metricsProvider      metrics.MetricProvider
+		options         *ReaderOptions
+		scheduler       Scheduler
+		rescheduler     Rescheduler
+		logger          log.Logger
+		metricsProvider metrics.MetricProvider
 
 		status     int32
 		shutdownCh chan struct{}
@@ -92,11 +86,8 @@ func NewReader(
 	options *ReaderOptions,
 	scheduler Scheduler,
 	rescheduler Rescheduler,
-	executor Executor,
-	timeSource clock.TimeSource,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
-	config *configs.Config,
 ) *ReaderImpl {
 
 	slices := list.New()
@@ -109,19 +100,18 @@ func NewReader(
 	}
 
 	return &ReaderImpl{
-		paginationFnProvider: paginationFnProvider,
-		options:              options,
-		scheduler:            scheduler,
-		rescheduler:          rescheduler,
-		timeSource:           timeSource,
-		logger:               logger,
-		metricsProvider:      metricsProvider,
+		options:         options,
+		scheduler:       scheduler,
+		rescheduler:     rescheduler,
+		logger:          logger,
+		metricsProvider: metricsProvider,
 
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
 
 		slices:        slices,
 		nextLoadSlice: slices.Front(),
+		notifyCh:      make(chan struct{}, 1),
 	}
 }
 
@@ -136,6 +126,8 @@ func (r *ReaderImpl) Start() {
 
 	r.shutdownWG.Add(1)
 	go r.eventLoop()
+
+	r.notify()
 
 	r.logger.Info("queue reader started", tag.LifeCycleStarted)
 }
@@ -332,6 +324,7 @@ func (r *ReaderImpl) notify() {
 	}
 }
 
+// TODO: probably move this logic into a method of Executable
 func (r *ReaderImpl) submit(
 	executable Executable,
 ) {

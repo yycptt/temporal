@@ -81,6 +81,8 @@ type (
 		MaxPollInterval                  dynamicconfig.DurationPropertyFn
 		MaxPollIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
 		CompleteTaskInterval             dynamicconfig.DurationPropertyFn
+		TaskMaxRetryCount                dynamicconfig.IntPropertyFn
+		QueueType                        QueueType
 	}
 )
 
@@ -132,11 +134,8 @@ func newProcessorBase(
 			&options.ReaderOptions,
 			scheduler,
 			rescheduler,
-			executor,
-			timeSource,
 			logger,
 			metricsProvider,
-			shard.GetConfig(),
 		)
 
 		for _, scope := range scopes {
