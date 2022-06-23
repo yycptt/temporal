@@ -95,61 +95,45 @@ func (s *sliceSuite) TestCanSplitByRange() {
 
 func (s *sliceSuite) TestSplitByRange() {
 	r := NewRandomRange()
-	predicate := predicates.All[tasks.Task]()
-	scope := NewScope(r, predicates.All[tasks.Task]())
-
-	slice := NewSlice(nil, s.executableInitializer, scope)
-	for _, executable := range s.randomExecutablesInRange(r, 10) {
-		slice.outstandingExecutables[executable.GetKey()] = executable
-	}
-	slice.iterators = s.randomIteratorsInRange(r, 5, nil)
+	slice := s.newTestSlice(r, nil, nil)
 
 	splitKey := NewRandomKeyInRange(r)
 	leftSlice, rightSlice := slice.SplitByRange(splitKey)
 	s.Equal(NewScope(
 		NewRange(r.InclusiveMin, splitKey),
-		predicate,
+		slice.scope.Predicate,
 	), leftSlice.Scope())
 	s.Equal(NewScope(
 		NewRange(splitKey, r.ExclusiveMax),
-		predicate,
+		slice.scope.Predicate,
 	), rightSlice.Scope())
 
 	s.validateSliceState(leftSlice.(*SliceImpl))
 	s.validateSliceState(rightSlice.(*SliceImpl))
 
-	s.Panics(func() { slice.validateNotDestroyed() })
+	s.Panics(func() { slice.stateSanityCheck() })
 }
 
 func (s *sliceSuite) TestSplitByPredicate() {
 	r := NewRandomRange()
 	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
-	predicate := tasks.NewNamespacePredicate(namespaceIDs)
-	scope := NewScope(r, predicate)
-
-	slice := NewSlice(nil, s.executableInitializer, scope)
-	for _, executable := range s.randomExecutablesInRange(r, 10) {
-		mockExecutable := executable.(*MockExecutable)
-		mockExecutable.EXPECT().GetNamespaceID().Return(namespaceIDs[rand.Intn(len(namespaceIDs))]).AnyTimes()
-		slice.outstandingExecutables[executable.GetKey()] = executable
-	}
-	slice.iterators = s.randomIteratorsInRange(r, 5, nil)
+	slice := s.newTestSlice(r, namespaceIDs, nil)
 
 	splitNamespaceIDs := append(slices.Clone(namespaceIDs[:rand.Intn(len(namespaceIDs))]), uuid.New(), uuid.New())
 	splitPredicate := tasks.NewNamespacePredicate(splitNamespaceIDs)
 	passSlice, failSlice := slice.SplitByPredicate(splitPredicate)
 	s.Equal(r, passSlice.Scope().Range)
 	s.Equal(r, failSlice.Scope().Range)
-	s.True(predicates.And[tasks.Task](predicate, splitPredicate).Equals(passSlice.Scope().Predicate))
-	s.True(predicates.And[tasks.Task](predicate, predicates.Not[tasks.Task](splitPredicate)).Equals(failSlice.Scope().Predicate))
+	s.True(predicates.And[tasks.Task](slice.scope.Predicate, splitPredicate).Equals(passSlice.Scope().Predicate))
+	s.True(predicates.And(slice.scope.Predicate, predicates.Not[tasks.Task](splitPredicate)).Equals(failSlice.Scope().Predicate))
 
 	s.validateSliceState(passSlice.(*SliceImpl))
 	s.validateSliceState(failSlice.(*SliceImpl))
 
-	s.Panics(func() { slice.validateNotDestroyed() })
+	s.Panics(func() { slice.stateSanityCheck() })
 }
 
-func (s *sliceSuite) TestCanMergeByRange() {
+func (s *sliceSuite) TestCanMergeWithSlice() {
 	r := NewRandomRange()
 	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
 	predicate := tasks.NewNamespacePredicate(namespaceIDs)
@@ -165,139 +149,137 @@ func (s *sliceSuite) TestCanMergeByRange() {
 	s.False(predicate.Equals(testPredicates[2]))
 
 	for _, mergePredicate := range testPredicates {
-		canMerge := predicate.Equals(mergePredicate)
-
 		testSlice := NewSlice(nil, nil, NewScope(r, mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, r.InclusiveMin), mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(r.ExclusiveMax, tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, NewRandomKeyInRange(r)), mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(NewRandomKeyInRange(r), tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 
 		testSlice = NewSlice(nil, nil, NewScope(NewRange(tasks.MinimumKey, tasks.MaximumKey), mergePredicate))
-		s.Equal(canMerge, slice.canMergeByRange(testSlice))
+		s.True(slice.CanMergeWithSlice(testSlice))
 	}
 
-	s.False(slice.canMergeByRange(slice))
+	s.False(slice.CanMergeWithSlice(slice))
 
 	testSlice := NewSlice(nil, nil, NewScope(NewRange(
 		tasks.MinimumKey,
 		tasks.NewKey(r.InclusiveMin.FireTime, r.InclusiveMin.TaskID-1),
 	), predicate))
-	s.False(slice.canMergeByRange(testSlice))
+	s.False(slice.CanMergeWithSlice(testSlice))
 
 	testSlice = NewSlice(nil, nil, NewScope(NewRange(
 		tasks.NewKey(r.ExclusiveMax.FireTime, r.ExclusiveMax.TaskID+1),
 		tasks.MaximumKey,
 	), predicate))
-	s.False(slice.canMergeByRange(testSlice))
+	s.False(slice.CanMergeWithSlice(testSlice))
 }
 
-func (s *sliceSuite) TestMergeByRange() {
+func (s *sliceSuite) TestMergeWithSlice_SamePredicate() {
 	r := NewRandomRange()
-	predicate := predicates.All[tasks.Task]()
-
-	slice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
-	for _, executable := range s.randomExecutablesInRange(r, rand.Intn(20)) {
-		slice.outstandingExecutables[executable.GetKey()] = executable
-	}
+	slice := s.newTestSlice(r, nil, nil)
 	totalExecutables := len(slice.outstandingExecutables)
-	slice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
 	incomingRange := NewRange(tasks.MinimumKey, NewRandomKeyInRange(r))
-	incomingSlice := NewSlice(nil, s.executableInitializer, NewScope(incomingRange, predicate))
-	for _, executable := range s.randomExecutablesInRange(incomingRange, rand.Intn(20)) {
-		incomingSlice.outstandingExecutables[executable.GetKey()] = executable
-	}
+	incomingSlice := s.newTestSlice(incomingRange, nil, nil)
 	totalExecutables += len(incomingSlice.outstandingExecutables)
-	incomingSlice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
-	mergedSlice := slice.mergeByRange(incomingSlice)
+	mergedSlices := slice.MergeWithSlice(incomingSlice)
+	s.Len(mergedSlices, 1)
 
-	s.Equal(NewScope(
-		NewRange(tasks.MinimumKey, r.ExclusiveMax),
-		predicate,
-	), mergedSlice.Scope())
-
-	s.validateSliceState(mergedSlice)
-	s.Len(mergedSlice.outstandingExecutables, totalExecutables)
-
-	s.Panics(func() { slice.validateNotDestroyed() })
-	s.Panics(func() { incomingSlice.validateNotDestroyed() })
+	s.validateMergedSlice(slice, incomingSlice, mergedSlices, totalExecutables)
 }
 
-func (s *sliceSuite) TestCanMergeByPredicate() {
+func (s *sliceSuite) TestMergeWithSlice_SameRange() {
 	r := NewRandomRange()
 	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
-	predicate := tasks.NewNamespacePredicate(namespaceIDs)
-	slice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
-
-	testSlice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
-	s.True(slice.canMergeByPredicate(testSlice))
-
-	testSlice = NewSlice(nil, s.executableInitializer, NewScope(r, tasks.NewTypePredicate([]enumsspb.TaskType{})))
-	s.True(slice.canMergeByPredicate(testSlice))
-
-	s.False(slice.canMergeByPredicate(slice))
-
-	testSlice = NewSlice(nil, s.executableInitializer, NewScope(NewRandomRange(), predicate))
-	s.False(slice.canMergeByPredicate(testSlice))
-
-	testSlice = NewSlice(nil, s.executableInitializer, NewScope(NewRandomRange(), predicates.All[tasks.Task]()))
-	s.False(slice.canMergeByPredicate(testSlice))
-}
-
-func (s *sliceSuite) TestMergeByPredicate() {
-	r := NewRandomRange()
-	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
-	predicate := tasks.NewNamespacePredicate(namespaceIDs)
-
-	slice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
-	for _, executable := range s.randomExecutablesInRange(r, rand.Intn(20)) {
-		mockExecutable := executable.(*MockExecutable)
-		mockExecutable.EXPECT().GetNamespaceID().Return(namespaceIDs[rand.Intn(len(namespaceIDs))]).AnyTimes()
-		mockExecutable.EXPECT().GetType().Return(enumsspb.TASK_TYPE_TRANSFER_CLOSE_EXECUTION).AnyTimes()
-		slice.outstandingExecutables[executable.GetKey()] = executable
-	}
+	slice := s.newTestSlice(r, namespaceIDs, nil)
 	totalExecutables := len(slice.outstandingExecutables)
-	slice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
 	taskTypes := []enumsspb.TaskType{
 		enumsspb.TASK_TYPE_ACTIVITY_RETRY_TIMER,
 		enumsspb.TASK_TYPE_DELETE_HISTORY_EVENT,
 	}
-	incomingPredicate := tasks.NewTypePredicate(taskTypes)
-	incomingSlice := NewSlice(nil, s.executableInitializer, NewScope(r, incomingPredicate))
-	for _, executable := range s.randomExecutablesInRange(r, rand.Intn(20)) {
-		mockExecutable := executable.(*MockExecutable)
-		mockExecutable.EXPECT().GetNamespaceID().Return(uuid.New()).AnyTimes()
-		mockExecutable.EXPECT().GetType().Return(taskTypes[rand.Intn(len(taskTypes))]).AnyTimes()
-		incomingSlice.outstandingExecutables[executable.GetKey()] = executable
-	}
+	incomingSlice := s.newTestSlice(r, nil, taskTypes)
 	totalExecutables += len(incomingSlice.outstandingExecutables)
-	incomingSlice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
 
-	mergedSlice := slice.mergeByPredicate(incomingSlice)
+	mergedSlices := slice.MergeWithSlice(incomingSlice)
+	s.Len(mergedSlices, 1)
 
-	s.Equal(r, mergedSlice.Scope().Range)
-	s.True(predicates.Or[tasks.Task](predicate, incomingPredicate).Equals(mergedSlice.Scope().Predicate))
-
-	s.validateSliceState(mergedSlice)
-	s.Len(mergedSlice.outstandingExecutables, totalExecutables)
-
-	s.Panics(func() { slice.validateNotDestroyed() })
-	s.Panics(func() { incomingSlice.validateNotDestroyed() })
+	s.validateMergedSlice(slice, incomingSlice, mergedSlices, totalExecutables)
 }
 
-// TODO: add test for CanMergeWithSlice and MergeWithSlice
+func (s *sliceSuite) TestMergeWithSlice_SameMinKey() {
+	r := NewRandomRange()
+	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	slice := s.newTestSlice(r, namespaceIDs, nil)
+	totalExecutables := len(slice.outstandingExecutables)
+
+	incomingRange := NewRange(
+		r.InclusiveMin,
+		NewRandomKeyInRange(NewRange(r.InclusiveMin, tasks.MaximumKey)),
+	)
+	incomingNamespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	incomingSlice := s.newTestSlice(incomingRange, incomingNamespaceIDs, nil)
+	totalExecutables += len(incomingSlice.outstandingExecutables)
+
+	mergedSlices := slice.MergeWithSlice(incomingSlice)
+	s.Len(mergedSlices, 2)
+
+	s.validateMergedSlice(slice, incomingSlice, mergedSlices, totalExecutables)
+}
+
+func (s *sliceSuite) TestMergeWithSlice_SameMaxKey() {
+	r := NewRandomRange()
+	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	slice := s.newTestSlice(r, namespaceIDs, nil)
+	totalExecutables := len(slice.outstandingExecutables)
+
+	incomingRange := NewRange(
+		NewRandomKeyInRange(NewRange(tasks.MinimumKey, r.ExclusiveMax)),
+		r.ExclusiveMax,
+	)
+	incomingNamespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	incomingSlice := s.newTestSlice(incomingRange, incomingNamespaceIDs, nil)
+	totalExecutables += len(incomingSlice.outstandingExecutables)
+
+	mergedSlices := slice.MergeWithSlice(incomingSlice)
+	s.Len(mergedSlices, 2)
+
+	s.validateMergedSlice(slice, incomingSlice, mergedSlices, totalExecutables)
+}
+
+func (s *sliceSuite) TestMergeWithSlice_DifferentMinMaxKey() {
+	r := NewRandomRange()
+	namespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	slice := s.newTestSlice(r, namespaceIDs, nil)
+	totalExecutables := len(slice.outstandingExecutables)
+
+	incomingMinKey := NewRandomKeyInRange(NewRange(r.InclusiveMin, r.ExclusiveMax))
+	incomingRange := NewRange(
+		incomingMinKey,
+		NewRandomKeyInRange(NewRange(incomingMinKey, tasks.MaximumKey)),
+	)
+	incomingNamespaceIDs := []string{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	incomingSlice := s.newTestSlice(incomingRange, incomingNamespaceIDs, nil)
+	totalExecutables += len(incomingSlice.outstandingExecutables)
+
+	s.validateSliceState(slice)
+	s.validateSliceState(incomingSlice)
+
+	mergedSlices := slice.MergeWithSlice(incomingSlice)
+	s.Len(mergedSlices, 3)
+
+	s.validateMergedSlice(slice, incomingSlice, mergedSlices, totalExecutables)
+}
 
 func (s *sliceSuite) TestShrinkRange() {
 	r := NewRandomRange()
@@ -432,6 +414,119 @@ func (s *sliceSuite) TestSelectTasks_Error() {
 	s.NoError(err)
 	s.Len(executables, numTasks)
 	s.Empty(slice.iterators)
+}
+
+func (s *sliceSuite) TestMoreTasks() {
+	slice := s.newTestSlice(NewRandomRange(), nil, nil)
+
+	s.True(slice.MoreTasks())
+
+	slice.outstandingExecutables = nil
+	s.True(slice.MoreTasks())
+
+	slice.iterators = nil
+	s.False(slice.MoreTasks())
+}
+
+func (s *sliceSuite) TestClear() {
+	slice := s.newTestSlice(NewRandomRange(), nil, nil)
+	for _, executable := range slice.outstandingExecutables {
+		executable.(*MockExecutable).EXPECT().State().Return(ctasks.TaskStatePending).Times(1)
+		executable.(*MockExecutable).EXPECT().Cancel().Times(1)
+	}
+	numIters := len(slice.iterators)
+
+	slice.Clear()
+	s.Empty(slice.outstandingExecutables)
+	s.Len(slice.iterators, numIters+1)
+
+	// clear again, the number of iterators should not increase
+	slice.Clear()
+	s.Empty(slice.outstandingExecutables)
+	s.Len(slice.iterators, numIters+1)
+}
+
+func (s *sliceSuite) newTestSlice(
+	r Range,
+	namespaceIDs []string,
+	taskTypes []enumsspb.TaskType,
+) *SliceImpl {
+	predicate := predicates.All[tasks.Task]()
+	if len(namespaceIDs) != 0 {
+		predicate = predicates.And[tasks.Task](
+			predicate,
+			tasks.NewNamespacePredicate(namespaceIDs),
+		)
+	}
+	if len(taskTypes) != 0 {
+		predicate = predicates.And[tasks.Task](
+			predicate,
+			tasks.NewTypePredicate(taskTypes),
+		)
+	}
+
+	if len(namespaceIDs) == 0 {
+		namespaceIDs = []string{uuid.New()}
+	}
+
+	if len(taskTypes) == 0 {
+		taskTypes = []enumsspb.TaskType{enumsspb.TASK_TYPE_TRANSFER_CLOSE_EXECUTION}
+	}
+
+	slice := NewSlice(nil, s.executableInitializer, NewScope(r, predicate))
+	for _, executable := range s.randomExecutablesInRange(r, rand.Intn(20)) {
+		slice.outstandingExecutables[executable.GetKey()] = executable
+
+		mockExecutable := executable.(*MockExecutable)
+		mockExecutable.EXPECT().GetNamespaceID().Return(namespaceIDs[rand.Intn(len(namespaceIDs))]).AnyTimes()
+		mockExecutable.EXPECT().GetType().Return(taskTypes[rand.Intn(len(taskTypes))]).AnyTimes()
+	}
+	slice.iterators = s.randomIteratorsInRange(r, rand.Intn(10), nil)
+
+	return slice
+}
+
+func (s *sliceSuite) validateMergedSlice(
+	currentSlice *SliceImpl,
+	incomingSlice *SliceImpl,
+	mergedSlices []Slice,
+	expectedTotalExecutables int,
+) {
+	expectedMergedRange := currentSlice.scope.Range.Merge(incomingSlice.scope.Range)
+	actualMergedRange := mergedSlices[0].Scope().Range
+	for _, mergedSlice := range mergedSlices {
+		actualMergedRange = actualMergedRange.Merge(mergedSlice.Scope().Range)
+
+		containedByCurrent := currentSlice.scope.Range.ContainsRange(mergedSlice.Scope().Range)
+		containedByIncoming := incomingSlice.scope.Range.ContainsRange(mergedSlice.Scope().Range)
+		if containedByCurrent && containedByIncoming {
+			s.True(predicates.Or(
+				currentSlice.scope.Predicate,
+				incomingSlice.scope.Predicate,
+			).Equals(mergedSlice.Scope().Predicate))
+		} else if containedByCurrent {
+			s.True(currentSlice.scope.Predicate.Equals(mergedSlice.Scope().Predicate))
+		} else if containedByIncoming {
+			s.True(incomingSlice.scope.Predicate.Equals(mergedSlice.Scope().Predicate))
+		} else if currentSlice.scope.Predicate.Equals(incomingSlice.scope.Predicate) {
+			s.True(currentSlice.scope.Predicate.Equals(mergedSlice.Scope().Predicate))
+		} else {
+			s.Fail("Merged slice range not contained by the merging slices")
+		}
+
+	}
+	s.True(expectedMergedRange.Equal(actualMergedRange))
+
+	actualTotalExecutables := 0
+	for _, mergedSlice := range mergedSlices {
+		mergedSliceImpl := mergedSlice.(*SliceImpl)
+		s.validateSliceState(mergedSliceImpl)
+		actualTotalExecutables += len(mergedSliceImpl.outstandingExecutables)
+	}
+	s.Equal(expectedTotalExecutables, actualTotalExecutables)
+
+	s.Panics(func() { currentSlice.stateSanityCheck() })
+	s.Panics(func() { incomingSlice.stateSanityCheck() })
 }
 
 func (s *sliceSuite) validateSliceState(

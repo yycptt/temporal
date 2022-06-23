@@ -33,7 +33,10 @@ import (
 
 type (
 
-	// Slice ... TODO add comments
+	// Slice manages the loading and status tracking of all
+	// tasks within its Scope.
+	// It also provides methods for splitting or merging with
+	// another slice either by range or by predicate.
 	Slice interface {
 		Scope() Scope
 		CanSplitByRange(tasks.Key) bool
@@ -80,12 +83,12 @@ func NewSlice(
 }
 
 func (s *SliceImpl) Scope() Scope {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 	return s.scope
 }
 
 func (s *SliceImpl) CanSplitByRange(key tasks.Key) bool {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 	return s.scope.CanSplitByRange(key)
 }
 
@@ -141,7 +144,7 @@ func (s *SliceImpl) splitByRange(key tasks.Key) (left *SliceImpl, right *SliceIm
 }
 
 func (s *SliceImpl) SplitByPredicate(predicate tasks.Predicate) (pass Slice, fail Slice) {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 
 	passScope, failScope := s.scope.SplitByPredicate(predicate)
 	passExecutables, failExecutables := s.splitExecutables(passScope, failScope)
@@ -195,9 +198,9 @@ func (s *SliceImpl) splitExecutables(
 }
 
 func (s *SliceImpl) CanMergeWithSlice(slice Slice) bool {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 
-	return s != slice && s.scope.CanMergeByRange(slice.Scope())
+	return s != slice && s.scope.Range.CanMerge(slice.Scope().Range)
 }
 
 func (s *SliceImpl) MergeWithSlice(slice Slice) []Slice {
@@ -214,7 +217,7 @@ func (s *SliceImpl) MergeWithSlice(slice Slice) []Slice {
 		panic(fmt.Sprintf("Unable to merge queue slice of type %T with type %T", s, slice))
 	}
 
-	if s.canMergeByRange(incomingSlice) {
+	if s.scope.CanMergeByRange(incomingSlice.scope) {
 		return []Slice{s.mergeByRange(incomingSlice)}
 	}
 
@@ -248,36 +251,34 @@ func (s *SliceImpl) MergeWithSlice(slice Slice) []Slice {
 
 }
 
-func (s *SliceImpl) canMergeByRange(slice *SliceImpl) bool {
-	return s.scope.CanMergeByRange(slice.scope)
-}
-
 func (s *SliceImpl) mergeByRange(incomingSlice *SliceImpl) *SliceImpl {
-	s.destroy()
-	incomingSlice.destroy()
-	return &SliceImpl{
+	mergedSlice := &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  s.scope.MergeByRange(incomingSlice.scope),
 		outstandingExecutables: s.mergeExecutables(incomingSlice),
 		iterators:              s.mergeIterators(incomingSlice),
 	}
-}
 
-func (s *SliceImpl) canMergeByPredicate(slice *SliceImpl) bool {
-	return s.scope.CanMergeByPredicate(slice.scope)
+	s.destroy()
+	incomingSlice.destroy()
+
+	return mergedSlice
 }
 
 func (s *SliceImpl) mergeByPredicate(incomingSlice *SliceImpl) *SliceImpl {
-	s.destroy()
-	incomingSlice.destroy()
-	return &SliceImpl{
+	mergedSlice := &SliceImpl{
 		paginationFnProvider:   s.paginationFnProvider,
 		executableInitializer:  s.executableInitializer,
 		scope:                  s.scope.MergeByPredicate(incomingSlice.scope),
 		outstandingExecutables: s.mergeExecutables(incomingSlice),
 		iterators:              s.mergeIterators(incomingSlice),
 	}
+
+	s.destroy()
+	incomingSlice.destroy()
+
+	return mergedSlice
 }
 
 func (s *SliceImpl) mergeExecutables(incomingSlice *SliceImpl) map[tasks.Key]Executable {
@@ -341,7 +342,7 @@ func (s *SliceImpl) appendIterator(
 }
 
 func (s *SliceImpl) ShrinkRange() {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 
 	minTaskKey := tasks.MaximumKey
 	for key := range s.outstandingExecutables {
@@ -370,7 +371,7 @@ func (s *SliceImpl) ShrinkRange() {
 }
 
 func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 
 	if len(s.iterators) == 0 {
 		return []Executable{}, nil
@@ -407,30 +408,34 @@ func (s *SliceImpl) SelectTasks(batchSize int) ([]Executable, error) {
 }
 
 func (s *SliceImpl) MoreTasks() bool {
-	s.validateNotDestroyed()
-
-	for _, iter := range s.iterators {
-		if iter.HasNext() {
-			break
-		}
-		s.iterators = s.iterators[1:]
-	}
+	s.stateSanityCheck()
 
 	return len(s.iterators) != 0
 }
 
 func (s *SliceImpl) Clear() {
-	s.validateNotDestroyed()
+	s.stateSanityCheck()
 
 	s.ShrinkRange()
 
-	for _, executable := range s.outstandingExecutables {
+	executableMaxKey := tasks.MinimumKey
+	for key, executable := range s.outstandingExecutables {
 		executable.Cancel()
+
+		executableMaxKey = tasks.MaxKey(executableMaxKey, key)
+		delete(s.outstandingExecutables, key)
 	}
 
-	s.outstandingExecutables = make(map[tasks.Key]Executable)
-	s.iterators = []Iterator{
-		NewIterator(s.paginationFnProvider, s.scope.Range),
+	if executableMaxKey != tasks.MinimumKey {
+		iterator := NewIterator(
+			s.paginationFnProvider,
+			NewRange(s.scope.Range.InclusiveMin, executableMaxKey),
+		)
+
+		iterators := make([]Iterator, 0, len(s.iterators)+1)
+		iterators = append(iterators, iterator)
+		iterators = append(iterators, s.iterators...)
+		s.iterators = iterators
 	}
 }
 
@@ -440,7 +445,7 @@ func (s *SliceImpl) destroy() {
 	s.outstandingExecutables = nil
 }
 
-func (s *SliceImpl) validateNotDestroyed() {
+func (s *SliceImpl) stateSanityCheck() {
 	if s.destroyed {
 		panic("Can not invoke method on destroyed queue slice")
 	}
