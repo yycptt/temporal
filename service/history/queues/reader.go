@@ -43,8 +43,8 @@ type (
 		common.Daemon
 
 		Scopes() []Scope
-		MergeSlices(...Slice)
 		SplitSlices(SliceSplitter)
+		MergeSlices(...Slice)
 		Throttle(time.Duration)
 	}
 
@@ -160,38 +160,6 @@ func (r *ReaderImpl) Scopes() []Scope {
 	return scopes
 }
 
-func (r *ReaderImpl) MergeSlices(incomingSlices ...Slice) {
-	r.Lock()
-	defer r.Unlock()
-
-	mergedSlices := make([]Slice, 0, r.slices.Len()+len(incomingSlices))
-	currentSliceElement := r.slices.Front()
-	incomingSliceIdx := 0
-
-	for currentSliceElement != nil && incomingSliceIdx < len(incomingSlices) {
-		currentSlice := currentSliceElement.Value.(Slice)
-		incomingSlice := incomingSlices[incomingSliceIdx]
-
-		if currentSlice.Scope().Range.InclusiveMin.CompareTo(incomingSlice.Scope().Range.InclusiveMin) < 0 {
-			mergedSlices = appendSlice(mergedSlices, currentSlice)
-			currentSliceElement = currentSliceElement.Next()
-		} else {
-			mergedSlices = appendSlice(mergedSlices, incomingSlice)
-			incomingSliceIdx++
-		}
-	}
-
-	for currentSliceElement != nil {
-		mergedSlices = appendSlice(mergedSlices, currentSliceElement.Value.(Slice))
-		currentSliceElement = currentSliceElement.Next()
-	}
-	for _, slice := range incomingSlices[incomingSliceIdx:] {
-		mergedSlices = appendSlice(mergedSlices, slice)
-	}
-
-	r.resetNextLoadSliceLocked()
-}
-
 func (r *ReaderImpl) SplitSlices(splitter SliceSplitter) {
 	r.Lock()
 	defer r.Unlock()
@@ -201,11 +169,47 @@ func (r *ReaderImpl) SplitSlices(splitter SliceSplitter) {
 		next = element.Next()
 
 		for _, newSlice := range splitter(element.Value.(Slice)) {
-			r.slices.InsertAfter(newSlice, element)
+			r.slices.InsertBefore(newSlice, element)
 		}
 
 		r.slices.Remove(element)
 	}
+
+	r.resetNextLoadSliceLocked()
+}
+
+func (r *ReaderImpl) MergeSlices(incomingSlices ...Slice) {
+	r.Lock()
+	defer r.Unlock()
+
+	mergedSlices := list.New()
+
+	currentSliceElement := r.slices.Front()
+	incomingSliceIdx := 0
+
+	for currentSliceElement != nil && incomingSliceIdx < len(incomingSlices) {
+		currentSlice := currentSliceElement.Value.(Slice)
+		incomingSlice := incomingSlices[incomingSliceIdx]
+
+		if currentSlice.Scope().Range.InclusiveMin.CompareTo(incomingSlice.Scope().Range.InclusiveMin) < 0 {
+			appendSlice(mergedSlices, currentSlice)
+			currentSliceElement = currentSliceElement.Next()
+		} else {
+			appendSlice(mergedSlices, incomingSlice)
+			incomingSliceIdx++
+		}
+	}
+
+	for ; currentSliceElement != nil; currentSliceElement = currentSliceElement.Next() {
+		appendSlice(mergedSlices, currentSliceElement.Value.(Slice))
+	}
+	for _, slice := range incomingSlices[incomingSliceIdx:] {
+		appendSlice(mergedSlices, slice)
+	}
+
+	// clear existing list
+	r.slices.Init()
+	r.slices = mergedSlices
 
 	r.resetNextLoadSliceLocked()
 }
@@ -218,6 +222,10 @@ func (r *ReaderImpl) Throttle(backoff time.Duration) {
 }
 
 func (r *ReaderImpl) throttleLocked(backoff time.Duration) {
+	if r.throttleTimer != nil {
+		r.throttleTimer.Stop()
+	}
+
 	r.throttleTimer = time.AfterFunc(backoff, func() {
 		r.Lock()
 		defer r.Unlock()
@@ -347,20 +355,24 @@ func (r *ReaderImpl) verifyPendingTaskSize() {
 }
 
 func appendSlice(
-	slices []Slice,
+	slices *list.List,
 	incomingSlice Slice,
-) []Slice {
-	if len(slices) == 0 {
-		return []Slice{incomingSlice}
+) {
+	if slices.Len() == 0 {
+		slices.PushBack(incomingSlice)
+		return
 	}
 
-	lastSlice := slices[len(slices)-1]
+	lastElement := slices.Back()
+	lastSlice := lastElement.Value.(Slice)
 	if !lastSlice.CanMergeWithSlice(incomingSlice) {
-		slices = append(slices, incomingSlice)
-		return slices
+		slices.PushBack(incomingSlice)
+		return
 	}
 
 	mergedSlices := lastSlice.MergeWithSlice(incomingSlice)
-	slices = slices[:len(slices)-1]
-	return append(slices, mergedSlices...)
+	slices.Remove(lastElement)
+	for _, mergedSlice := range mergedSlices {
+		slices.PushBack(mergedSlice)
+	}
 }

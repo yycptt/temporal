@@ -26,6 +26,8 @@ package queues
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -115,6 +117,216 @@ func (s *readerSuite) TestScopes() {
 	}
 }
 
+func (s *readerSuite) TestSplitSlices() {
+	scopes := s.newRandomScopes(3)
+	reader := s.newTestReader(scopes, nil)
+
+	splitter := func(s Slice) []Slice {
+		// split head
+		if scope := s.Scope(); !scope.Equals(scopes[0]) {
+			return []Slice{s}
+		}
+
+		// test remove slice
+		return nil
+	}
+	reader.SplitSlices(splitter)
+	s.Len(reader.Scopes(), 2)
+	s.validateSlicesOrdered(reader)
+
+	splitter = func(s Slice) []Slice {
+		// split tail
+		if scope := s.Scope(); !scope.Equals(scopes[2]) {
+			return []Slice{s}
+		}
+
+		left, right := s.SplitByRange(NewRandomKeyInRange(s.Scope().Range))
+		_, right = right.SplitByRange(NewRandomKeyInRange(right.Scope().Range))
+
+		return []Slice{left, right}
+	}
+	reader.SplitSlices(splitter)
+	s.Len(reader.Scopes(), 3)
+	s.validateSlicesOrdered(reader)
+
+	splitter = func(s Slice) []Slice {
+		left, right := s.SplitByRange(NewRandomKeyInRange(s.Scope().Range))
+		return []Slice{left, right}
+	}
+	reader.SplitSlices(splitter)
+	s.Len(reader.Scopes(), 6)
+	s.validateSlicesOrdered(reader)
+}
+
+func (s *readerSuite) TestMergeSlices() {
+	scopes := s.newRandomScopes(rand.Intn(10))
+	reader := s.newTestReader(scopes, nil)
+
+	incomingScopes := s.newRandomScopes(rand.Intn(10))
+	incomingSlices := make([]Slice, 0, len(incomingScopes))
+	for _, incomingScope := range incomingScopes {
+		incomingSlices = append(incomingSlices, NewSlice(nil, s.executableInitializer, incomingScope))
+	}
+
+	reader.MergeSlices(incomingSlices...)
+
+	mergedScopes := reader.Scopes()
+	for idx, scope := range mergedScopes[:len(mergedScopes)-1] {
+		nextScope := mergedScopes[idx+1]
+		if scope.Range.ExclusiveMax.CompareTo(nextScope.Range.InclusiveMin) > 0 {
+			panic(fmt.Sprintf(
+				"Found overlapping scope in merged slices, left: %v, right: %v",
+				scope,
+				nextScope,
+			))
+		}
+	}
+}
+
+func (s *readerSuite) TestThrottle() {
+	scopes := s.newRandomScopes(1)
+
+	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
+		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
+			mockTask := tasks.NewMockTask(s.controller)
+			mockTask.EXPECT().GetKey().Return(NewRandomKeyInRange(scopes[0].Range)).AnyTimes()
+			return []tasks.Task{mockTask}, nil, nil
+		}
+	}
+
+	reader := s.newTestReader(scopes, paginationFnProvider)
+
+	now := time.Now()
+	delay := 100 * time.Millisecond
+	reader.Throttle(delay / 2)
+
+	// check if existing throttle timer will be overwritten
+	reader.Throttle(delay)
+
+	doneCh := make(chan struct{})
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).DoAndReturn(func(_ Executable) (bool, error) {
+		s.True(time.Now().After(now.Add(delay)))
+		close(doneCh)
+		return true, nil
+	}).Times(1)
+	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
+
+	reader.Start()
+	<-doneCh
+	reader.Stop()
+}
+
+func (s *readerSuite) TestLoadAndSubmitTasks_Throttled() {
+	scopes := s.newRandomScopes(1)
+
+	reader := s.newTestReader(scopes, nil)
+	reader.Throttle(100 * time.Millisecond)
+
+	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
+
+	// should be no-op
+	reader.loadAndSubmitTasks()
+}
+
+func (s *readerSuite) TestLoadAndSubmitTasks_TooManyPendingTasks() {
+	scopes := s.newRandomScopes(1)
+
+	reader := s.newTestReader(scopes, nil)
+
+	s.mockRescheduler.EXPECT().Len().Return(reader.options.MaxReschdulerSize() * 2).AnyTimes()
+
+	// should be no-op
+	reader.loadAndSubmitTasks()
+}
+
+func (s *readerSuite) TestLoadAndSubmitTasks_MoreTasks() {
+	scopes := s.newRandomScopes(1)
+
+	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
+		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
+			result := make([]tasks.Task, 0, 100)
+			for i := 0; i != 100; i++ {
+				mockTask := tasks.NewMockTask(s.controller)
+				mockTask.EXPECT().GetKey().Return(NewRandomKeyInRange(scopes[0].Range)).AnyTimes()
+				result = append(result, mockTask)
+			}
+
+			return result, nil, nil
+		}
+	}
+
+	reader := s.newTestReader(scopes, paginationFnProvider)
+
+	taskSubmitted := 0
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).DoAndReturn(func(_ Executable) (bool, error) {
+		taskSubmitted++
+		return true, nil
+	}).AnyTimes()
+	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
+
+	reader.loadAndSubmitTasks()
+	<-reader.notifyCh // should trigger next round of load
+	s.Equal(reader.options.BatchSize(), taskSubmitted)
+	s.True(scopes[0].Equals(reader.nextLoadSlice.Value.(Slice).Scope()))
+}
+
+func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_HasNextSlice() {
+	scopes := s.newRandomScopes(2)
+
+	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
+		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
+			mockTask := tasks.NewMockTask(s.controller)
+			mockTask.EXPECT().GetKey().Return(NewRandomKeyInRange(scopes[0].Range)).AnyTimes()
+			return []tasks.Task{mockTask}, nil, nil
+		}
+	}
+
+	reader := s.newTestReader(scopes, paginationFnProvider)
+
+	taskSubmitted := 0
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).DoAndReturn(func(_ Executable) (bool, error) {
+		taskSubmitted++
+		return true, nil
+	}).AnyTimes()
+	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
+
+	reader.loadAndSubmitTasks()
+	<-reader.notifyCh // should trigger next round of load
+	s.Equal(1, taskSubmitted)
+	s.True(scopes[1].Equals(reader.nextLoadSlice.Value.(Slice).Scope()))
+}
+
+func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_NoNextSlice() {
+	scopes := s.newRandomScopes(1)
+
+	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
+		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
+			mockTask := tasks.NewMockTask(s.controller)
+			mockTask.EXPECT().GetKey().Return(NewRandomKeyInRange(scopes[0].Range)).AnyTimes()
+			return []tasks.Task{mockTask}, nil, nil
+		}
+	}
+
+	reader := s.newTestReader(scopes, paginationFnProvider)
+
+	taskSubmitted := 0
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).DoAndReturn(func(_ Executable) (bool, error) {
+		taskSubmitted++
+		return true, nil
+	}).AnyTimes()
+	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
+
+	reader.loadAndSubmitTasks()
+	select {
+	case <-reader.notifyCh:
+		s.Fail("should not signal notify ch as there's no more task or slice")
+	default:
+		// should not trigger next round of load
+	}
+	s.Equal(1, taskSubmitted)
+	s.Nil(reader.nextLoadSlice)
+}
+
 func (s *readerSuite) TestShrinkRanges() {
 	numScopes := 10
 	scopes := s.newRandomScopes(numScopes)
@@ -162,6 +374,19 @@ func (s *readerSuite) TestSubmitTask() {
 	reader.submit(mockExecutable)
 }
 
+func (s *readerSuite) validateSlicesOrdered(
+	reader Reader,
+) {
+	scopes := reader.Scopes()
+	if len(scopes) <= 1 {
+		return
+	}
+
+	for idx := range scopes[:len(scopes)-1] {
+		s.True(scopes[idx].Range.ExclusiveMax.CompareTo(scopes[idx+1].Range.InclusiveMin) <= 0)
+	}
+}
+
 func (s *readerSuite) newRandomScopes(
 	numScopes int,
 ) []Scope {
@@ -187,7 +412,7 @@ func (s *readerSuite) newTestReader(
 		s.executableInitializer,
 		scopes,
 		&ReaderOptions{
-			BatchSize:                            dynamicconfig.GetIntPropertyFn(100),
+			BatchSize:                            dynamicconfig.GetIntPropertyFn(10),
 			ShrinkRangeInterval:                  dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
 			ShrinkRangeIntervalJitterCoefficient: dynamicconfig.GetFloatPropertyFn(0.15),
 			MaxReschdulerSize:                    dynamicconfig.GetIntPropertyFn(100),
