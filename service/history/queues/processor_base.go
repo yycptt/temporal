@@ -120,7 +120,18 @@ func newProcessorBase(
 		)
 	}
 
-	readerScopes := FromPersistenceProcessorState(persistenceState, category.Type())
+	readerScopes := make(map[int32][]Scope)
+	if persistenceState != nil {
+		readerScopes = FromPersistenceProcessorState(persistenceState, category.Type())
+	} else {
+		readerScopes[defaultReaderId] = []Scope{NewScope(
+			NewRange(
+				shard.GetQueueAckLevel(category),
+				shard.GetQueueMaxReadLevel(category, ""),
+			),
+			predicates.All[tasks.Task](),
+		)}
+	}
 	readers := make(map[int32]Reader, len(readerScopes))
 
 	minKey := tasks.MaximumKey
