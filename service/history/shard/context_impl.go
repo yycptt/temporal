@@ -112,15 +112,15 @@ type (
 		lifecycleCancel context.CancelFunc
 
 		// All following fields are protected by rwLock, and only valid if state >= Acquiring:
-		rwLock                       sync.RWMutex
-		state                        contextState
-		engineFuture                 *future.FutureImpl[Engine]
-		lastUpdated                  time.Time
-		shardInfo                    *persistence.ShardInfoWithFailover
-		taskSequenceNumber           int64
-		maxTaskSequenceNumber        int64
-		immediateTaskMaxReadLevel    int64
-		scheduledTaskMaxReadLevelMap map[string]time.Time // cluster -> scheduledTaskMaxReadLevel
+		rwLock                             sync.RWMutex
+		state                              contextState
+		engineFuture                       *future.FutureImpl[Engine]
+		lastUpdated                        time.Time
+		shardInfo                          *persistence.ShardInfoWithFailover
+		taskSequenceNumber                 int64
+		maxTaskSequenceNumber              int64
+		immediateExclusiveTaskMaxReadLevel int64
+		scheduledTaskMaxReadLevelMap       map[string]time.Time // cluster -> scheduledTaskMaxReadLevel
 
 		// exist only in memory
 		remoteClusterInfos map[string]*remoteClusterInfo
@@ -263,13 +263,13 @@ func (s *ContextImpl) GenerateTaskIDs(number int) ([]int64, error) {
 	return result, nil
 }
 
-func (s *ContextImpl) GetQueueMaxReadLevel(
+func (s *ContextImpl) GetQueueExclusiveMaxReadLevel(
 	category tasks.Category,
 	cluster string,
 ) tasks.Key {
 	switch categoryType := category.Type(); categoryType {
 	case tasks.CategoryTypeImmediate:
-		return s.getImmediateTaskMaxReadLevel()
+		return s.getImmediateExclusiveTaskMaxReadLevel()
 	case tasks.CategoryTypeScheduled:
 		return s.updateScheduledTaskMaxReadLevel(cluster)
 	default:
@@ -277,10 +277,10 @@ func (s *ContextImpl) GetQueueMaxReadLevel(
 	}
 }
 
-func (s *ContextImpl) getImmediateTaskMaxReadLevel() tasks.Key {
+func (s *ContextImpl) getImmediateExclusiveTaskMaxReadLevel() tasks.Key {
 	s.rLock()
 	defer s.rUnlock()
-	return tasks.NewImmediateKey(s.immediateTaskMaxReadLevel)
+	return tasks.NewImmediateKey(s.immediateExclusiveTaskMaxReadLevel)
 }
 
 func (s *ContextImpl) getScheduledTaskMaxReadLevel(cluster string) tasks.Key {
@@ -312,6 +312,8 @@ func (s *ContextImpl) updateScheduledTaskMaxReadLevel(cluster string) tasks.Key 
 	return tasks.NewKey(s.scheduledTaskMaxReadLevelMap[cluster], 0)
 }
 
+// NOTE: the ack level returned is inclusive for immediate task category (acked),
+// but exclusive for scheduled task category (not acked).
 func (s *ContextImpl) GetQueueAckLevel(category tasks.Category) tasks.Key {
 	s.rLock()
 	defer s.rUnlock()
@@ -672,12 +674,12 @@ func (s *ContextImpl) CreateWorkflowExecution(
 		return nil, err
 	}
 
-	transferMaxReadLevel := int64(0)
+	transferExclusiveMaxReadLevel := int64(0)
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.NewWorkflowSnapshot.Tasks,
-		&transferMaxReadLevel,
+		&transferExclusiveMaxReadLevel,
 	); err != nil {
 		return nil, err
 	}
@@ -685,7 +687,7 @@ func (s *ContextImpl) CreateWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.CreateWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -716,12 +718,12 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 		return nil, err
 	}
 
-	transferMaxReadLevel := int64(0)
+	transferExclusiveMaxReadLevel := int64(0)
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.UpdateWorkflowMutation.Tasks,
-		&transferMaxReadLevel,
+		&transferExclusiveMaxReadLevel,
 	); err != nil {
 		return nil, err
 	}
@@ -731,7 +733,7 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 			namespaceEntry,
 			workflowID,
 			request.NewWorkflowSnapshot.Tasks,
-			&transferMaxReadLevel,
+			&transferExclusiveMaxReadLevel,
 		); err != nil {
 			return nil, err
 		}
@@ -741,7 +743,7 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.UpdateWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -787,13 +789,13 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 		return nil, err
 	}
 
-	transferMaxReadLevel := int64(0)
+	transferExclusiveMaxReadLevel := int64(0)
 	if request.CurrentWorkflowMutation != nil {
 		if err := s.allocateTaskIDsLocked(
 			namespaceEntry,
 			workflowID,
 			request.CurrentWorkflowMutation.Tasks,
-			&transferMaxReadLevel,
+			&transferExclusiveMaxReadLevel,
 		); err != nil {
 			return nil, err
 		}
@@ -802,7 +804,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 		namespaceEntry,
 		workflowID,
 		request.ResetWorkflowSnapshot.Tasks,
-		&transferMaxReadLevel,
+		&transferExclusiveMaxReadLevel,
 	); err != nil {
 		return nil, err
 	}
@@ -811,7 +813,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 			namespaceEntry,
 			workflowID,
 			request.NewWorkflowSnapshot.Tasks,
-			&transferMaxReadLevel,
+			&transferExclusiveMaxReadLevel,
 		); err != nil {
 			return nil, err
 		}
@@ -820,7 +822,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.ConflictResolveWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -851,12 +853,12 @@ func (s *ContextImpl) SetWorkflowExecution(
 		return nil, err
 	}
 
-	transferMaxReadLevel := int64(0)
+	transferExclusiveMaxReadLevel := int64(0)
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.SetWorkflowSnapshot.Tasks,
-		&transferMaxReadLevel,
+		&transferExclusiveMaxReadLevel,
 	); err != nil {
 		return nil, err
 	}
@@ -864,7 +866,7 @@ func (s *ContextImpl) SetWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.SetWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -905,19 +907,19 @@ func (s *ContextImpl) addTasksLocked(
 	request *persistence.AddHistoryTasksRequest,
 	namespaceEntry *namespace.Namespace,
 ) error {
-	transferMaxReadLevel := int64(0)
+	transferExclusiveMaxReadLevel := int64(0)
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		request.WorkflowID,
 		request.Tasks,
-		&transferMaxReadLevel,
+		&transferExclusiveMaxReadLevel,
 	); err != nil {
 		return err
 	}
 
 	request.RangeID = s.getRangeIDLocked()
 	err := s.executionManager.AddHistoryTasks(ctx, request)
-	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferMaxReadLevel)
+	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel)
 }
 
 func (s *ContextImpl) AppendHistoryEvents(
@@ -1184,16 +1186,16 @@ func (s *ContextImpl) renewRangeLocked(isStealing bool) error {
 
 	s.taskSequenceNumber = updatedShardInfo.GetRangeId() << s.config.RangeSizeBits
 	s.maxTaskSequenceNumber = (updatedShardInfo.GetRangeId() + 1) << s.config.RangeSizeBits
-	s.immediateTaskMaxReadLevel = s.taskSequenceNumber - 1
+	s.immediateExclusiveTaskMaxReadLevel = s.taskSequenceNumber
 	s.shardInfo = updatedShardInfo
 
 	return nil
 }
 
 func (s *ContextImpl) updateMaxReadLevelLocked(rl int64) {
-	if rl > s.immediateTaskMaxReadLevel {
+	if rl > s.immediateExclusiveTaskMaxReadLevel {
 		s.contextTaggedLogger.Debug("Updating MaxTaskID", tag.MaxLevel(rl))
-		s.immediateTaskMaxReadLevel = rl
+		s.immediateExclusiveTaskMaxReadLevel = rl
 	}
 }
 
@@ -1260,10 +1262,10 @@ func (s *ContextImpl) emitShardInfoMetricsLogsLocked() {
 	diffTransferLevel := maxTransferLevel.TaskID - minTransferLevel.TaskID
 	diffTimerLevel := maxTimerLevel.FireTime.Sub(minTimerLevel.FireTime)
 
-	replicationLag := s.immediateTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryReplication).TaskID
-	transferLag := s.immediateTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryTransfer).TaskID
+	replicationLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryReplication).TaskID - 1
+	transferLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryTransfer).TaskID - 1
 	timerLag := s.timeSource.Now().Sub(s.getQueueAckLevelLocked(tasks.CategoryTimer).FireTime)
-	visibilityLag := s.immediateTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryVisibility).TaskID
+	visibilityLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryVisibility).TaskID - 1
 
 	transferFailoverInProgress := len(s.shardInfo.FailoverLevels[tasks.CategoryTransfer])
 	timerFailoverInProgress := len(s.shardInfo.FailoverLevels[tasks.CategoryTimer])
@@ -1304,7 +1306,7 @@ func (s *ContextImpl) allocateTaskIDsLocked(
 	namespaceEntry *namespace.Namespace,
 	workflowID string,
 	newTasks map[tasks.Category][]tasks.Task,
-	transferMaxReadLevel *int64,
+	transferExclusiveMaxReadLevel *int64,
 ) error {
 	currentCluster := s.GetClusterMetadata().GetCurrentClusterName()
 	for category, tasksByCategory := range newTasks {
@@ -1316,7 +1318,7 @@ func (s *ContextImpl) allocateTaskIDsLocked(
 			}
 			s.contextTaggedLogger.Debug("Assigning task ID", tag.TaskID(id))
 			task.SetTaskID(id)
-			*transferMaxReadLevel = id
+			*transferExclusiveMaxReadLevel = id + 1
 
 			// if scheduled task, check if fire time is in the past
 			if category.Type() == tasks.CategoryTypeScheduled {

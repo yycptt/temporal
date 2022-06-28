@@ -132,8 +132,7 @@ func newProcessorBase(
 		exclusiveMaxReadKey = queueState.exclusiveMaxReadKey
 		completedTaskKey = queueState.exclusiveMaxReadKey
 	} else {
-		// TODO: make max read level always exclusive
-		exclusiveMaxReadKey = shard.GetQueueMaxReadLevel(category, "").Next()
+		exclusiveMaxReadKey = shard.GetQueueExclusiveMaxReadLevel(category, "")
 		completedTaskKey = shard.GetQueueAckLevel(category)
 	}
 
@@ -226,7 +225,7 @@ func (p *processorBase) processNewRange() {
 	// TODO: is the max read level inclusive or exclusive for read?
 	// today inclusive for immediate task
 	// exclusive for scheduled task
-	newMaxKey := p.shard.GetQueueMaxReadLevel(p.category, "").Next()
+	newMaxKey := p.shard.GetQueueExclusiveMaxReadLevel(p.category, "")
 
 	if !p.nonReadableRange.CanSplit(newMaxKey) {
 		return
