@@ -80,7 +80,7 @@ func newVisibilityQueueProcessor(
 	visibilityMgr manager.VisibilityManager,
 	metricProvider metrics.MetricProvider,
 	hostRateLimiter quotas.RateLimiter,
-) queues.Processor {
+) queues.Queue {
 
 	config := shard.GetConfig()
 	logger := log.With(shard.GetLogger(), tag.ComponentVisibilityQueue)

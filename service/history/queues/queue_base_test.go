@@ -59,7 +59,7 @@ type (
 		mockRescheduler *MockRescheduler
 
 		config          *configs.Config
-		options         *ProcessorOptions
+		options         *QueueOptions
 		logger          log.Logger
 		metricsProvider metrics.MetricProvider
 	}
@@ -78,7 +78,7 @@ func (s *processorBaseSuite) SetupTest() {
 	s.mockRescheduler = NewMockRescheduler(s.controller)
 
 	s.config = tests.NewDynamicConfig()
-	s.options = &ProcessorOptions{
+	s.options = &QueueOptions{
 		ReaderOptions: ReaderOptions{
 			BatchSize:                            dynamicconfig.GetIntPropertyFn(10),
 			ShrinkRangeInterval:                  dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
@@ -120,7 +120,7 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 		s.config,
 	)
 
-	base := newProcessorBase(
+	base := newQueueBase(
 		mockShard,
 		tasks.CategoryTransfer,
 		nil,
@@ -207,7 +207,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 		s.config,
 	)
 
-	base := newProcessorBase(
+	base := newQueueBase(
 		mockShard,
 		tasks.CategoryTransfer,
 		nil,
@@ -264,7 +264,7 @@ func (s *processorBaseSuite) TestStartStop() {
 	}).Times(1)
 	s.mockRescheduler.EXPECT().Len().Return(0).AnyTimes()
 
-	base := newProcessorBase(
+	base := newQueueBase(
 		mockShard,
 		tasks.CategoryTransfer,
 		paginationFnProvider,
@@ -310,7 +310,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		s.config,
 	)
 
-	base := newProcessorBase(
+	base := newQueueBase(
 		mockShard,
 		tasks.CategoryTimer,
 		nil,
@@ -364,7 +364,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		s.config,
 	)
 
-	base := newProcessorBase(
+	base := newQueueBase(
 		mockShard,
 		tasks.CategoryTimer,
 		nil,

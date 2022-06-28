@@ -40,25 +40,25 @@ import (
 	"go.temporal.io/server/service/history/tasks"
 )
 
-var _ Processor = (*immediateProcessor)(nil)
+var _ Queue = (*immediateQueue)(nil)
 
 type (
-	immediateProcessor struct {
-		*processorBase
+	immediateQueue struct {
+		*queueBase
 
 		notifyCh chan struct{}
 	}
 )
 
-func newImmediateProcessor(
+func newImmediateQueue(
 	shard shard.Context,
 	category tasks.Category,
 	scheduler Scheduler,
 	executor Executor,
-	options *ProcessorOptions,
+	options *QueueOptions,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
-) *immediateProcessor {
+) *immediateQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			request := &persistence.GetHistoryTasksRequest{
@@ -79,8 +79,8 @@ func newImmediateProcessor(
 		}
 	}
 
-	return &immediateProcessor{
-		processorBase: newProcessorBase(
+	return &immediateQueue{
+		queueBase: newQueueBase(
 			shard,
 			category,
 			paginationFnProvider,
@@ -95,7 +95,7 @@ func newImmediateProcessor(
 	}
 }
 
-func (p *immediateProcessor) Start() {
+func (p *immediateQueue) Start() {
 	if !atomic.CompareAndSwapInt32(&p.status, common.DaemonStatusInitialized, common.DaemonStatusStarted) {
 		return
 	}
@@ -103,7 +103,7 @@ func (p *immediateProcessor) Start() {
 	p.logger.Info("", tag.LifeCycleStarting)
 	defer p.logger.Info("", tag.LifeCycleStarted)
 
-	p.processorBase.Start()
+	p.queueBase.Start()
 
 	p.shutdownWG.Add(1)
 	go p.processEventLoop()
@@ -111,7 +111,7 @@ func (p *immediateProcessor) Start() {
 	p.notify()
 }
 
-func (p *immediateProcessor) Stop() {
+func (p *immediateQueue) Stop() {
 	if !atomic.CompareAndSwapInt32(&p.status, common.DaemonStatusStarted, common.DaemonStatusStopped) {
 		return
 	}
@@ -125,10 +125,10 @@ func (p *immediateProcessor) Stop() {
 		p.logger.Warn("", tag.LifeCycleStopTimedout)
 	}
 
-	p.processorBase.Stop()
+	p.queueBase.Stop()
 }
 
-func (p *immediateProcessor) NotifyNewTasks(_ string, tasks []tasks.Task) {
+func (p *immediateQueue) NotifyNewTasks(_ string, tasks []tasks.Task) {
 	if len(tasks) == 0 {
 		return
 	}
@@ -136,7 +136,7 @@ func (p *immediateProcessor) NotifyNewTasks(_ string, tasks []tasks.Task) {
 	p.notify()
 }
 
-func (p *immediateProcessor) processEventLoop() {
+func (p *immediateQueue) processEventLoop() {
 	defer p.shutdownWG.Done()
 
 	pollTimer := time.NewTimer(backoff.JitDuration(
@@ -166,7 +166,7 @@ func (p *immediateProcessor) processEventLoop() {
 	}
 }
 
-func (p *immediateProcessor) notify() {
+func (p *immediateQueue) notify() {
 	select {
 	case p.notifyCh <- struct{}{}:
 	default:

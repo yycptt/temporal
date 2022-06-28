@@ -51,7 +51,7 @@ type (
 		exclusiveMaxReadKey tasks.Key
 	}
 
-	processorBase struct {
+	queueBase struct {
 		shard shard.Context
 
 		status     int32
@@ -59,7 +59,7 @@ type (
 		shutdownWG sync.WaitGroup
 
 		category        tasks.Category
-		options         *ProcessorOptions
+		options         *QueueOptions
 		rescheduler     Rescheduler
 		timeSource      clock.TimeSource
 		logger          log.Logger
@@ -78,7 +78,7 @@ type (
 		completeRetryPolicy backoff.RetryPolicy
 	}
 
-	ProcessorOptions struct {
+	QueueOptions struct {
 		// TODO: remove duplicate for complete task and shrink range
 		ReaderOptions
 
@@ -90,16 +90,16 @@ type (
 	}
 )
 
-func newProcessorBase(
+func newQueueBase(
 	shard shard.Context,
 	category tasks.Category,
 	paginationFnProvider PaginationFnProvider,
 	scheduler Scheduler,
 	executor Executor,
-	options *ProcessorOptions,
+	options *QueueOptions,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
-) *processorBase {
+) *queueBase {
 	timeSource := shard.GetTimeSource()
 	rescheduler := NewRescheduler(
 		scheduler,
@@ -158,7 +158,7 @@ func newProcessorBase(
 	completeRetryPolicy.SetMaximumInterval(5 * time.Second)
 	completeRetryPolicy.SetExpirationInterval(backoff.NoInterval)
 
-	return &processorBase{
+	return &queueBase{
 		shard: shard,
 
 		status:     common.DaemonStatusInitialized,
@@ -182,7 +182,7 @@ func newProcessorBase(
 	}
 }
 
-func (p *processorBase) Start() {
+func (p *queueBase) Start() {
 	for _, reader := range p.readers {
 		reader.Start()
 	}
@@ -194,7 +194,7 @@ func (p *processorBase) Start() {
 	))
 }
 
-func (p *processorBase) Stop() {
+func (p *queueBase) Stop() {
 	for _, reader := range p.readers {
 		reader.Stop()
 	}
@@ -202,26 +202,26 @@ func (p *processorBase) Stop() {
 	p.completeTaskTimer.Stop()
 }
 
-func (p *processorBase) Category() tasks.Category {
+func (p *queueBase) Category() tasks.Category {
 	return p.category
 }
 
-func (p *processorBase) FailoverNamespace(
+func (p *queueBase) FailoverNamespace(
 	namespaceIDs map[string]struct{},
 ) {
 	// TODO: reschedule all tasks for namespaces that becomes active
 	// no-op
 }
 
-func (p *processorBase) LockTaskProcessing() {
+func (p *queueBase) LockTaskProcessing() {
 	// no-op
 }
 
-func (p *processorBase) UnlockTaskProcessing() {
+func (p *queueBase) UnlockTaskProcessing() {
 	// no-op
 }
 
-func (p *processorBase) processNewRange() {
+func (p *queueBase) processNewRange() {
 	// TODO: is the max read level inclusive or exclusive for read?
 	// today inclusive for immediate task
 	// exclusive for scheduled task
@@ -243,7 +243,7 @@ func (p *processorBase) processNewRange() {
 	))
 }
 
-func (p *processorBase) completeTaskAndPersistState() {
+func (p *queueBase) completeTaskAndPersistState() {
 	var err error
 	defer func() {
 		if err == nil {

@@ -378,7 +378,7 @@ func HistoryServiceProvider(
 		fx.Provide(params.PersistenceFactoryProvider),
 		fx.Provide(workflow.NewTaskGeneratorProvider),
 		resource.DefaultOptions,
-		history.QueueProcessorModule,
+		history.QueueModule,
 		history.Module,
 		replication.Module,
 		fx.NopLogger,

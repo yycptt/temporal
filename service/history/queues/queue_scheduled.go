@@ -42,11 +42,11 @@ import (
 	"go.temporal.io/server/service/history/tasks"
 )
 
-var _ Processor = (*scheduledProcessor)(nil)
+var _ Queue = (*scheduledQueue)(nil)
 
 type (
-	scheduledProcessor struct {
-		*processorBase
+	scheduledQueue struct {
+		*queueBase
 
 		timerGate   timer.Gate
 		newTimerCh  chan struct{}
@@ -55,15 +55,15 @@ type (
 	}
 )
 
-func newScheduledProcessor(
+func newScheduledQueue(
 	shard shard.Context,
 	category tasks.Category,
 	scheduler Scheduler,
 	executor Executor,
-	options *ProcessorOptions,
+	options *QueueOptions,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
-) *scheduledProcessor {
+) *scheduledQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			request := &persistence.GetHistoryTasksRequest{
@@ -84,8 +84,8 @@ func newScheduledProcessor(
 		}
 	}
 
-	return &scheduledProcessor{
-		processorBase: newProcessorBase(
+	return &scheduledQueue{
+		queueBase: newQueueBase(
 			shard,
 			category,
 			paginationFnProvider,
@@ -100,7 +100,7 @@ func newScheduledProcessor(
 	}
 }
 
-func (p *scheduledProcessor) Start() {
+func (p *scheduledQueue) Start() {
 	if !atomic.CompareAndSwapInt32(&p.status, common.DaemonStatusInitialized, common.DaemonStatusStarted) {
 		return
 	}
@@ -108,7 +108,7 @@ func (p *scheduledProcessor) Start() {
 	p.logger.Info("", tag.LifeCycleStarting)
 	defer p.logger.Info("", tag.LifeCycleStarted)
 
-	p.processorBase.Start()
+	p.queueBase.Start()
 
 	p.shutdownWG.Add(1)
 	go p.processEventLoop()
@@ -116,7 +116,7 @@ func (p *scheduledProcessor) Start() {
 	p.notify(time.Time{})
 }
 
-func (p *scheduledProcessor) Stop() {
+func (p *scheduledQueue) Stop() {
 	if !atomic.CompareAndSwapInt32(&p.status, common.DaemonStatusStarted, common.DaemonStatusStopped) {
 		return
 	}
@@ -131,10 +131,10 @@ func (p *scheduledProcessor) Stop() {
 		p.logger.Warn("", tag.LifeCycleStopTimedout)
 	}
 
-	p.processorBase.Stop()
+	p.queueBase.Stop()
 }
 
-func (p *scheduledProcessor) NotifyNewTasks(_ string, tasks []tasks.Task) {
+func (p *scheduledQueue) NotifyNewTasks(_ string, tasks []tasks.Task) {
 	if len(tasks) == 0 {
 		return
 	}
@@ -150,7 +150,7 @@ func (p *scheduledProcessor) NotifyNewTasks(_ string, tasks []tasks.Task) {
 	p.notify(newTime)
 }
 
-func (p *scheduledProcessor) processEventLoop() {
+func (p *scheduledQueue) processEventLoop() {
 	defer p.shutdownWG.Done()
 
 	pollTimer := time.NewTimer(backoff.JitDuration(
@@ -182,7 +182,7 @@ func (p *scheduledProcessor) processEventLoop() {
 	}
 }
 
-func (p *scheduledProcessor) notify(newTime time.Time) {
+func (p *scheduledQueue) notify(newTime time.Time) {
 	p.newTimeLock.Lock()
 	defer p.newTimeLock.Unlock()
 
@@ -197,7 +197,7 @@ func (p *scheduledProcessor) notify(newTime time.Time) {
 	}
 }
 
-func (p *scheduledProcessor) processNewTime() {
+func (p *scheduledQueue) processNewTime() {
 	p.newTimeLock.Lock()
 	newTime := p.newTime
 	p.newTime = time.Time{}
@@ -208,12 +208,12 @@ func (p *scheduledProcessor) processNewTime() {
 	p.timerGate.Update(newTime)
 }
 
-func (p *scheduledProcessor) processNewRange() {
-	p.processorBase.processNewRange()
+func (p *scheduledQueue) processNewRange() {
+	p.queueBase.processNewRange()
 	p.lookAheadTask()
 }
 
-func (p *scheduledProcessor) lookAheadTask() {
+func (p *scheduledQueue) lookAheadTask() {
 	lookAheadMinTime := p.nonReadableRange.InclusiveMin.FireTime
 	lookAheadMaxTime := lookAheadMinTime.Add(p.options.MaxPollInterval())
 

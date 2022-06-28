@@ -528,7 +528,7 @@ func (c *temporalImpl) startHistory(
 			fx.Provide(func() *esclient.Config { return c.esConfig }),
 			fx.Provide(func() esclient.Client { return c.esClient }),
 			fx.Provide(workflow.NewTaskGeneratorProvider),
-			history.QueueProcessorModule,
+			history.QueueModule,
 			history.Module,
 			replication.Module,
 			fx.Populate(&historyService, &clientBean, &namespaceRegistry),
