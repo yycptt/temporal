@@ -108,7 +108,7 @@ func (s *readerSuite) TestStartLoadStop() {
 }
 
 func (s *readerSuite) TestScopes() {
-	scopes := s.newRandomScopes(10)
+	scopes := NewRandomScopes(10)
 
 	reader := s.newTestReader(scopes, nil)
 	actualScopes := reader.Scopes()
@@ -118,7 +118,7 @@ func (s *readerSuite) TestScopes() {
 }
 
 func (s *readerSuite) TestSplitSlices() {
-	scopes := s.newRandomScopes(3)
+	scopes := NewRandomScopes(3)
 	reader := s.newTestReader(scopes, nil)
 
 	splitter := func(s Slice) []Slice {
@@ -159,10 +159,10 @@ func (s *readerSuite) TestSplitSlices() {
 }
 
 func (s *readerSuite) TestMergeSlices() {
-	scopes := s.newRandomScopes(rand.Intn(10))
+	scopes := NewRandomScopes(rand.Intn(10))
 	reader := s.newTestReader(scopes, nil)
 
-	incomingScopes := s.newRandomScopes(rand.Intn(10))
+	incomingScopes := NewRandomScopes(rand.Intn(10))
 	incomingSlices := make([]Slice, 0, len(incomingScopes))
 	for _, incomingScope := range incomingScopes {
 		incomingSlices = append(incomingSlices, NewSlice(nil, s.executableInitializer, incomingScope))
@@ -184,7 +184,7 @@ func (s *readerSuite) TestMergeSlices() {
 }
 
 func (s *readerSuite) TestThrottle() {
-	scopes := s.newRandomScopes(1)
+	scopes := NewRandomScopes(1)
 
 	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -217,7 +217,7 @@ func (s *readerSuite) TestThrottle() {
 }
 
 func (s *readerSuite) TestLoadAndSubmitTasks_Throttled() {
-	scopes := s.newRandomScopes(1)
+	scopes := NewRandomScopes(1)
 
 	reader := s.newTestReader(scopes, nil)
 	reader.Throttle(100 * time.Millisecond)
@@ -229,7 +229,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_Throttled() {
 }
 
 func (s *readerSuite) TestLoadAndSubmitTasks_TooManyPendingTasks() {
-	scopes := s.newRandomScopes(1)
+	scopes := NewRandomScopes(1)
 
 	reader := s.newTestReader(scopes, nil)
 
@@ -240,7 +240,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_TooManyPendingTasks() {
 }
 
 func (s *readerSuite) TestLoadAndSubmitTasks_MoreTasks() {
-	scopes := s.newRandomScopes(1)
+	scopes := NewRandomScopes(1)
 
 	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -271,7 +271,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_MoreTasks() {
 }
 
 func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_HasNextSlice() {
-	scopes := s.newRandomScopes(2)
+	scopes := NewRandomScopes(2)
 
 	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -297,7 +297,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_HasNextSlice() {
 }
 
 func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_NoNextSlice() {
-	scopes := s.newRandomScopes(1)
+	scopes := NewRandomScopes(1)
 
 	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -329,7 +329,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_NoNextSlice() {
 
 func (s *readerSuite) TestShrinkRanges() {
 	numScopes := 10
-	scopes := s.newRandomScopes(numScopes)
+	scopes := NewRandomScopes(numScopes)
 
 	// manually set some scopes to be empty
 	emptyIdx := map[int]struct{}{0: {}, 2: {}, 5: {}, 9: {}}
@@ -385,22 +385,6 @@ func (s *readerSuite) validateSlicesOrdered(
 	for idx := range scopes[:len(scopes)-1] {
 		s.True(scopes[idx].Range.ExclusiveMax.CompareTo(scopes[idx+1].Range.InclusiveMin) <= 0)
 	}
-}
-
-func (s *readerSuite) newRandomScopes(
-	numScopes int,
-) []Scope {
-	ranges := NewRandomOrderedRangesInRange(
-		NewRandomRange(),
-		numScopes,
-	)
-
-	scopes := make([]Scope, 0, 10)
-	for _, r := range ranges {
-		scopes = append(scopes, NewScope(r, predicates.All[tasks.Task]()))
-	}
-
-	return scopes
 }
 
 func (s *readerSuite) newTestReader(

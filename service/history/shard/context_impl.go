@@ -452,6 +452,10 @@ func (s *ContextImpl) UpdateQueueState(
 	minAckLevel := int64(math.MaxInt64)
 	for _, readerState := range state.ReaderStates {
 		for _, scope := range readerState.Scopes {
+			// TODO: this is a bit different
+			// for immediate type, ack level is acked
+			// for scheduled type, ack level is not acked.
+			// so for immediate type, we need to call Prev on inclusive min
 			minAckLevel = common.MinInt64(minAckLevel, scope.Range.InclusiveMin)
 		}
 	}

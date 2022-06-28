@@ -29,7 +29,6 @@ import (
 	"sync"
 	"time"
 
-	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/clock"
@@ -89,7 +88,6 @@ type (
 func newProcessorBase(
 	shard shard.Context,
 	category tasks.Category,
-	persistenceState *persistencespb.QueueProcessorState,
 	paginationFnProvider PaginationFnProvider,
 	scheduler Scheduler,
 	executor Executor,
@@ -108,7 +106,7 @@ func newProcessorBase(
 	executableInitializer := func(t tasks.Task) Executable {
 		return NewExecutable(
 			t,
-			func(task tasks.Task) bool { return true },
+			nil,
 			executor,
 			scheduler,
 			rescheduler,
@@ -121,13 +119,14 @@ func newProcessorBase(
 	}
 
 	readerScopes := make(map[int32][]Scope)
-	if persistenceState != nil {
+	if persistenceState, ok := shard.GetQueueState(category); ok {
 		readerScopes = FromPersistenceProcessorState(persistenceState, category.Type())
 	} else {
+		// TODO: just create an empty list for defaultID and let the initial scan to fill in the first range?
 		readerScopes[defaultReaderId] = []Scope{NewScope(
 			NewRange(
 				shard.GetQueueAckLevel(category),
-				shard.GetQueueMaxReadLevel(category, ""),
+				shard.GetQueueMaxReadLevel(category, "").Next(),
 			),
 			predicates.All[tasks.Task](),
 		)}
@@ -136,7 +135,6 @@ func newProcessorBase(
 
 	minKey := tasks.MaximumKey
 	maxKey := tasks.MinimumKey
-
 	for key, scopes := range readerScopes {
 		readers[key] = NewReader(
 			paginationFnProvider,
@@ -149,9 +147,9 @@ func newProcessorBase(
 			metricsProvider,
 		)
 
-		for _, scope := range scopes {
-			minKey = tasks.MinKey(minKey, scope.Range.InclusiveMin)
-			maxKey = tasks.MaxKey(maxKey, scope.Range.ExclusiveMax)
+		if len(scopes) != 0 {
+			minKey = tasks.MinKey(minKey, scopes[0].Range.InclusiveMin)
+			maxKey = tasks.MaxKey(maxKey, scopes[len(scopes)-1].Range.ExclusiveMax)
 		}
 	}
 
@@ -176,7 +174,7 @@ func newProcessorBase(
 		executableInitializer: executableInitializer,
 
 		completedTaskKey: minKey,
-		nonReadableRange: NewRange(maxKey, tasks.MaximumKey),
+		nonReadableRange: NewRange(maxKey, tasks.MaximumKey), // should not use max key, the value should be persisted and loaded from persistence
 		readers:          readers,
 
 		completeRetryPolicy: completeRetryPolicy,
@@ -210,7 +208,8 @@ func (p *processorBase) Category() tasks.Category {
 func (p *processorBase) FailoverNamespace(
 	namespaceIDs map[string]struct{},
 ) {
-	// TODO: reschedule all tasks for failover namespaces
+	// TODO: reschedule all tasks for namespaces that becomes active
+	// no-op
 }
 
 func (p *processorBase) LockTaskProcessing() {
@@ -222,7 +221,10 @@ func (p *processorBase) UnlockTaskProcessing() {
 }
 
 func (p *processorBase) processNewRange() {
-	newMaxKey := p.shard.GetQueueMaxReadLevel(p.category, "")
+	// TODO: is the max read level inclusive or exclusive for read?
+	// today inclusive for immediate task
+	// exclusive for scheduled task
+	newMaxKey := p.shard.GetQueueMaxReadLevel(p.category, "").Next()
 
 	if !p.nonReadableRange.CanSplit(newMaxKey) {
 		return
@@ -267,17 +269,19 @@ func (p *processorBase) completeTaskAndPersistState() {
 		}
 	}
 
-	// must do range complete first
-	if err = p.shard.GetExecutionManager().RangeCompleteHistoryTasks(context.TODO(), &persistence.RangeCompleteHistoryTasksRequest{
-		ShardID:             p.shard.GetShardID(),
-		TaskCategory:        p.category,
-		InclusiveMinTaskKey: p.completedTaskKey,
-		ExclusiveMaxTaskKey: minPendingTaskKey,
-	}); err != nil {
-		return
-	}
+	if minPendingTaskKey != tasks.MaximumKey && minPendingTaskKey.CompareTo(p.completedTaskKey) > 0 {
+		// must do range complete first
+		if err = p.shard.GetExecutionManager().RangeCompleteHistoryTasks(context.TODO(), &persistence.RangeCompleteHistoryTasksRequest{
+			ShardID:             p.shard.GetShardID(),
+			TaskCategory:        p.category,
+			InclusiveMinTaskKey: p.completedTaskKey, // TODO: sanitize key
+			ExclusiveMaxTaskKey: minPendingTaskKey,
+		}); err != nil {
+			return
+		}
 
-	p.completedTaskKey = minPendingTaskKey
+		p.completedTaskKey = minPendingTaskKey
+	}
 
 	persistenceState := ToPersistenceProcessorState(readerScopes, p.category.Type())
 	err = p.shard.UpdateQueueState(p.category, persistenceState)

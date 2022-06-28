@@ -434,16 +434,19 @@ func (s *sliceSuite) TestClear() {
 		executable.(*MockExecutable).EXPECT().State().Return(ctasks.TaskStatePending).Times(1)
 		executable.(*MockExecutable).EXPECT().Cancel().Times(1)
 	}
-	numIters := len(slice.iterators)
+	expectedNumIters := len(slice.iterators)
+	if len(slice.outstandingExecutables) != 0 {
+		expectedNumIters++
+	}
 
 	slice.Clear()
 	s.Empty(slice.outstandingExecutables)
-	s.Len(slice.iterators, numIters+1)
+	s.Len(slice.iterators, expectedNumIters)
 
 	// clear again, the number of iterators should not increase
 	slice.Clear()
 	s.Empty(slice.outstandingExecutables)
-	s.Len(slice.iterators, numIters+1)
+	s.Len(slice.iterators, expectedNumIters)
 }
 
 func (s *sliceSuite) newTestSlice(

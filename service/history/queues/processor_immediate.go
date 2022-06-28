@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/collection"
@@ -54,7 +53,6 @@ type (
 func newImmediateProcessor(
 	shard shard.Context,
 	category tasks.Category,
-	persistenceState *persistencespb.QueueProcessorState,
 	scheduler Scheduler,
 	executor Executor,
 	options *ProcessorOptions,
@@ -85,7 +83,6 @@ func newImmediateProcessor(
 		processorBase: newProcessorBase(
 			shard,
 			category,
-			persistenceState,
 			paginationFnProvider,
 			scheduler,
 			executor,
