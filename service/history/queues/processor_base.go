@@ -46,6 +46,11 @@ const (
 )
 
 type (
+	queueState struct {
+		readerScopes        map[int32][]Scope
+		exclusiveMaxReadKey tasks.Key
+	}
+
 	processorBase struct {
 		shard shard.Context
 
@@ -119,22 +124,20 @@ func newProcessorBase(
 	}
 
 	readerScopes := make(map[int32][]Scope)
+	var completedTaskKey tasks.Key
+	var exclusiveMaxReadKey tasks.Key
 	if persistenceState, ok := shard.GetQueueState(category); ok {
-		readerScopes = FromPersistenceProcessorState(persistenceState, category.Type())
+		queueState := FromPersistenceQueueState(persistenceState, category.Type())
+		readerScopes = queueState.readerScopes
+		exclusiveMaxReadKey = queueState.exclusiveMaxReadKey
+		completedTaskKey = queueState.exclusiveMaxReadKey
 	} else {
-		// TODO: just create an empty list for defaultID and let the initial scan to fill in the first range?
-		readerScopes[defaultReaderId] = []Scope{NewScope(
-			NewRange(
-				shard.GetQueueAckLevel(category),
-				shard.GetQueueMaxReadLevel(category, "").Next(),
-			),
-			predicates.All[tasks.Task](),
-		)}
+		// TODO: make max read level always exclusive
+		exclusiveMaxReadKey = shard.GetQueueMaxReadLevel(category, "").Next()
+		completedTaskKey = shard.GetQueueAckLevel(category)
 	}
-	readers := make(map[int32]Reader, len(readerScopes))
 
-	minKey := tasks.MaximumKey
-	maxKey := tasks.MinimumKey
+	readers := make(map[int32]Reader, len(readerScopes))
 	for key, scopes := range readerScopes {
 		readers[key] = NewReader(
 			paginationFnProvider,
@@ -148,8 +151,7 @@ func newProcessorBase(
 		)
 
 		if len(scopes) != 0 {
-			minKey = tasks.MinKey(minKey, scopes[0].Range.InclusiveMin)
-			maxKey = tasks.MaxKey(maxKey, scopes[len(scopes)-1].Range.ExclusiveMax)
+			completedTaskKey = tasks.MinKey(completedTaskKey, scopes[0].Range.InclusiveMin)
 		}
 	}
 
@@ -173,8 +175,8 @@ func newProcessorBase(
 		paginationFnProvider:  paginationFnProvider,
 		executableInitializer: executableInitializer,
 
-		completedTaskKey: minKey,
-		nonReadableRange: NewRange(maxKey, tasks.MaximumKey), // should not use max key, the value should be persisted and loaded from persistence
+		completedTaskKey: completedTaskKey,
+		nonReadableRange: NewRange(exclusiveMaxReadKey, tasks.MaximumKey), // should not use max key, the value should be persisted and loaded from persistence
 		readers:          readers,
 
 		completeRetryPolicy: completeRetryPolicy,
@@ -283,6 +285,9 @@ func (p *processorBase) completeTaskAndPersistState() {
 		p.completedTaskKey = minPendingTaskKey
 	}
 
-	persistenceState := ToPersistenceProcessorState(readerScopes, p.category.Type())
+	persistenceState := ToPersistenceQueueState(&queueState{
+		readerScopes:        readerScopes,
+		exclusiveMaxReadKey: p.nonReadableRange.InclusiveMin,
+	}, p.category.Type())
 	err = p.shard.UpdateQueueState(p.category, persistenceState)
 }

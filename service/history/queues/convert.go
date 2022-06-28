@@ -34,12 +34,12 @@ import (
 	"go.temporal.io/server/service/history/tasks"
 )
 
-func ToPersistenceProcessorState(
-	readerScopes map[int32][]Scope,
+func ToPersistenceQueueState(
+	queueState *queueState,
 	categoryType tasks.CategoryType,
-) *persistencespb.QueueProcessorState {
+) *persistencespb.QueueState {
 	readerStates := make(map[int32]*persistencespb.QueueReaderState)
-	for id, scopes := range readerScopes {
+	for id, scopes := range queueState.readerScopes {
 		persistenceScopes := make([]*persistencespb.QueueSliceScope, 0, len(scopes))
 		for _, scope := range scopes {
 			persistenceScopes = append(persistenceScopes, ToPersistenceScope(scope, categoryType))
@@ -49,15 +49,16 @@ func ToPersistenceProcessorState(
 		}
 	}
 
-	return &persistencespb.QueueProcessorState{
-		ReaderStates: readerStates,
+	return &persistencespb.QueueState{
+		ReaderStates:        readerStates,
+		ExclusiveMaxReadKey: ToPersistenceTaskKey(queueState.exclusiveMaxReadKey, categoryType),
 	}
 }
 
-func FromPersistenceProcessorState(
-	state *persistencespb.QueueProcessorState,
+func FromPersistenceQueueState(
+	state *persistencespb.QueueState,
 	categoryType tasks.CategoryType,
-) map[int32][]Scope {
+) *queueState {
 	readerScopes := make(map[int32][]Scope, len(state.ReaderStates))
 	for id, persistenceReaderState := range state.ReaderStates {
 		scopes := make([]Scope, 0, len(persistenceReaderState.Scopes))
@@ -67,7 +68,10 @@ func FromPersistenceProcessorState(
 		readerScopes[id] = scopes
 	}
 
-	return readerScopes
+	return &queueState{
+		readerScopes:        readerScopes,
+		exclusiveMaxReadKey: FromPersistenceTaskKey(state.ExclusiveMaxReadKey, categoryType),
+	}
 }
 
 func ToPersistenceScope(

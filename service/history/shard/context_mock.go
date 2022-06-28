@@ -534,10 +534,10 @@ func (mr *MockContextMockRecorder) GetQueueMaxReadLevel(category, cluster interf
 }
 
 // GetQueueState mocks base method.
-func (m *MockContext) GetQueueState(category tasks.Category) (*v13.QueueProcessorState, bool) {
+func (m *MockContext) GetQueueState(category tasks.Category) (*v13.QueueState, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetQueueState", category)
-	ret0, _ := ret[0].(*v13.QueueProcessorState)
+	ret0, _ := ret[0].(*v13.QueueState)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
@@ -801,7 +801,7 @@ func (mr *MockContextMockRecorder) UpdateQueueClusterAckLevel(category, cluster,
 }
 
 // UpdateQueueState mocks base method.
-func (m *MockContext) UpdateQueueState(category tasks.Category, state *v13.QueueProcessorState) error {
+func (m *MockContext) UpdateQueueState(category tasks.Category, state *v13.QueueState) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateQueueState", category, state)
 	ret0, _ := ret[0].(error)

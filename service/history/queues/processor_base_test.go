@@ -141,7 +141,7 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 }
 
 func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
-	persistenceState := &persistencespb.QueueProcessorState{
+	persistenceState := &persistencespb.QueueState{
 		ReaderStates: map[int32]*persistencespb.QueueReaderState{
 			defaultReaderId: {
 				Scopes: []*persistencespb.QueueSliceScope{
@@ -190,6 +190,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 				},
 			},
 		},
+		ExclusiveMaxReadKey: 4000,
 	}
 
 	mockShard := shard.NewTestContext(
@@ -198,10 +199,8 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 			ShardInfo: &persistencespb.ShardInfo{
 				ShardId: 0,
 				RangeId: 10,
-				QueueAckLevels: map[int32]*persistencespb.QueueAckLevel{
-					tasks.CategoryIDTransfer: {
-						ProcessorState: persistenceState,
-					},
+				QueueStates: map[int32]*persistencespb.QueueState{
+					tasks.CategoryIDTransfer: persistenceState,
 				},
 			},
 		},
@@ -223,8 +222,12 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 	for id, reader := range base.readers {
 		readerScopes[id] = reader.Scopes()
 	}
+	queueState := &queueState{
+		readerScopes:        readerScopes,
+		exclusiveMaxReadKey: base.nonReadableRange.InclusiveMin,
+	}
 
-	s.Equal(persistenceState, ToPersistenceProcessorState(readerScopes, tasks.CategoryTypeImmediate))
+	s.Equal(persistenceState, ToPersistenceQueueState(queueState, tasks.CategoryTypeImmediate))
 }
 
 func (s *processorBaseSuite) TestStartStop() {
@@ -284,11 +287,14 @@ func (s *processorBaseSuite) TestStartStop() {
 }
 
 func (s *processorBaseSuite) TestProcessNewRange() {
-	readerScopes := map[int32][]Scope{
-		defaultReaderId: {},
+	queueState := &queueState{
+		readerScopes: map[int32][]Scope{
+			defaultReaderId: {},
+		},
+		exclusiveMaxReadKey: tasks.MinimumKey,
 	}
 
-	persistenceState := ToPersistenceProcessorState(readerScopes, tasks.CategoryTypeScheduled)
+	persistenceState := ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled)
 
 	mockShard := shard.NewTestContext(
 		s.controller,
@@ -296,10 +302,8 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 			ShardInfo: &persistencespb.ShardInfo{
 				ShardId: 0,
 				RangeId: 10,
-				QueueAckLevels: map[int32]*persistencespb.QueueAckLevel{
-					tasks.CategoryIDTimer: {
-						ProcessorState: persistenceState,
-					},
+				QueueStates: map[int32]*persistencespb.QueueState{
+					tasks.CategoryIDTimer: persistenceState,
 				},
 			},
 		},
@@ -337,8 +341,14 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 			minKey = tasks.MinKey(minKey, scopes[0].Range.InclusiveMin)
 		}
 	}
+	queueState := &queueState{
+		readerScopes: map[int32][]Scope{
+			defaultReaderId: {},
+		},
+		exclusiveMaxReadKey: tasks.MaximumKey,
+	}
 
-	persistenceState := ToPersistenceProcessorState(readerScopes, tasks.CategoryTypeScheduled)
+	persistenceState := ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled)
 
 	mockShard := shard.NewTestContext(
 		s.controller,
@@ -346,10 +356,8 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 			ShardInfo: &persistencespb.ShardInfo{
 				ShardId: 0,
 				RangeId: 10,
-				QueueAckLevels: map[int32]*persistencespb.QueueAckLevel{
-					tasks.CategoryIDTimer: {
-						ProcessorState: persistenceState,
-					},
+				QueueStates: map[int32]*persistencespb.QueueState{
+					tasks.CategoryIDTimer: persistenceState,
 				},
 			},
 		},
@@ -383,7 +391,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		}).Return(nil),
 		mockShard.Resource.ShardMgr.EXPECT().UpdateShard(gomock.Any(), gomock.Any()).DoAndReturn(
 			func(_ context.Context, request *persistence.UpdateShardRequest) error {
-				s.Equal(persistenceState, request.ShardInfo.QueueAckLevels[tasks.CategoryIDTimer].ProcessorState)
+				s.Equal(persistenceState, request.ShardInfo.QueueStates[tasks.CategoryIDTimer])
 				return nil
 			},
 		),

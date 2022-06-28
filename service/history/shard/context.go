@@ -81,8 +81,8 @@ type (
 		UpdateQueueAckLevel(category tasks.Category, ackLevel tasks.Key) error
 		GetQueueClusterAckLevel(category tasks.Category, cluster string) tasks.Key
 		UpdateQueueClusterAckLevel(category tasks.Category, cluster string, ackLevel tasks.Key) error
-		GetQueueState(category tasks.Category) (*persistencespb.QueueProcessorState, bool)
-		UpdateQueueState(category tasks.Category, state *persistencespb.QueueProcessorState) error
+		GetQueueState(category tasks.Category) (*persistencespb.QueueState, bool)
+		UpdateQueueState(category tasks.Category, state *persistencespb.QueueState) error
 
 		GetReplicatorDLQAckLevel(sourceCluster string) int64
 		UpdateReplicatorDLQAckLevel(sourCluster string, ackLevel int64) error

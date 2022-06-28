@@ -248,8 +248,8 @@ func (s *convertSuite) TestConvertScope() {
 	))
 }
 
-func (s *convertSuite) TestConvertProcessorState() {
-	state := map[int32][]Scope{
+func (s *convertSuite) TestConvertQueueState() {
+	readerScopes := map[int32][]Scope{
 		0: {},
 		1: {
 			NewScope(
@@ -272,8 +272,14 @@ func (s *convertSuite) TestConvertProcessorState() {
 		},
 	}
 
-	s.Equal(state, FromPersistenceProcessorState(
-		ToPersistenceProcessorState(state, tasks.CategoryTypeScheduled),
+	queueState := &queueState{
+		readerScopes:        readerScopes,
+		exclusiveMaxReadKey: tasks.NewKey(time.Unix(0, rand.Int63()).UTC(), 0),
+	}
+
+	s.Equal(queueState, FromPersistenceQueueState(
+		ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled),
+
 		tasks.CategoryTypeScheduled,
 	))
 }
