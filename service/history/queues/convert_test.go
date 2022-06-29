@@ -55,7 +55,7 @@ func (s *convertSuite) SetupTest() {
 }
 
 func (s *convertSuite) TestConvertPredicate_All() {
-	predicate := predicates.All[tasks.Task]()
+	predicate := predicates.Universal[tasks.Task]()
 	s.Equal(predicate, FromPersistencePredicate(ToPersistencePredicate(predicate)))
 }
 
@@ -67,7 +67,7 @@ func (s *convertSuite) TestConvertPredicate_Empty() {
 func (s *convertSuite) TestConvertPredicate_And() {
 	predicates := []tasks.Predicate{
 		predicates.And(
-			predicates.All[tasks.Task](),
+			predicates.Universal[tasks.Task](),
 			predicates.Empty[tasks.Task](),
 		),
 		predicates.And(
@@ -110,7 +110,7 @@ func (s *convertSuite) TestConvertPredicate_And() {
 func (s *convertSuite) TestConvertPredicate_Or() {
 	predicates := []tasks.Predicate{
 		predicates.Or(
-			predicates.All[tasks.Task](),
+			predicates.Universal[tasks.Task](),
 			predicates.Empty[tasks.Task](),
 		),
 		predicates.Or(
@@ -152,7 +152,7 @@ func (s *convertSuite) TestConvertPredicate_Or() {
 
 func (s *convertSuite) TestConvertPredicate_Not() {
 	predicates := []tasks.Predicate{
-		predicates.Not(predicates.All[tasks.Task]()),
+		predicates.Not(predicates.Universal[tasks.Task]()),
 		predicates.Not(predicates.Empty[tasks.Task]()),
 		predicates.Not(predicates.And[tasks.Task](
 			tasks.NewNamespacePredicate([]string{uuid.New()}),

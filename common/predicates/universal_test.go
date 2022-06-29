@@ -24,21 +24,53 @@
 
 package predicates
 
-type (
-	AllImpl[T any] struct{}
+import (
+	"math/rand"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func All[T any]() Predicate[T] {
-	return &AllImpl[T]{}
+type (
+	allSuite struct {
+		suite.Suite
+		*require.Assertions
+
+		all Predicate[int]
+	}
+)
+
+func TestAllSuite(t *testing.T) {
+	s := new(allSuite)
+	suite.Run(t, s)
 }
 
-func (a *AllImpl[T]) Test(t T) bool {
-	return true
+func (s *allSuite) SetupTest() {
+	s.Assertions = require.New(s.T())
+
+	s.all = Universal[int]()
 }
 
-func (a *AllImpl[T]) Equals(
-	predicate Predicate[T],
-) bool {
-	_, ok := predicate.(*AllImpl[T])
-	return ok
+func (s *allSuite) TestAll_Test() {
+	for i := 0; i != 10; i++ {
+		s.True(s.all.Test(rand.Int()))
+	}
+}
+
+func (s *allSuite) TestAll_Equals() {
+	s.True(s.all.Equals(s.all))
+	s.True(s.all.Equals(Universal[int]()))
+
+	s.False(s.all.Equals(newTestPredicate(1, 2, 3)))
+	s.False(s.all.Equals(And[int](
+		newTestPredicate(1, 2, 3),
+		newTestPredicate(2, 3, 4),
+	)))
+	s.False(s.all.Equals(Or[int](
+		newTestPredicate(1, 2, 3),
+		newTestPredicate(4, 5, 6),
+	)))
+	s.False(s.all.Equals(Not[int](newTestPredicate(1, 2, 3))))
+	s.False(s.all.Equals(Empty[int]()))
 }

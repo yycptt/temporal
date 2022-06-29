@@ -84,7 +84,7 @@ func (s *readerSuite) TearDownTest() {
 
 func (s *readerSuite) TestStartLoadStop() {
 	r := NewRandomRange()
-	scopes := []Scope{NewScope(r, predicates.All[tasks.Task]())}
+	scopes := []Scope{NewScope(r, predicates.Universal[tasks.Task]())}
 
 	paginationFnProvider := func(paginationRange Range) collection.PaginationFn[tasks.Task] {
 		s.Equal(r, paginationRange)
@@ -358,7 +358,7 @@ func (s *readerSuite) TestShrinkRanges() {
 
 func (s *readerSuite) TestSubmitTask() {
 	r := NewRandomRange()
-	scopes := []Scope{NewScope(r, predicates.All[tasks.Task]())}
+	scopes := []Scope{NewScope(r, predicates.Universal[tasks.Task]())}
 	reader := s.newTestReader(scopes, nil)
 
 	mockExecutable := NewMockExecutable(s.controller)

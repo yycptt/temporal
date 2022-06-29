@@ -242,7 +242,7 @@ func (p *queueBase) processNewRange() {
 	p.readers[defaultReaderId].MergeSlices(NewSlice(
 		p.paginationFnProvider,
 		p.executableInitializer,
-		NewScope(newRange, predicates.All[tasks.Task]()),
+		NewScope(newRange, predicates.Universal[tasks.Task]()),
 	))
 }
 

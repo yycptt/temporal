@@ -138,7 +138,7 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 	s.Len(readerScopes, 1)
 	s.Equal(ackLevel, readerScopes[0].Range.InclusiveMin.TaskID)
 	s.Equal(rangeID<<s.config.RangeSizeBits, readerScopes[0].Range.ExclusiveMax.TaskID)
-	s.True(predicates.All[tasks.Task]().Equals(readerScopes[0].Predicate))
+	s.True(predicates.Universal[tasks.Task]().Equals(readerScopes[0].Predicate))
 }
 
 func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
@@ -162,7 +162,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 							ExclusiveMax: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 3000},
 						},
 						Predicate: &persistencespb.Predicate{
-							PredicateType: enumsspb.PREDICATE_TYPE_TASKTYPE,
+							PredicateType: enumsspb.PREDICATE_TYPE_TASK_TYPE,
 							Attributes: &persistencespb.Predicate_TaskTypePredicateAttributes{
 								TaskTypePredicateAttributes: &persistencespb.TaskTypePredicateAttributes{
 									TaskTypes: []enumsspb.TaskType{enumsspb.TASK_TYPE_ACTIVITY_RETRY_TIMER},
@@ -180,7 +180,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 							ExclusiveMax: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 3000},
 						},
 						Predicate: &persistencespb.Predicate{
-							PredicateType: enumsspb.PREDICATE_TYPE_NAMESPACEID,
+							PredicateType: enumsspb.PREDICATE_TYPE_NAMESPACE_ID,
 							Attributes: &persistencespb.Predicate_NamespaceIdPredicateAttributes{
 								NamespaceIdPredicateAttributes: &persistencespb.NamespaceIdPredicateAttributes{
 									NamespaceIds: []string{uuid.New()},
@@ -327,7 +327,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 	scopes := base.readers[defaultReaderId].Scopes()
 	s.Len(scopes, 1)
 	s.True(scopes[0].Range.InclusiveMin.CompareTo(tasks.MinimumKey) == 0)
-	s.True(scopes[0].Predicate.Equals(predicates.All[tasks.Task]()))
+	s.True(scopes[0].Predicate.Equals(predicates.Universal[tasks.Task]()))
 	s.True(time.Since(scopes[0].Range.ExclusiveMax.FireTime) <= time.Second)
 	s.True(base.nonReadableRange.Equals(NewRange(scopes[0].Range.ExclusiveMax, tasks.MaximumKey)))
 }

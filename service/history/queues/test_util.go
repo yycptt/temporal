@@ -115,7 +115,7 @@ func NewRandomScopes(
 
 	scopes := make([]Scope, 0, 10)
 	for _, r := range ranges {
-		scopes = append(scopes, NewScope(r, predicates.All[tasks.Task]()))
+		scopes = append(scopes, NewScope(r, predicates.Universal[tasks.Task]()))
 	}
 
 	return scopes

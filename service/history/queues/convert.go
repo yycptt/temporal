@@ -127,7 +127,7 @@ func ToPersistencePredicate(
 	predicate tasks.Predicate,
 ) *persistencespb.Predicate {
 	switch predicate := predicate.(type) {
-	case *predicates.AllImpl[tasks.Task]:
+	case *predicates.UniversalImpl[tasks.Task]:
 		return ToPersistenceUniversalPredicate(predicate)
 	case *predicates.EmptyImpl[tasks.Task]:
 		return ToPersistenceEmptyPredicate(predicate)
@@ -160,9 +160,9 @@ func FromPersistencePredicate(
 		return FromPersistenceOrPredicate(predicate.GetOrPredicateAttributes())
 	case enumsspb.PREDICATE_TYPE_NOT:
 		return FromPersistenceNotPredicate(predicate.GetNotPredicateAttributes())
-	case enumsspb.PREDICATE_TYPE_NAMESPACEID:
+	case enumsspb.PREDICATE_TYPE_NAMESPACE_ID:
 		return FromPersistenceNamespaceIDPredicate(predicate.GetNamespaceIdPredicateAttributes())
-	case enumsspb.PREDICATE_TYPE_TASKTYPE:
+	case enumsspb.PREDICATE_TYPE_TASK_TYPE:
 		return FromPersistenceTaskTypePredicate(predicate.GetTaskTypePredicateAttributes())
 	default:
 		panic(fmt.Sprintf("unknown persistence task predicate type: %v", predicate.GetPredicateType()))
@@ -170,7 +170,7 @@ func FromPersistencePredicate(
 }
 
 func ToPersistenceUniversalPredicate(
-	_ *predicates.AllImpl[tasks.Task],
+	_ *predicates.UniversalImpl[tasks.Task],
 ) *persistencespb.Predicate {
 	return &persistencespb.Predicate{
 		PredicateType: enumsspb.PREDICATE_TYPE_UNIVERSAL,
@@ -181,7 +181,7 @@ func ToPersistenceUniversalPredicate(
 func FromPersistenceUniversalPredicate(
 	_ *persistencespb.UniversalPredicateAttributes,
 ) tasks.Predicate {
-	return predicates.All[tasks.Task]()
+	return predicates.Universal[tasks.Task]()
 }
 
 func ToPersistenceEmptyPredicate(
@@ -285,7 +285,7 @@ func ToPersistenceNamespaceIDPredicate(
 	}
 
 	return &persistencespb.Predicate{
-		PredicateType: enumsspb.PREDICATE_TYPE_NAMESPACEID,
+		PredicateType: enumsspb.PREDICATE_TYPE_NAMESPACE_ID,
 		Attributes: &persistencespb.Predicate_NamespaceIdPredicateAttributes{
 			NamespaceIdPredicateAttributes: &persistencespb.NamespaceIdPredicateAttributes{
 				NamespaceIds: namespaceIDs,
@@ -309,7 +309,7 @@ func ToPersistenceTaskTypePredicate(
 	}
 
 	return &persistencespb.Predicate{
-		PredicateType: enumsspb.PREDICATE_TYPE_TASKTYPE,
+		PredicateType: enumsspb.PREDICATE_TYPE_TASK_TYPE,
 		Attributes: &persistencespb.Predicate_TaskTypePredicateAttributes{
 			TaskTypePredicateAttributes: &persistencespb.TaskTypePredicateAttributes{
 				TaskTypes: taskTypes,
