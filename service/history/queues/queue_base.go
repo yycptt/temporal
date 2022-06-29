@@ -68,10 +68,10 @@ type (
 		paginationFnProvider  PaginationFnProvider
 		executableInitializer ExecutableInitializer
 
-		completedTaskKey tasks.Key
-		nonReadableRange Range
-		readers          map[int32]Reader
-		lastPollTime     time.Time
+		exclusiveCompletedTaskKey tasks.Key
+		nonReadableRange          Range
+		readers                   map[int32]Reader
+		lastPollTime              time.Time
 
 		completeTaskTimer   *time.Timer
 		completeTaskAttempt int
@@ -124,16 +124,21 @@ func newQueueBase(
 	}
 
 	readerScopes := make(map[int32][]Scope)
-	var completedTaskKey tasks.Key
+	var exclusiveCompletedTaskKey tasks.Key
 	var exclusiveMaxReadKey tasks.Key
 	if persistenceState, ok := shard.GetQueueState(category); ok {
 		queueState := FromPersistenceQueueState(persistenceState, category.Type())
 		readerScopes = queueState.readerScopes
 		exclusiveMaxReadKey = queueState.exclusiveMaxReadKey
-		completedTaskKey = queueState.exclusiveMaxReadKey
+		exclusiveCompletedTaskKey = queueState.exclusiveMaxReadKey
 	} else {
-		exclusiveMaxReadKey = shard.GetQueueExclusiveMaxReadLevel(category, "")
-		completedTaskKey = shard.GetQueueAckLevel(category)
+		ackLevel := shard.GetQueueAckLevel(category)
+		if category.Type() == tasks.CategoryTypeImmediate {
+			// convert to exclusive ack level
+			ackLevel = ackLevel.Next()
+		}
+		exclusiveMaxReadKey = ackLevel
+		exclusiveCompletedTaskKey = ackLevel
 	}
 
 	readers := make(map[int32]Reader, len(readerScopes))
@@ -145,12 +150,13 @@ func newQueueBase(
 			&options.ReaderOptions,
 			scheduler,
 			rescheduler,
+			timeSource,
 			logger,
 			metricsProvider,
 		)
 
 		if len(scopes) != 0 {
-			completedTaskKey = tasks.MinKey(completedTaskKey, scopes[0].Range.InclusiveMin)
+			exclusiveCompletedTaskKey = tasks.MinKey(exclusiveCompletedTaskKey, scopes[0].Range.InclusiveMin)
 		}
 	}
 
@@ -174,9 +180,9 @@ func newQueueBase(
 		paginationFnProvider:  paginationFnProvider,
 		executableInitializer: executableInitializer,
 
-		completedTaskKey: completedTaskKey,
-		nonReadableRange: NewRange(exclusiveMaxReadKey, tasks.MaximumKey), // should not use max key, the value should be persisted and loaded from persistence
-		readers:          readers,
+		exclusiveCompletedTaskKey: exclusiveCompletedTaskKey,
+		nonReadableRange:          NewRange(exclusiveMaxReadKey, tasks.MaximumKey),
+		readers:                   readers,
 
 		completeRetryPolicy: completeRetryPolicy,
 	}
@@ -222,9 +228,6 @@ func (p *queueBase) UnlockTaskProcessing() {
 }
 
 func (p *queueBase) processNewRange() {
-	// TODO: is the max read level inclusive or exclusive for read?
-	// today inclusive for immediate task
-	// exclusive for scheduled task
 	newMaxKey := p.shard.GetQueueExclusiveMaxReadLevel(p.category, "")
 
 	if !p.nonReadableRange.CanSplit(newMaxKey) {
@@ -259,29 +262,37 @@ func (p *queueBase) completeTaskAndPersistState() {
 		}
 	}()
 
-	minPendingTaskKey := tasks.MaximumKey
+	exclusiveMaxCompletedTaskKey := tasks.MaximumKey
 	readerScopes := make(map[int32][]Scope)
 
 	for id, reader := range p.readers {
 		scopes := reader.Scopes()
 		readerScopes[id] = scopes
 		for _, scope := range scopes {
-			minPendingTaskKey = tasks.MinKey(minPendingTaskKey, scope.Range.InclusiveMin)
+			exclusiveMaxCompletedTaskKey = tasks.MinKey(exclusiveMaxCompletedTaskKey, scope.Range.InclusiveMin)
 		}
 	}
 
-	if minPendingTaskKey != tasks.MaximumKey && minPendingTaskKey.CompareTo(p.completedTaskKey) > 0 {
-		// must do range complete first
+	// NOTE: Must range complete task first.
+	// Otherwise, if state is updated first, later deletion fails and shard get reloaded
+	// some tasks will never be deleted.
+	if exclusiveMaxCompletedTaskKey != tasks.MaximumKey && exclusiveMaxCompletedTaskKey.CompareTo(p.exclusiveCompletedTaskKey) > 0 {
+		lastCompletedTaskKey := p.exclusiveCompletedTaskKey
+		if p.category.Type() == tasks.CategoryTypeScheduled {
+			lastCompletedTaskKey = tasks.NewKey(lastCompletedTaskKey.FireTime, 0)
+			exclusiveMaxCompletedTaskKey = tasks.NewKey(exclusiveMaxCompletedTaskKey.FireTime, 0)
+		}
+
 		if err = p.shard.GetExecutionManager().RangeCompleteHistoryTasks(context.TODO(), &persistence.RangeCompleteHistoryTasksRequest{
 			ShardID:             p.shard.GetShardID(),
 			TaskCategory:        p.category,
-			InclusiveMinTaskKey: p.completedTaskKey, // TODO: sanitize key
-			ExclusiveMaxTaskKey: minPendingTaskKey,
+			InclusiveMinTaskKey: lastCompletedTaskKey,
+			ExclusiveMaxTaskKey: exclusiveMaxCompletedTaskKey,
 		}); err != nil {
 			return
 		}
 
-		p.completedTaskKey = minPendingTaskKey
+		p.exclusiveCompletedTaskKey = exclusiveMaxCompletedTaskKey
 	}
 
 	persistenceState := ToPersistenceQueueState(&queueState{

@@ -34,6 +34,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/collection"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
@@ -404,6 +405,7 @@ func (s *readerSuite) newTestReader(
 		},
 		s.mockScheduler,
 		s.mockRescheduler,
+		clock.NewRealTimeSource(),
 		s.logger,
 		s.metricsProvider,
 	)

@@ -376,8 +376,8 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 	)
 	base.completeTaskTimer = time.NewTimer(s.options.CompleteTaskInterval())
 
-	s.Equal(minKey.FireTime.UTC(), base.completedTaskKey.FireTime)
-	base.completedTaskKey = tasks.MinimumKey // set to a smaller value to that delete will be triggered
+	s.Equal(minKey.FireTime.UTC(), base.exclusiveCompletedTaskKey.FireTime)
+	base.exclusiveCompletedTaskKey = tasks.MinimumKey // set to a smaller value to that delete will be triggered
 
 	mockShard.Resource.ClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	mockShard.Resource.ClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestAllClusterInfo).AnyTimes()
@@ -399,5 +399,5 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 
 	base.completeTaskAndPersistState()
 
-	s.Equal(minKey.FireTime.UTC(), base.completedTaskKey.FireTime)
+	s.Equal(minKey.FireTime.UTC(), base.exclusiveCompletedTaskKey.FireTime)
 }

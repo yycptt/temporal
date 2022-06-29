@@ -32,6 +32,7 @@ import (
 
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
+	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -64,6 +65,7 @@ type (
 		options         *ReaderOptions
 		scheduler       Scheduler
 		rescheduler     Rescheduler
+		timeSource      clock.TimeSource
 		logger          log.Logger
 		metricsProvider metrics.MetricProvider
 
@@ -86,6 +88,7 @@ func NewReader(
 	options *ReaderOptions,
 	scheduler Scheduler,
 	rescheduler Rescheduler,
+	timeSource clock.TimeSource,
 	logger log.Logger,
 	metricsProvider metrics.MetricProvider,
 ) *ReaderImpl {
@@ -103,6 +106,7 @@ func NewReader(
 		options:         options,
 		scheduler:       scheduler,
 		rescheduler:     rescheduler,
+		timeSource:      timeSource,
 		logger:          logger,
 		metricsProvider: metricsProvider,
 
@@ -332,10 +336,14 @@ func (r *ReaderImpl) notify() {
 	}
 }
 
-// TODO: probably move this logic into a method of Executable
 func (r *ReaderImpl) submit(
 	executable Executable,
 ) {
+	now := r.timeSource.Now()
+	if fireTime := executable.GetKey().FireTime; now.Before(fireTime) {
+		r.rescheduler.Add(executable, fireTime)
+		return
+	}
 
 	submitted, err := r.scheduler.TrySubmit(executable)
 	if err != nil {
