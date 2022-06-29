@@ -262,7 +262,7 @@ type Config struct {
 	ESProcessorAckTimeout             dynamicconfig.DurationPropertyFn
 
 	EnableCrossNamespaceCommands  dynamicconfig.BoolPropertyFn
-	EnableActivityLocalDispatch   dynamicconfig.BoolPropertyFnWithNamespaceFilter
+	EnableActivityEagerExecution  dynamicconfig.BoolPropertyFnWithNamespaceFilter
 	NamespaceCacheRefreshInterval dynamicconfig.DurationPropertyFn
 }
 
@@ -461,7 +461,7 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		ESProcessorAckTimeout:    dc.GetDurationProperty(dynamicconfig.WorkerESProcessorAckTimeout, 1*time.Minute),
 
 		EnableCrossNamespaceCommands:  dc.GetBoolProperty(dynamicconfig.EnableCrossNamespaceCommands, true),
-		EnableActivityLocalDispatch:   dc.GetBoolPropertyFnWithNamespaceFilter(dynamicconfig.EnableActivityLocalDispatch, false),
+		EnableActivityEagerExecution:  dc.GetBoolPropertyFnWithNamespaceFilter(dynamicconfig.EnableActivityEagerExecution, false),
 		NamespaceCacheRefreshInterval: dc.GetDurationProperty(dynamicconfig.NamespaceCacheRefreshInterval, 10*time.Second),
 	}
 

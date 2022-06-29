@@ -43,6 +43,7 @@ import (
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/common/predicates"
+	"go.temporal.io/server/common/primitives/timestamp"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
@@ -58,10 +59,10 @@ type (
 		mockScheduler   *MockScheduler
 		mockRescheduler *MockRescheduler
 
-		config          *configs.Config
-		options         *QueueOptions
-		logger          log.Logger
-		metricsProvider metrics.MetricProvider
+		config         *configs.Config
+		options        *QueueOptions
+		logger         log.Logger
+		metricsHandler metrics.MetricsHandler
 	}
 )
 
@@ -92,7 +93,7 @@ func (s *processorBaseSuite) SetupTest() {
 		TaskMaxRetryCount:                dynamicconfig.GetIntPropertyFn(100),
 	}
 	s.logger = log.NewTestLogger()
-	s.metricsProvider = metrics.NoopMetricProvider
+	s.metricsHandler = metrics.NoopMetricsHandler
 
 }
 
@@ -128,7 +129,7 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 		nil,
 		s.options,
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 
 	s.Len(base.readers, 1)
@@ -147,18 +148,18 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 				Scopes: []*persistencespb.QueueSliceScope{
 					{
 						Range: &persistencespb.QueueSliceRange{
-							InclusiveMin: 1000,
-							ExclusiveMax: 2000,
+							InclusiveMin: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 1000},
+							ExclusiveMax: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 2000},
 						},
 						Predicate: &persistencespb.Predicate{
-							PredicateType: enumsspb.PREDICATE_TYPE_ALL,
-							Attributes:    &persistencespb.Predicate_AllPredicateAttributes{},
+							PredicateType: enumsspb.PREDICATE_TYPE_UNIVERSAL,
+							Attributes:    &persistencespb.Predicate_UniversalPredicateAttributes{},
 						},
 					},
 					{
 						Range: &persistencespb.QueueSliceRange{
-							InclusiveMin: 2000,
-							ExclusiveMax: 3000,
+							InclusiveMin: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 2000},
+							ExclusiveMax: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 3000},
 						},
 						Predicate: &persistencespb.Predicate{
 							PredicateType: enumsspb.PREDICATE_TYPE_TASKTYPE,
@@ -175,8 +176,8 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 				Scopes: []*persistencespb.QueueSliceScope{
 					{
 						Range: &persistencespb.QueueSliceRange{
-							InclusiveMin: 2000,
-							ExclusiveMax: 3000,
+							InclusiveMin: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 2000},
+							ExclusiveMax: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 3000},
 						},
 						Predicate: &persistencespb.Predicate{
 							PredicateType: enumsspb.PREDICATE_TYPE_NAMESPACEID,
@@ -190,7 +191,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 				},
 			},
 		},
-		ExclusiveMaxReadKey: 4000,
+		ExclusiveReaderHighWatermark: &persistencespb.TaskKey{FireTime: timestamp.TimePtr(tasks.DefaultFireTime), TaskId: 4000},
 	}
 
 	mockShard := shard.NewTestContext(
@@ -215,7 +216,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 		nil,
 		s.options,
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 
 	readerScopes := make(map[int32][]Scope)
@@ -227,7 +228,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 		exclusiveMaxReadKey: base.nonReadableRange.InclusiveMin,
 	}
 
-	s.Equal(persistenceState, ToPersistenceQueueState(queueState, tasks.CategoryTypeImmediate))
+	s.Equal(persistenceState, ToPersistenceQueueState(queueState))
 }
 
 func (s *processorBaseSuite) TestStartStop() {
@@ -272,7 +273,7 @@ func (s *processorBaseSuite) TestStartStop() {
 		nil,
 		s.options,
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 	base.rescheduler = s.mockRescheduler // replace with mock to verify Start/Stop
 
@@ -294,7 +295,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		exclusiveMaxReadKey: tasks.MinimumKey,
 	}
 
-	persistenceState := ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled)
+	persistenceState := ToPersistenceQueueState(queueState)
 
 	mockShard := shard.NewTestContext(
 		s.controller,
@@ -318,7 +319,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		nil,
 		s.options,
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 	s.True(base.nonReadableRange.Equals(NewRange(tasks.MinimumKey, tasks.MaximumKey)))
 
@@ -348,7 +349,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		exclusiveMaxReadKey: tasks.MaximumKey,
 	}
 
-	persistenceState := ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled)
+	persistenceState := ToPersistenceQueueState(queueState)
 
 	mockShard := shard.NewTestContext(
 		s.controller,
@@ -372,7 +373,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		nil,
 		s.options,
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 	base.completeTaskTimer = time.NewTimer(s.options.CompleteTaskInterval())
 

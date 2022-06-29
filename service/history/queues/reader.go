@@ -62,12 +62,12 @@ type (
 	ReaderImpl struct {
 		sync.Mutex
 
-		options         *ReaderOptions
-		scheduler       Scheduler
-		rescheduler     Rescheduler
-		timeSource      clock.TimeSource
-		logger          log.Logger
-		metricsProvider metrics.MetricProvider
+		options        *ReaderOptions
+		scheduler      Scheduler
+		rescheduler    Rescheduler
+		timeSource     clock.TimeSource
+		logger         log.Logger
+		metricsHandler metrics.MetricsHandler
 
 		status     int32
 		shutdownCh chan struct{}
@@ -90,7 +90,7 @@ func NewReader(
 	rescheduler Rescheduler,
 	timeSource clock.TimeSource,
 	logger log.Logger,
-	metricsProvider metrics.MetricProvider,
+	metricsHandler metrics.MetricsHandler,
 ) *ReaderImpl {
 
 	slices := list.New()
@@ -103,12 +103,12 @@ func NewReader(
 	}
 
 	return &ReaderImpl{
-		options:         options,
-		scheduler:       scheduler,
-		rescheduler:     rescheduler,
-		timeSource:      timeSource,
-		logger:          logger,
-		metricsProvider: metricsProvider,
+		options:        options,
+		scheduler:      scheduler,
+		rescheduler:    rescheduler,
+		timeSource:     timeSource,
+		logger:         logger,
+		metricsHandler: metricsHandler,
 
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),

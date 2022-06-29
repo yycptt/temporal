@@ -173,11 +173,19 @@ func (p *queueProcessorBase) processorPump() {
 	))
 	defer updateAckTimer.Stop()
 
-processorPumpLoop:
+eventLoop:
 	for {
+		// prioritize shutdown
 		select {
 		case <-p.shutdownCh:
-			break processorPumpLoop
+			break eventLoop
+		default:
+			// noop
+		}
+
+		select {
+		case <-p.shutdownCh:
+			break eventLoop
 		case <-p.ackMgr.getFinishedChan():
 			// use a separate gorouting since the caller hold the shutdownWG
 			go p.Stop()
@@ -199,7 +207,7 @@ processorPumpLoop:
 			if err := p.ackMgr.updateQueueAckLevel(); err == shard.ErrShardClosed {
 				// shard is no longer owned by this instance, bail out
 				go p.Stop()
-				break processorPumpLoop
+				break eventLoop
 			}
 		}
 	}

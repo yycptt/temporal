@@ -53,7 +53,7 @@ type (
 		mockRescheduler *MockRescheduler
 
 		logger                log.Logger
-		metricsProvider       metrics.MetricProvider
+		metricsHandler        metrics.MetricsHandler
 		executableInitializer ExecutableInitializer
 	}
 )
@@ -71,7 +71,7 @@ func (s *readerSuite) SetupTest() {
 	s.mockRescheduler = NewMockRescheduler(s.controller)
 
 	s.logger = log.NewTestLogger()
-	s.metricsProvider = metrics.NoopMetricProvider
+	s.metricsHandler = metrics.NoopMetricsHandler
 
 	s.executableInitializer = func(t tasks.Task) Executable {
 		return NewMockExecutable(s.controller)
@@ -407,6 +407,6 @@ func (s *readerSuite) newTestReader(
 		s.mockRescheduler,
 		clock.NewRealTimeSource(),
 		s.logger,
-		s.metricsProvider,
+		s.metricsHandler,
 	)
 }

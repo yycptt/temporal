@@ -63,7 +63,7 @@ type (
 		cache                    workflow.Cache
 		archivalClient           archiver.Client
 		logger                   log.Logger
-		metricProvider           metrics.MetricProvider
+		metricProvider           metrics.MetricsHandler
 		metricsClient            metrics.Client
 		historyClient            historyservice.HistoryServiceClient
 		matchingClient           matchingservice.MatchingServiceClient
@@ -78,7 +78,7 @@ func newTransferQueueTaskExecutorBase(
 	workflowCache workflow.Cache,
 	archivalClient archiver.Client,
 	logger log.Logger,
-	metricProvider metrics.MetricProvider,
+	metricProvider metrics.MetricsHandler,
 	matchingClient matchingservice.MatchingServiceClient,
 ) *transferQueueTaskExecutorBase {
 	return &transferQueueTaskExecutorBase{
@@ -120,7 +120,7 @@ func (t *transferQueueTaskExecutorBase) pushActivity(
 			Name: task.TaskQueue,
 			Kind: enumspb.TASK_QUEUE_KIND_NORMAL,
 		},
-		ScheduleId:             task.ScheduleID,
+		ScheduledEventId:       task.ScheduledEventID,
 		ScheduleToStartTimeout: activityScheduleToStartTimeout,
 		Clock:                  vclock.NewVectorClock(t.shard.GetClusterMetadata().GetClusterID(), t.shard.GetShardID(), task.TaskID),
 	})
@@ -146,7 +146,7 @@ func (t *transferQueueTaskExecutorBase) pushWorkflowTask(
 			RunId:      task.RunID,
 		},
 		TaskQueue:              taskqueue,
-		ScheduleId:             task.ScheduleID,
+		ScheduledEventId:       task.ScheduledEventID,
 		ScheduleToStartTimeout: workflowTaskScheduleToStartTimeout,
 		Clock:                  vclock.NewVectorClock(t.shard.GetClusterMetadata().GetClusterID(), t.shard.GetShardID(), task.TaskID),
 	})
@@ -173,7 +173,6 @@ func (t *transferQueueTaskExecutorBase) archiveVisibility(
 	visibilityMemo *commonpb.Memo,
 	searchAttributes *commonpb.SearchAttributes,
 ) error {
-
 	namespaceEntry, err := t.registry.GetNamespaceByID(namespaceID)
 	if err != nil {
 		return err
@@ -237,7 +236,6 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 	task tasks.Task,
 	forceDeleteFromOpenVisibility bool,
 ) (retError error) {
-
 	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
 	defer cancel()
 
@@ -262,14 +260,8 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 		return err
 	}
 
-	lastWriteVersion, err := mutableState.GetLastWriteVersion()
-	if err != nil {
-		return err
-	}
-	ok := VerifyTaskVersion(t.shard, t.logger, mutableState.GetNamespaceEntry(), lastWriteVersion, task.GetVersion(), task)
-	if !ok {
-		return nil
-	}
+	// Do not validate version here because DeleteExecutionTask transfer task is created only for
+	// explicit API call, and in this case execution needs to be deleted regardless of the version.
 
 	return t.workflowDeleteManager.DeleteWorkflowExecution(
 		ctx,
@@ -277,7 +269,6 @@ func (t *transferQueueTaskExecutorBase) deleteExecution(
 		workflowExecution,
 		weCtx,
 		mutableState,
-		task.GetVersion(),
 		forceDeleteFromOpenVisibility,
 	)
 }

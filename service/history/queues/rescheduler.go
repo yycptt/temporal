@@ -67,7 +67,7 @@ type (
 		scheduler      Scheduler
 		timeSource     clock.TimeSource
 		logger         log.Logger
-		metricProvider metrics.MetricProvider
+		metricsHandler metrics.MetricsHandler
 
 		status     int32
 		shutdownCh chan struct{}
@@ -84,13 +84,13 @@ func NewRescheduler(
 	scheduler Scheduler,
 	timeSource clock.TimeSource,
 	logger log.Logger,
-	metricProvider metrics.MetricProvider,
+	metricsHandler metrics.MetricsHandler,
 ) *reschedulerImpl {
 	return &reschedulerImpl{
 		scheduler:      scheduler,
 		timeSource:     timeSource,
 		logger:         logger,
-		metricProvider: metricProvider,
+		metricsHandler: metricsHandler,
 
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
@@ -173,7 +173,7 @@ func (r *reschedulerImpl) reschedule() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.metricProvider.Histogram(TaskReschedulerPendingTasks, nil).Record(int64(r.pq.Len()))
+	r.metricsHandler.Histogram(TaskReschedulerPendingTasks, metrics.Dimensionless).Record(int64(r.pq.Len()))
 
 	var failToSubmit []rescheduledExecuable
 	for !r.pq.IsEmpty() {

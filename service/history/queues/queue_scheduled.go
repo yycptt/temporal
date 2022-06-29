@@ -62,7 +62,7 @@ func newScheduledQueue(
 	executor Executor,
 	options *QueueOptions,
 	logger log.Logger,
-	metricsProvider metrics.MetricProvider,
+	metricsHandler metrics.MetricsHandler,
 ) *scheduledQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -93,7 +93,7 @@ func newScheduledQueue(
 			executor,
 			options,
 			logger,
-			metricsProvider,
+			metricsHandler,
 		),
 
 		timerGate: timer.NewLocalGate(shard.GetTimeSource()),

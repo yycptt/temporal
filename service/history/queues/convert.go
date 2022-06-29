@@ -36,13 +36,12 @@ import (
 
 func ToPersistenceQueueState(
 	queueState *queueState,
-	categoryType tasks.CategoryType,
 ) *persistencespb.QueueState {
 	readerStates := make(map[int32]*persistencespb.QueueReaderState)
 	for id, scopes := range queueState.readerScopes {
 		persistenceScopes := make([]*persistencespb.QueueSliceScope, 0, len(scopes))
 		for _, scope := range scopes {
-			persistenceScopes = append(persistenceScopes, ToPersistenceScope(scope, categoryType))
+			persistenceScopes = append(persistenceScopes, ToPersistenceScope(scope))
 		}
 		readerStates[id] = &persistencespb.QueueReaderState{
 			Scopes: persistenceScopes,
@@ -50,88 +49,78 @@ func ToPersistenceQueueState(
 	}
 
 	return &persistencespb.QueueState{
-		ReaderStates:        readerStates,
-		ExclusiveMaxReadKey: ToPersistenceTaskKey(queueState.exclusiveMaxReadKey, categoryType),
+		ReaderStates:                 readerStates,
+		ExclusiveReaderHighWatermark: ToPersistenceTaskKey(queueState.exclusiveMaxReadKey),
 	}
 }
 
 func FromPersistenceQueueState(
 	state *persistencespb.QueueState,
-	categoryType tasks.CategoryType,
 ) *queueState {
 	readerScopes := make(map[int32][]Scope, len(state.ReaderStates))
 	for id, persistenceReaderState := range state.ReaderStates {
 		scopes := make([]Scope, 0, len(persistenceReaderState.Scopes))
 		for _, persistenceScope := range persistenceReaderState.Scopes {
-			scopes = append(scopes, FromPersistenceScope(persistenceScope, categoryType))
+			scopes = append(scopes, FromPersistenceScope(persistenceScope))
 		}
 		readerScopes[id] = scopes
 	}
 
 	return &queueState{
 		readerScopes:        readerScopes,
-		exclusiveMaxReadKey: FromPersistenceTaskKey(state.ExclusiveMaxReadKey, categoryType),
+		exclusiveMaxReadKey: FromPersistenceTaskKey(state.ExclusiveReaderHighWatermark),
 	}
 }
 
 func ToPersistenceScope(
 	scope Scope,
-	categoryType tasks.CategoryType,
 ) *persistencespb.QueueSliceScope {
 	return &persistencespb.QueueSliceScope{
-		Range:     ToPersistenceRange(scope.Range, categoryType),
+		Range:     ToPersistenceRange(scope.Range),
 		Predicate: ToPersistencePredicate(scope.Predicate),
 	}
 }
 
 func FromPersistenceScope(
 	scope *persistencespb.QueueSliceScope,
-	categoryType tasks.CategoryType,
 ) Scope {
 	return NewScope(
-		FromPersistenceRange(scope.Range, categoryType),
+		FromPersistenceRange(scope.Range),
 		FromPersistencePredicate(scope.Predicate),
 	)
 }
 
 func ToPersistenceRange(
 	r Range,
-	categoryType tasks.CategoryType,
 ) *persistencespb.QueueSliceRange {
 	return &persistencespb.QueueSliceRange{
-		InclusiveMin: ToPersistenceTaskKey(r.InclusiveMin, categoryType),
-		ExclusiveMax: ToPersistenceTaskKey(r.ExclusiveMax, categoryType),
+		InclusiveMin: ToPersistenceTaskKey(r.InclusiveMin),
+		ExclusiveMax: ToPersistenceTaskKey(r.ExclusiveMax),
 	}
 }
 
 func FromPersistenceRange(
 	r *persistencespb.QueueSliceRange,
-	categoryType tasks.CategoryType,
 ) Range {
 	return NewRange(
-		FromPersistenceTaskKey(r.InclusiveMin, categoryType),
-		FromPersistenceTaskKey(r.ExclusiveMax, categoryType),
+		FromPersistenceTaskKey(r.InclusiveMin),
+		FromPersistenceTaskKey(r.ExclusiveMax),
 	)
 }
 
 func ToPersistenceTaskKey(
 	key tasks.Key,
-	categoryType tasks.CategoryType,
-) int64 {
-	if categoryType == tasks.CategoryTypeImmediate {
-		return key.TaskID
+) *persistencespb.TaskKey {
+	return &persistencespb.TaskKey{
+		FireTime: timestamp.TimePtr(key.FireTime),
+		TaskId:   key.TaskID,
 	}
-	return key.FireTime.UnixNano()
 }
 
 func FromPersistenceTaskKey(
-	key int64,
-	categoryType tasks.CategoryType,
+	key *persistencespb.TaskKey,
 ) tasks.Key {
-	if categoryType == tasks.CategoryTypeImmediate {
-		return tasks.NewImmediateKey(key)
-	}
-	return tasks.NewKey(timestamp.UnixOrZeroTime(key), 0)
+	return tasks.NewKey(timestamp.TimeValue(key.FireTime), key.TaskId)
 }
 
 func ToPersistencePredicate(
@@ -139,7 +128,7 @@ func ToPersistencePredicate(
 ) *persistencespb.Predicate {
 	switch predicate := predicate.(type) {
 	case *predicates.AllImpl[tasks.Task]:
-		return ToPersistenceAllPredicate(predicate)
+		return ToPersistenceUniversalPredicate(predicate)
 	case *predicates.EmptyImpl[tasks.Task]:
 		return ToPersistenceEmptyPredicate(predicate)
 	case *predicates.AndImpl[tasks.Task]:
@@ -161,8 +150,8 @@ func FromPersistencePredicate(
 	predicate *persistencespb.Predicate,
 ) tasks.Predicate {
 	switch predicate.GetPredicateType() {
-	case enumsspb.PREDICATE_TYPE_ALL:
-		return FromPersistenceAllPredicate(predicate.GetAllPredicateAttributes())
+	case enumsspb.PREDICATE_TYPE_UNIVERSAL:
+		return FromPersistenceUniversalPredicate(predicate.GetUniversalPredicateAttributes())
 	case enumsspb.PREDICATE_TYPE_EMPTY:
 		return FromPersistenceEmptyPredicate(predicate.GetEmptyPredicateAttributes())
 	case enumsspb.PREDICATE_TYPE_AND:
@@ -180,17 +169,17 @@ func FromPersistencePredicate(
 	}
 }
 
-func ToPersistenceAllPredicate(
+func ToPersistenceUniversalPredicate(
 	_ *predicates.AllImpl[tasks.Task],
 ) *persistencespb.Predicate {
 	return &persistencespb.Predicate{
-		PredicateType: enumsspb.PREDICATE_TYPE_ALL,
-		Attributes:    &persistencespb.Predicate_AllPredicateAttributes{},
+		PredicateType: enumsspb.PREDICATE_TYPE_UNIVERSAL,
+		Attributes:    &persistencespb.Predicate_UniversalPredicateAttributes{},
 	}
 }
 
-func FromPersistenceAllPredicate(
-	_ *persistencespb.AllPredicateAttributes,
+func FromPersistenceUniversalPredicate(
+	_ *persistencespb.UniversalPredicateAttributes,
 ) tasks.Predicate {
 	return predicates.All[tasks.Task]()
 }

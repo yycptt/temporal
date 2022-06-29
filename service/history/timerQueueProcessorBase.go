@@ -97,7 +97,6 @@ func newTimerQueueProcessorBase(
 	logger log.Logger,
 	metricsScope metrics.Scope,
 ) *timerQueueProcessorBase {
-
 	logger = log.With(logger, tag.ComponentTimerQueue)
 	config := shard.GetConfig()
 
@@ -184,7 +183,6 @@ RetryProcessor:
 func (t *timerQueueProcessorBase) notifyNewTimers(
 	timerTasks []tasks.Task,
 ) {
-
 	if len(timerTasks) == 0 {
 		return
 	}
@@ -203,7 +201,6 @@ func (t *timerQueueProcessorBase) notifyNewTimers(
 func (t *timerQueueProcessorBase) notifyNewTimer(
 	newTime time.Time,
 ) {
-
 	t.newTimeLock.Lock()
 	defer t.newTimeLock.Unlock()
 	if t.newTime.IsZero() || newTime.Before(t.newTime) {
@@ -230,7 +227,16 @@ func (t *timerQueueProcessorBase) internalProcessor() error {
 	))
 	defer updateAckTimer.Stop()
 
+eventLoop:
 	for {
+		// prioritize shutdown
+		select {
+		case <-t.shutdownCh:
+			break eventLoop
+		default:
+			// noop
+		}
+
 		// Wait until one of four things occurs:
 		// 1. we get notified of a new message
 		// 2. the timer gate fires (message scheduled to be delivered)
@@ -239,8 +245,7 @@ func (t *timerQueueProcessorBase) internalProcessor() error {
 		//
 		select {
 		case <-t.shutdownCh:
-			t.logger.Debug("Timer queue processor pump shutting down.")
-			return nil
+			break eventLoop
 		case <-t.timerQueueAckMgr.getFinishedChan():
 			// timer queue ack manager indicate that all task scanned
 			// are finished and no more tasks
@@ -289,6 +294,8 @@ func (t *timerQueueProcessorBase) internalProcessor() error {
 			t.timerGate.Update(newTime)
 		}
 	}
+
+	return nil
 }
 
 func (t *timerQueueProcessorBase) readAndFanoutTimerTasks() (*time.Time, error) {
@@ -344,7 +351,6 @@ func (t *timerQueueProcessorBase) verifyReschedulerSize() bool {
 func (t *timerQueueProcessorBase) submitTask(
 	executable queues.Executable,
 ) {
-
 	submitted, err := t.scheduler.TrySubmit(executable)
 	if err != nil {
 		t.logger.Error("Failed to submit task", tag.Error(err))
@@ -357,7 +363,7 @@ func (t *timerQueueProcessorBase) submitTask(
 func newTimerTaskScheduler(
 	shard shard.Context,
 	logger log.Logger,
-	metricProvider metrics.MetricProvider,
+	metricProvider metrics.MetricsHandler,
 ) queues.Scheduler {
 	config := shard.GetConfig()
 	return queues.NewScheduler(

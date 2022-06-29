@@ -33,6 +33,7 @@ import (
 	"sync/atomic"
 
 	"github.com/pborman/uuid"
+	"go.opentelemetry.io/otel/trace"
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
@@ -98,6 +99,7 @@ type (
 		archivalMetadata              archiver.ArchivalMetadata
 		hostInfoProvider              membership.HostInfoProvider
 		controller                    *shard.ControllerImpl
+		tracer                        trace.Tracer
 	}
 
 	NewHandlerArgs struct {
@@ -122,6 +124,7 @@ type (
 		ShardController               *shard.ControllerImpl
 		EventNotifier                 events.Notifier
 		ReplicationTaskFetcherFactory replication.TaskFetcherFactory
+		TracerProvider                trace.TracerProvider
 	}
 )
 
@@ -303,7 +306,7 @@ func (h *Handler) RecordWorkflowTaskStarted(ctx context.Context, request *histor
 			tag.Error(err),
 			tag.WorkflowID(request.WorkflowExecution.GetWorkflowId()),
 			tag.WorkflowRunID(request.WorkflowExecution.GetRunId()),
-			tag.WorkflowScheduleID(request.GetScheduleId()),
+			tag.WorkflowScheduledEventID(request.GetScheduledEventId()),
 		)
 		return nil, h.convertError(err)
 	}
@@ -456,7 +459,7 @@ func (h *Handler) RespondWorkflowTaskCompleted(ctx context.Context, request *his
 		tag.WorkflowNamespaceID(token.GetNamespaceId()),
 		tag.WorkflowID(token.GetWorkflowId()),
 		tag.WorkflowRunID(token.GetRunId()),
-		tag.WorkflowScheduleID(token.GetScheduleId()))
+		tag.WorkflowScheduledEventID(token.GetScheduledEventId()))
 
 	err0 = validateTaskToken(token)
 	if err0 != nil {
@@ -501,7 +504,7 @@ func (h *Handler) RespondWorkflowTaskFailed(ctx context.Context, request *histor
 		tag.WorkflowNamespaceID(token.GetNamespaceId()),
 		tag.WorkflowID(token.GetWorkflowId()),
 		tag.WorkflowRunID(token.GetRunId()),
-		tag.WorkflowScheduleID(token.GetScheduleId()))
+		tag.WorkflowScheduledEventID(token.GetScheduledEventId()))
 
 	err0 = validateTaskToken(token)
 	if err0 != nil {

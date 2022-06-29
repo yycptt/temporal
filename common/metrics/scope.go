@@ -28,20 +28,19 @@ import (
 	"fmt"
 	"time"
 
-	"golang.org/x/exp/event"
 	"golang.org/x/exp/maps"
 )
 
 type (
-	eventsScope struct {
-		provider   MetricProvider
+	scope struct {
+		provider   MetricsHandler
 		serviceIdx ServiceIdx
 		scopeId    int
 		scopeTags  []Tag
 		scopeDef   scopeDefinition
 	}
 
-	eventsStopwatch struct {
+	stopwatch struct {
 		recordFunc timerRecordFunc
 		start      time.Time
 	}
@@ -50,11 +49,11 @@ type (
 )
 
 var (
-	_ Scope     = (*eventsScope)(nil)
-	_ Stopwatch = (*eventsStopwatch)(nil)
+	_ Scope     = (*scope)(nil)
+	_ Stopwatch = (*stopwatch)(nil)
 )
 
-func newEventsScope(provider MetricProvider, idx ServiceIdx, id int) *eventsScope {
+func newScope(provider MetricsHandler, idx ServiceIdx, id int) *scope {
 	def, ok := ScopeDefs[idx][id]
 	if !ok {
 		def, ok = ScopeDefs[Common][id]
@@ -63,7 +62,7 @@ func newEventsScope(provider MetricProvider, idx ServiceIdx, id int) *eventsScop
 		}
 	}
 
-	return &eventsScope{
+	return &scope{
 		provider:   provider,
 		serviceIdx: idx,
 		scopeId:    id,
@@ -73,44 +72,32 @@ func newEventsScope(provider MetricProvider, idx ServiceIdx, id int) *eventsScop
 }
 
 // IncCounter increments a counter metric
-func (e *eventsScope) IncCounter(counter int) {
+func (e *scope) IncCounter(counter int) {
 	e.AddCounter(counter, 1)
 }
 
 // AddCounter adds delta to the counter metric
-func (e *eventsScope) AddCounter(counter int, delta int64) {
+func (e *scope) AddCounter(counter int, delta int64) {
 	m := getDefinition(e.serviceIdx, counter)
 
-	e.provider.Counter(m.metricName.String(), &MetricOptions{
-		Namespace: defaultMetricNamespace,
-		Unit:      event.Unit(m.unit),
-	}).Record(int64(delta), e.scopeTags...)
+	e.provider.Counter(m.metricName.String()).Record(int64(delta), e.scopeTags...)
 
 	if !m.metricRollupName.Empty() {
-		e.provider.Counter(m.metricRollupName.String(), &event.MetricOptions{
-			Namespace: defaultMetricNamespace,
-			Unit:      event.Unit(m.unit),
-		}).Record(int64(delta), e.scopeTags...)
+		e.provider.Counter(m.metricRollupName.String()).Record(int64(delta), e.scopeTags...)
 	}
 }
 
 // StartTimer starts a timer for the given metric name.
 // Time will be recorded when stopwatch is stopped.
-func (e *eventsScope) StartTimer(timer int) Stopwatch {
+func (e *scope) StartTimer(timer int) Stopwatch {
 	m := getDefinition(e.serviceIdx, timer)
 
-	return &eventsStopwatch{
+	return &stopwatch{
 		recordFunc: func(d time.Duration) {
-			e.provider.Timer(m.metricName.String(), &MetricOptions{
-				Namespace: defaultMetricNamespace,
-				Unit:      event.Unit(m.unit),
-			}).Record(d, e.scopeTags...)
+			e.provider.Timer(m.metricName.String()).Record(d, e.scopeTags...)
 
 			if !m.metricRollupName.Empty() {
-				e.provider.Timer(m.metricRollupName.String(), &MetricOptions{
-					Namespace: defaultMetricNamespace,
-					Unit:      event.Unit(m.unit),
-				}).Record(d, e.scopeTags...)
+				e.provider.Timer(m.metricRollupName.String()).Record(d, e.scopeTags...)
 			}
 		},
 		start: time.Now(),
@@ -118,61 +105,43 @@ func (e *eventsScope) StartTimer(timer int) Stopwatch {
 }
 
 // RecordTimer records a timer for the given metric name
-func (e *eventsScope) RecordTimer(timer int, d time.Duration) {
+func (e *scope) RecordTimer(timer int, d time.Duration) {
 	m := getDefinition(e.serviceIdx, timer)
 
-	e.provider.Timer(m.metricName.String(), &MetricOptions{
-		Namespace: defaultMetricNamespace,
-		Unit:      event.Unit(m.unit),
-	}).Record(d, e.scopeTags...)
+	e.provider.Timer(m.metricName.String()).Record(d, e.scopeTags...)
 
 	if !m.metricRollupName.Empty() {
-		e.provider.Timer(m.metricRollupName.String(), &event.MetricOptions{
-			Namespace: defaultMetricNamespace,
-			Unit:      event.Unit(m.unit),
-		}).Record(d, e.scopeTags...)
+		e.provider.Timer(m.metricRollupName.String()).Record(d, e.scopeTags...)
 	}
 }
 
 // RecordDistribution records a distribution (wrapper on top of timer) for the given
 // metric name
-func (e *eventsScope) RecordDistribution(id int, d int) {
+func (e *scope) RecordDistribution(id int, d int) {
 	m := getDefinition(e.serviceIdx, id)
 
-	e.provider.Histogram(m.metricName.String(), &MetricOptions{
-		Namespace: defaultMetricNamespace,
-		Unit:      event.Unit(m.unit),
-	}).Record(int64(d), e.scopeTags...)
+	e.provider.Histogram(m.metricName.String(), m.unit).Record(int64(d), e.scopeTags...)
 
 	if !m.metricRollupName.Empty() {
-		e.provider.Histogram(m.metricRollupName.String(), &event.MetricOptions{
-			Namespace: defaultMetricNamespace,
-			Unit:      event.Unit(m.unit),
-		}).Record(int64(d), e.scopeTags...)
+		e.provider.Histogram(m.metricRollupName.String(), m.unit).Record(int64(d), e.scopeTags...)
 	}
 }
 
 // UpdateGauge reports Gauge type absolute value metric
-func (e *eventsScope) UpdateGauge(gauge int, value float64) {
+func (e *scope) UpdateGauge(gauge int, value float64) {
 	m := getDefinition(e.serviceIdx, gauge)
 
-	e.provider.Gauge(m.metricName.String(), &MetricOptions{
-		Namespace: defaultMetricNamespace,
-		Unit:      event.Unit(m.unit),
-	}).Record(value, e.scopeTags...)
+	e.provider.Gauge(m.metricName.String()).Record(value, e.scopeTags...)
 
 	if !m.metricRollupName.Empty() {
-		e.provider.Gauge(m.metricRollupName.String(), &event.MetricOptions{
-			Namespace: defaultMetricNamespace,
-			Unit:      event.Unit(m.unit),
-		}).Record(value, e.scopeTags...)
+		e.provider.Gauge(m.metricRollupName.String()).Record(value, e.scopeTags...)
 	}
 }
 
 // Tagged returns an internal scope that can be used to add additional
 // information to metrics
-func (e *eventsScope) Tagged(tags ...Tag) Scope {
-	return newEventsScope(e.provider.WithTags(tags...), e.serviceIdx, e.scopeId)
+func (e *scope) Tagged(tags ...Tag) Scope {
+	return newScope(e.provider.WithTags(tags...), e.serviceIdx, e.scopeId)
 }
 
 func scopeDefToTags(s scopeDefinition) []Tag {
@@ -186,12 +155,12 @@ func scopeDefToTags(s scopeDefinition) []Tag {
 }
 
 // Stop records time elapsed from time of creation.
-func (e *eventsStopwatch) Stop() {
+func (e *stopwatch) Stop() {
 	e.recordFunc(time.Since(e.start))
 }
 
 // Subtract adds value to subtract from recorded duration.
-func (e *eventsStopwatch) Subtract(d time.Duration) {
+func (e *stopwatch) Subtract(d time.Duration) {
 	e.start = e.start.Add(d)
 }
 

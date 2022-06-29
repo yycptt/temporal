@@ -29,9 +29,10 @@ import (
 	"math/rand"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"go.temporal.io/server/common/predicates"
 	"go.temporal.io/server/service/history/tasks"
-	"golang.org/x/exp/slices"
 )
 
 func NewRandomKey() tasks.Key {

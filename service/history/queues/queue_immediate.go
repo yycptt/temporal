@@ -57,7 +57,7 @@ func newImmediateQueue(
 	executor Executor,
 	options *QueueOptions,
 	logger log.Logger,
-	metricsProvider metrics.MetricProvider,
+	metricsHandler metrics.MetricsHandler,
 ) *immediateQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
@@ -88,7 +88,7 @@ func newImmediateQueue(
 			executor,
 			options,
 			logger,
-			metricsProvider,
+			metricsHandler,
 		),
 
 		notifyCh: make(chan struct{}, 1),

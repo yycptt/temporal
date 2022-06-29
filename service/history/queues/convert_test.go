@@ -202,49 +202,28 @@ func (s *convertSuite) TestConvertPredicate_TaskType() {
 	}
 }
 
-func (s *convertSuite) TestConvertTaskKey_Immediate() {
-	immediateKey := tasks.NewImmediateKey(rand.Int63())
-	s.Equal(immediateKey, FromPersistenceTaskKey(
-		ToPersistenceTaskKey(immediateKey, tasks.CategoryTypeImmediate),
-		tasks.CategoryTypeImmediate,
+func (s *convertSuite) TestConvertTaskKey() {
+	key := NewRandomKey()
+	s.Equal(key, FromPersistenceTaskKey(
+		ToPersistenceTaskKey(key),
 	))
 }
 
-func (s *convertSuite) TestConvertTaskKey_Scheduled() {
-	scheduledKey := tasks.NewKey(time.Now().UTC(), 0)
-	s.Equal(scheduledKey, FromPersistenceTaskKey(
-		ToPersistenceTaskKey(scheduledKey, tasks.CategoryTypeScheduled),
-		tasks.CategoryTypeScheduled,
-	))
-}
-
-func (s *convertSuite) TestConvertTaskRange_Immediate() {
-	r := s.newRandomImmdiateTaskRange()
-
+func (s *convertSuite) TestConvertTaskRange() {
+	r := NewRandomRange()
 	s.Equal(r, FromPersistenceRange(
-		ToPersistenceRange(r, tasks.CategoryTypeImmediate),
-		tasks.CategoryTypeImmediate,
-	))
-}
-
-func (s *convertSuite) TestConvertTaskRange_Scheduled() {
-	r := s.newRandomScheduledTaskRange()
-
-	s.Equal(r, FromPersistenceRange(
-		ToPersistenceRange(r, tasks.CategoryTypeScheduled),
-		tasks.CategoryTypeScheduled,
+		ToPersistenceRange(r),
 	))
 }
 
 func (s *convertSuite) TestConvertScope() {
 	scope := NewScope(
-		s.newRandomScheduledTaskRange(),
+		NewRandomRange(),
 		tasks.NewNamespacePredicate([]string{uuid.New(), uuid.New()}),
 	)
 
 	s.Equal(scope, FromPersistenceScope(
-		ToPersistenceScope(scope, tasks.CategoryTypeScheduled),
-		tasks.CategoryTypeScheduled,
+		ToPersistenceScope(scope),
 	))
 }
 
@@ -253,17 +232,17 @@ func (s *convertSuite) TestConvertQueueState() {
 		0: {},
 		1: {
 			NewScope(
-				s.newRandomScheduledTaskRange(),
+				NewRandomRange(),
 				tasks.NewNamespacePredicate([]string{uuid.New(), uuid.New()}),
 			),
 		},
 		123: {
 			NewScope(
-				s.newRandomScheduledTaskRange(),
+				NewRandomRange(),
 				tasks.NewNamespacePredicate([]string{uuid.New(), uuid.New()}),
 			),
 			NewScope(
-				s.newRandomScheduledTaskRange(),
+				NewRandomRange(),
 				tasks.NewTypePredicate([]enumsspb.TaskType{
 					enumsspb.TASK_TYPE_ACTIVITY_TIMEOUT,
 					enumsspb.TASK_TYPE_ACTIVITY_RETRY_TIMER,
@@ -278,25 +257,6 @@ func (s *convertSuite) TestConvertQueueState() {
 	}
 
 	s.Equal(queueState, FromPersistenceQueueState(
-		ToPersistenceQueueState(queueState, tasks.CategoryTypeScheduled),
-
-		tasks.CategoryTypeScheduled,
+		ToPersistenceQueueState(queueState),
 	))
-}
-
-func (s *convertSuite) newRandomImmdiateTaskRange() Range {
-	maxKey := tasks.NewImmediateKey(rand.Int63())
-	minKey := tasks.NewImmediateKey(maxKey.TaskID)
-
-	return NewRange(minKey, maxKey)
-}
-
-func (s *convertSuite) newRandomScheduledTaskRange() Range {
-	maxKey := tasks.NewKey(time.Unix(0, rand.Int63()).UTC(), 0)
-	minKey := tasks.NewKey(
-		time.Unix(0, rand.Int63n(maxKey.FireTime.UnixNano())).UTC(),
-		0,
-	)
-
-	return NewRange(minKey, maxKey)
 }

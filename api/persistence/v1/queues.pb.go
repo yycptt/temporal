@@ -50,15 +50,66 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.GoGoProtoPackageIsVersion3 // please upgrade the proto package
 
+type QueueAckLevel struct {
+	AckLevel        int64            `protobuf:"varint,1,opt,name=ack_level,json=ackLevel,proto3" json:"ack_level,omitempty"`
+	ClusterAckLevel map[string]int64 `protobuf:"bytes,2,rep,name=cluster_ack_level,json=clusterAckLevel,proto3" json:"cluster_ack_level,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+}
+
+func (m *QueueAckLevel) Reset()      { *m = QueueAckLevel{} }
+func (*QueueAckLevel) ProtoMessage() {}
+func (*QueueAckLevel) Descriptor() ([]byte, []int) {
+	return fileDescriptor_b7fa5f143ac80378, []int{0}
+}
+func (m *QueueAckLevel) XXX_Unmarshal(b []byte) error {
+	return m.Unmarshal(b)
+}
+func (m *QueueAckLevel) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	if deterministic {
+		return xxx_messageInfo_QueueAckLevel.Marshal(b, m, deterministic)
+	} else {
+		b = b[:cap(b)]
+		n, err := m.MarshalToSizedBuffer(b)
+		if err != nil {
+			return nil, err
+		}
+		return b[:n], nil
+	}
+}
+func (m *QueueAckLevel) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_QueueAckLevel.Merge(m, src)
+}
+func (m *QueueAckLevel) XXX_Size() int {
+	return m.Size()
+}
+func (m *QueueAckLevel) XXX_DiscardUnknown() {
+	xxx_messageInfo_QueueAckLevel.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_QueueAckLevel proto.InternalMessageInfo
+
+func (m *QueueAckLevel) GetAckLevel() int64 {
+	if m != nil {
+		return m.AckLevel
+	}
+	return 0
+}
+
+func (m *QueueAckLevel) GetClusterAckLevel() map[string]int64 {
+	if m != nil {
+		return m.ClusterAckLevel
+	}
+	return nil
+}
+
 type QueueState struct {
-	ReaderStates        map[int32]*QueueReaderState `protobuf:"bytes,1,rep,name=reader_states,json=readerStates,proto3" json:"reader_states,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	ExclusiveMaxReadKey int64                       `protobuf:"varint,2,opt,name=exclusive_max_read_key,json=exclusiveMaxReadKey,proto3" json:"exclusive_max_read_key,omitempty"`
+	ReaderStates                 map[int32]*QueueReaderState `protobuf:"bytes,1,rep,name=reader_states,json=readerStates,proto3" json:"reader_states,omitempty" protobuf_key:"varint,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	ExclusiveReaderHighWatermark *TaskKey                    `protobuf:"bytes,2,opt,name=exclusive_reader_high_watermark,json=exclusiveReaderHighWatermark,proto3" json:"exclusive_reader_high_watermark,omitempty"`
 }
 
 func (m *QueueState) Reset()      { *m = QueueState{} }
 func (*QueueState) ProtoMessage() {}
 func (*QueueState) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7fa5f143ac80378, []int{0}
+	return fileDescriptor_b7fa5f143ac80378, []int{1}
 }
 func (m *QueueState) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -94,11 +145,11 @@ func (m *QueueState) GetReaderStates() map[int32]*QueueReaderState {
 	return nil
 }
 
-func (m *QueueState) GetExclusiveMaxReadKey() int64 {
+func (m *QueueState) GetExclusiveReaderHighWatermark() *TaskKey {
 	if m != nil {
-		return m.ExclusiveMaxReadKey
+		return m.ExclusiveReaderHighWatermark
 	}
-	return 0
+	return nil
 }
 
 type QueueReaderState struct {
@@ -108,7 +159,7 @@ type QueueReaderState struct {
 func (m *QueueReaderState) Reset()      { *m = QueueReaderState{} }
 func (*QueueReaderState) ProtoMessage() {}
 func (*QueueReaderState) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7fa5f143ac80378, []int{1}
+	return fileDescriptor_b7fa5f143ac80378, []int{2}
 }
 func (m *QueueReaderState) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -152,7 +203,7 @@ type QueueSliceScope struct {
 func (m *QueueSliceScope) Reset()      { *m = QueueSliceScope{} }
 func (*QueueSliceScope) ProtoMessage() {}
 func (*QueueSliceScope) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7fa5f143ac80378, []int{2}
+	return fileDescriptor_b7fa5f143ac80378, []int{3}
 }
 func (m *QueueSliceScope) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -196,14 +247,14 @@ func (m *QueueSliceScope) GetPredicate() *Predicate {
 }
 
 type QueueSliceRange struct {
-	InclusiveMin int64 `protobuf:"varint,1,opt,name=inclusive_min,json=inclusiveMin,proto3" json:"inclusive_min,omitempty"`
-	ExclusiveMax int64 `protobuf:"varint,2,opt,name=exclusive_max,json=exclusiveMax,proto3" json:"exclusive_max,omitempty"`
+	InclusiveMin *TaskKey `protobuf:"bytes,1,opt,name=inclusive_min,json=inclusiveMin,proto3" json:"inclusive_min,omitempty"`
+	ExclusiveMax *TaskKey `protobuf:"bytes,2,opt,name=exclusive_max,json=exclusiveMax,proto3" json:"exclusive_max,omitempty"`
 }
 
 func (m *QueueSliceRange) Reset()      { *m = QueueSliceRange{} }
 func (*QueueSliceRange) ProtoMessage() {}
 func (*QueueSliceRange) Descriptor() ([]byte, []int) {
-	return fileDescriptor_b7fa5f143ac80378, []int{3}
+	return fileDescriptor_b7fa5f143ac80378, []int{4}
 }
 func (m *QueueSliceRange) XXX_Unmarshal(b []byte) error {
 	return m.Unmarshal(b)
@@ -232,21 +283,23 @@ func (m *QueueSliceRange) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_QueueSliceRange proto.InternalMessageInfo
 
-func (m *QueueSliceRange) GetInclusiveMin() int64 {
+func (m *QueueSliceRange) GetInclusiveMin() *TaskKey {
 	if m != nil {
 		return m.InclusiveMin
 	}
-	return 0
+	return nil
 }
 
-func (m *QueueSliceRange) GetExclusiveMax() int64 {
+func (m *QueueSliceRange) GetExclusiveMax() *TaskKey {
 	if m != nil {
 		return m.ExclusiveMax
 	}
-	return 0
+	return nil
 }
 
 func init() {
+	proto.RegisterType((*QueueAckLevel)(nil), "temporal.server.api.persistence.v1.QueueAckLevel")
+	proto.RegisterMapType((map[string]int64)(nil), "temporal.server.api.persistence.v1.QueueAckLevel.ClusterAckLevelEntry")
 	proto.RegisterType((*QueueState)(nil), "temporal.server.api.persistence.v1.QueueState")
 	proto.RegisterMapType((map[int32]*QueueReaderState)(nil), "temporal.server.api.persistence.v1.QueueState.ReaderStatesEntry")
 	proto.RegisterType((*QueueReaderState)(nil), "temporal.server.api.persistence.v1.QueueReaderState")
@@ -259,36 +312,75 @@ func init() {
 }
 
 var fileDescriptor_b7fa5f143ac80378 = []byte{
-	// 429 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x94, 0x92, 0xb1, 0x8e, 0xd3, 0x30,
-	0x18, 0xc7, 0xe3, 0x46, 0x3d, 0x09, 0x5f, 0x4f, 0x1c, 0x46, 0x42, 0xa7, 0x1b, 0xac, 0x2a, 0x2c,
-	0x5d, 0x70, 0x74, 0x4d, 0x07, 0x04, 0x0b, 0x42, 0x62, 0x80, 0xaa, 0x12, 0xb8, 0x1b, 0x0c, 0x91,
-	0x49, 0x3f, 0x55, 0x86, 0x34, 0x09, 0x76, 0x12, 0xb5, 0x1b, 0x8f, 0xc0, 0x1b, 0xb0, 0xc2, 0x9b,
-	0x30, 0x76, 0xec, 0x48, 0xd3, 0x85, 0xb1, 0x8f, 0x80, 0x9c, 0xb6, 0x69, 0x28, 0x42, 0xe4, 0x36,
-	0xdb, 0x7f, 0xff, 0x7f, 0xdf, 0xe7, 0xef, 0x6f, 0xec, 0xa6, 0x30, 0x4b, 0x62, 0x25, 0x42, 0x57,
-	0x83, 0xca, 0x41, 0xb9, 0x22, 0x91, 0x6e, 0x02, 0x4a, 0x4b, 0x9d, 0x42, 0x14, 0x80, 0x9b, 0xdf,
-	0xb8, 0x9f, 0x32, 0xc8, 0x40, 0xb3, 0x44, 0xc5, 0x69, 0x4c, 0x9c, 0x83, 0x81, 0xed, 0x0c, 0x4c,
-	0x24, 0x92, 0xd5, 0x0c, 0x2c, 0xbf, 0xb9, 0xf6, 0x1a, 0x40, 0x13, 0x05, 0x13, 0x19, 0x88, 0xf4,
-	0x00, 0x76, 0xbe, 0xb6, 0x30, 0x7e, 0x63, 0x2a, 0x8d, 0x53, 0x91, 0x02, 0x01, 0x7c, 0xa1, 0x40,
-	0x4c, 0x40, 0xf9, 0xda, 0xec, 0xf5, 0x15, 0xea, 0xda, 0xbd, 0xf3, 0xfe, 0x33, 0xf6, 0xff, 0xfa,
-	0xec, 0x88, 0x61, 0xbc, 0x64, 0x94, 0x6b, 0xfd, 0x22, 0x4a, 0xd5, 0x82, 0x77, 0x54, 0xed, 0x88,
-	0x78, 0xf8, 0x01, 0xcc, 0x83, 0x30, 0xd3, 0x32, 0x07, 0x7f, 0x26, 0xe6, 0xbe, 0x51, 0xfd, 0x8f,
-	0xb0, 0xb8, 0x6a, 0x75, 0x51, 0xcf, 0xe6, 0xf7, 0x2b, 0x75, 0x24, 0xe6, 0x06, 0x36, 0x84, 0xc5,
-	0x75, 0x86, 0xef, 0xfd, 0xc5, 0x25, 0x97, 0xd8, 0x36, 0x36, 0xd4, 0x45, 0xbd, 0x36, 0x37, 0x4b,
-	0xf2, 0x0a, 0xb7, 0x73, 0x11, 0x66, 0x50, 0xa2, 0xce, 0xfb, 0x83, 0xc6, 0xad, 0xd7, 0xe0, 0x7c,
-	0x87, 0x78, 0xd2, 0x7a, 0x8c, 0x1c, 0x1f, 0x5f, 0x9e, 0xca, 0x64, 0x88, 0xcf, 0x74, 0x10, 0x27,
-	0xd5, 0x7c, 0xbc, 0xe6, 0xf3, 0x09, 0x65, 0x00, 0x63, 0xe3, 0xe5, 0x7b, 0x84, 0xf3, 0x1d, 0xe1,
-	0xbb, 0x27, 0x1a, 0x79, 0x89, 0xdb, 0x4a, 0x44, 0x53, 0x28, 0x1f, 0x76, 0x6b, 0x3e, 0x37, 0x56,
-	0xbe, 0x23, 0x90, 0x21, 0xbe, 0x53, 0xa5, 0xbe, 0x9f, 0xc9, 0xa3, 0x26, 0xb8, 0xd7, 0x07, 0x13,
-	0x3f, 0xfa, 0x9d, 0x77, 0xf5, 0x56, 0xcb, 0x32, 0xe4, 0x21, 0xbe, 0x90, 0x51, 0x95, 0xa5, 0x8c,
-	0xca, 0x96, 0x6d, 0xde, 0xa9, 0x0e, 0x47, 0x32, 0x32, 0x97, 0xfe, 0x08, 0x7c, 0x9f, 0x73, 0xa7,
-	0x9e, 0xf3, 0xf3, 0x0f, 0xcb, 0x35, 0xb5, 0x56, 0x6b, 0x6a, 0x6d, 0xd7, 0x14, 0x7d, 0x2e, 0x28,
-	0xfa, 0x56, 0x50, 0xf4, 0xa3, 0xa0, 0x68, 0x59, 0x50, 0xf4, 0xb3, 0xa0, 0xe8, 0x57, 0x41, 0xad,
-	0x6d, 0x41, 0xd1, 0x97, 0x0d, 0xb5, 0x96, 0x1b, 0x6a, 0xad, 0x36, 0xd4, 0x7a, 0x3b, 0x98, 0xc6,
-	0xc7, 0xe7, 0xc8, 0xf8, 0xdf, 0x9f, 0xff, 0x69, 0x6d, 0xfb, 0xfe, 0xac, 0xfc, 0xfe, 0xde, 0xef,
-	0x00, 0x00, 0x00, 0xff, 0xff, 0xca, 0xfd, 0xbc, 0x21, 0x8a, 0x03, 0x00, 0x00,
+	// 542 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x9c, 0x94, 0xc1, 0x6e, 0xd3, 0x30,
+	0x18, 0xc7, 0xe3, 0x4e, 0x9d, 0xa8, 0xdb, 0x6a, 0x5b, 0xb4, 0x43, 0x55, 0x90, 0x99, 0x7a, 0x9a,
+	0x84, 0x48, 0xb4, 0x76, 0x07, 0x04, 0x17, 0x18, 0x02, 0x01, 0x65, 0xd2, 0xc8, 0x90, 0x90, 0xb8,
+	0x44, 0x26, 0xfb, 0xd4, 0x9a, 0xa4, 0x49, 0xb0, 0xdd, 0xd0, 0xde, 0x78, 0x04, 0x1e, 0x03, 0x1e,
+	0x80, 0x77, 0xe0, 0xd8, 0xe3, 0x4e, 0x88, 0xa6, 0x1c, 0x38, 0xee, 0x11, 0x50, 0x9c, 0x26, 0x4d,
+	0x07, 0x88, 0x8c, 0x5b, 0x3e, 0xdb, 0xff, 0xdf, 0xf7, 0xff, 0xfe, 0x75, 0x8d, 0x4d, 0x09, 0xa3,
+	0x30, 0xe0, 0xd4, 0x33, 0x05, 0xf0, 0x08, 0xb8, 0x49, 0x43, 0x66, 0x86, 0xc0, 0x05, 0x13, 0x12,
+	0x7c, 0x07, 0xcc, 0xe8, 0xc0, 0x7c, 0x37, 0x86, 0x31, 0x08, 0x23, 0xe4, 0x81, 0x0c, 0xf4, 0x4e,
+	0x26, 0x30, 0x52, 0x81, 0x41, 0x43, 0x66, 0x14, 0x04, 0x46, 0x74, 0xd0, 0xee, 0x95, 0x80, 0x86,
+	0x1c, 0xce, 0x98, 0x43, 0x65, 0x06, 0x6e, 0x1b, 0x25, 0x44, 0x92, 0x0a, 0x77, 0x79, 0xbe, 0xf3,
+	0x03, 0xe1, 0xe6, 0x8b, 0xc4, 0xd9, 0x03, 0xc7, 0x7d, 0x0e, 0x11, 0x78, 0xfa, 0x75, 0x5c, 0xa3,
+	0x8e, 0x6b, 0x7b, 0x49, 0xd1, 0x42, 0x7b, 0x68, 0x7f, 0xc3, 0xba, 0x46, 0xb3, 0x4d, 0x8e, 0x77,
+	0x1c, 0x6f, 0x2c, 0x24, 0x70, 0x7b, 0x75, 0xa8, 0xb2, 0xb7, 0xb1, 0x5f, 0xef, 0x3e, 0x36, 0xfe,
+	0x3d, 0x93, 0xb1, 0xd6, 0xca, 0x78, 0x98, 0xa2, 0xb2, 0xfa, 0x91, 0x2f, 0xf9, 0xd4, 0xda, 0x72,
+	0xd6, 0x57, 0xdb, 0x47, 0x78, 0xf7, 0x4f, 0x07, 0xf5, 0x6d, 0xbc, 0xe1, 0xc2, 0x54, 0x59, 0xac,
+	0x59, 0xc9, 0xa7, 0xbe, 0x8b, 0xab, 0x11, 0xf5, 0xc6, 0xd0, 0xaa, 0x28, 0xdb, 0x69, 0x71, 0xb7,
+	0x72, 0x07, 0x75, 0xbe, 0x55, 0x30, 0x56, 0xbd, 0x4f, 0x25, 0x95, 0xa0, 0x03, 0x6e, 0x72, 0xa0,
+	0x67, 0xc0, 0x6d, 0x91, 0xd4, 0xa2, 0x85, 0xd4, 0x08, 0xf7, 0x4b, 0x8f, 0xa0, 0x30, 0x86, 0xa5,
+	0x18, 0xea, 0x5b, 0xa4, 0xe6, 0x1b, 0xbc, 0xb0, 0xa4, 0x73, 0x7c, 0x13, 0x26, 0xc9, 0x38, 0x2c,
+	0x02, 0x7b, 0xd9, 0x70, 0xc8, 0x06, 0x43, 0xfb, 0x3d, 0x95, 0xc0, 0x47, 0x94, 0xbb, 0xca, 0x69,
+	0xbd, 0x7b, 0xab, 0x4c, 0xe3, 0x97, 0x54, 0xb8, 0x7d, 0x98, 0x5a, 0x37, 0x72, 0x66, 0xda, 0xff,
+	0x09, 0x1b, 0x0c, 0x5f, 0x65, 0xc0, 0xf6, 0x18, 0xef, 0xfc, 0x66, 0xab, 0x18, 0x55, 0x35, 0x8d,
+	0xea, 0x59, 0x31, 0xaa, 0x7a, 0xf7, 0xb0, 0xf4, 0xe4, 0x05, 0x78, 0x31, 0x60, 0x1b, 0x6f, 0x5f,
+	0xde, 0xd6, 0xfb, 0x78, 0x53, 0x38, 0x41, 0x98, 0xc7, 0xdb, 0x2b, 0x1f, 0xaf, 0xc7, 0x1c, 0x38,
+	0x4d, 0xb4, 0xd6, 0x12, 0xd1, 0xf9, 0x8c, 0xf0, 0xd6, 0xa5, 0x3d, 0xfd, 0x29, 0xae, 0x72, 0xea,
+	0x0f, 0x40, 0x0d, 0x76, 0x65, 0xbe, 0x95, 0x48, 0xad, 0x94, 0xa0, 0xf7, 0x71, 0x2d, 0xff, 0x2f,
+	0x2d, 0x33, 0xb9, 0x5d, 0x06, 0x77, 0x92, 0x89, 0xac, 0x95, 0xbe, 0xf3, 0x65, 0xcd, 0xab, 0xea,
+	0xa3, 0x9f, 0xe0, 0x26, 0xf3, 0xb3, 0xbb, 0x30, 0x62, 0xfe, 0xd2, 0xf3, 0x95, 0x7e, 0xf9, 0x46,
+	0x4e, 0x38, 0x66, 0x7e, 0x42, 0x5c, 0xdd, 0xae, 0x11, 0x9d, 0xfc, 0xcf, 0x5d, 0x6a, 0xe4, 0x84,
+	0x63, 0x3a, 0x39, 0x7a, 0x3b, 0x9b, 0x13, 0xed, 0x7c, 0x4e, 0xb4, 0x8b, 0x39, 0x41, 0x1f, 0x62,
+	0x82, 0x3e, 0xc5, 0x04, 0x7d, 0x8d, 0x09, 0x9a, 0xc5, 0x04, 0x7d, 0x8f, 0x09, 0xfa, 0x19, 0x13,
+	0xed, 0x22, 0x26, 0xe8, 0xe3, 0x82, 0x68, 0xb3, 0x05, 0xd1, 0xce, 0x17, 0x44, 0x7b, 0x7d, 0x38,
+	0x08, 0x56, 0x2d, 0x59, 0xf0, 0xf7, 0x87, 0xe7, 0x5e, 0xa1, 0x7c, 0xb3, 0xa9, 0xde, 0x9f, 0xde,
+	0xaf, 0x00, 0x00, 0x00, 0xff, 0xff, 0x72, 0x0f, 0xf4, 0x16, 0x3b, 0x05, 0x00, 0x00,
 }
 
+func (this *QueueAckLevel) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	that1, ok := that.(*QueueAckLevel)
+	if !ok {
+		that2, ok := that.(QueueAckLevel)
+		if ok {
+			that1 = &that2
+		} else {
+			return false
+		}
+	}
+	if that1 == nil {
+		return this == nil
+	} else if this == nil {
+		return false
+	}
+	if this.AckLevel != that1.AckLevel {
+		return false
+	}
+	if len(this.ClusterAckLevel) != len(that1.ClusterAckLevel) {
+		return false
+	}
+	for i := range this.ClusterAckLevel {
+		if this.ClusterAckLevel[i] != that1.ClusterAckLevel[i] {
+			return false
+		}
+	}
+	return true
+}
 func (this *QueueState) Equal(that interface{}) bool {
 	if that == nil {
 		return this == nil
@@ -316,7 +408,7 @@ func (this *QueueState) Equal(that interface{}) bool {
 			return false
 		}
 	}
-	if this.ExclusiveMaxReadKey != that1.ExclusiveMaxReadKey {
+	if !this.ExclusiveReaderHighWatermark.Equal(that1.ExclusiveReaderHighWatermark) {
 		return false
 	}
 	return true
@@ -396,13 +488,36 @@ func (this *QueueSliceRange) Equal(that interface{}) bool {
 	} else if this == nil {
 		return false
 	}
-	if this.InclusiveMin != that1.InclusiveMin {
+	if !this.InclusiveMin.Equal(that1.InclusiveMin) {
 		return false
 	}
-	if this.ExclusiveMax != that1.ExclusiveMax {
+	if !this.ExclusiveMax.Equal(that1.ExclusiveMax) {
 		return false
 	}
 	return true
+}
+func (this *QueueAckLevel) GoString() string {
+	if this == nil {
+		return "nil"
+	}
+	s := make([]string, 0, 6)
+	s = append(s, "&persistence.QueueAckLevel{")
+	s = append(s, "AckLevel: "+fmt.Sprintf("%#v", this.AckLevel)+",\n")
+	keysForClusterAckLevel := make([]string, 0, len(this.ClusterAckLevel))
+	for k, _ := range this.ClusterAckLevel {
+		keysForClusterAckLevel = append(keysForClusterAckLevel, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForClusterAckLevel)
+	mapStringForClusterAckLevel := "map[string]int64{"
+	for _, k := range keysForClusterAckLevel {
+		mapStringForClusterAckLevel += fmt.Sprintf("%#v: %#v,", k, this.ClusterAckLevel[k])
+	}
+	mapStringForClusterAckLevel += "}"
+	if this.ClusterAckLevel != nil {
+		s = append(s, "ClusterAckLevel: "+mapStringForClusterAckLevel+",\n")
+	}
+	s = append(s, "}")
+	return strings.Join(s, "")
 }
 func (this *QueueState) GoString() string {
 	if this == nil {
@@ -423,7 +538,9 @@ func (this *QueueState) GoString() string {
 	if this.ReaderStates != nil {
 		s = append(s, "ReaderStates: "+mapStringForReaderStates+",\n")
 	}
-	s = append(s, "ExclusiveMaxReadKey: "+fmt.Sprintf("%#v", this.ExclusiveMaxReadKey)+",\n")
+	if this.ExclusiveReaderHighWatermark != nil {
+		s = append(s, "ExclusiveReaderHighWatermark: "+fmt.Sprintf("%#v", this.ExclusiveReaderHighWatermark)+",\n")
+	}
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -460,8 +577,12 @@ func (this *QueueSliceRange) GoString() string {
 	}
 	s := make([]string, 0, 6)
 	s = append(s, "&persistence.QueueSliceRange{")
-	s = append(s, "InclusiveMin: "+fmt.Sprintf("%#v", this.InclusiveMin)+",\n")
-	s = append(s, "ExclusiveMax: "+fmt.Sprintf("%#v", this.ExclusiveMax)+",\n")
+	if this.InclusiveMin != nil {
+		s = append(s, "InclusiveMin: "+fmt.Sprintf("%#v", this.InclusiveMin)+",\n")
+	}
+	if this.ExclusiveMax != nil {
+		s = append(s, "ExclusiveMax: "+fmt.Sprintf("%#v", this.ExclusiveMax)+",\n")
+	}
 	s = append(s, "}")
 	return strings.Join(s, "")
 }
@@ -473,6 +594,51 @@ func valueToGoStringQueues(v interface{}, typ string) string {
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("func(v %v) *%v { return &v } ( %#v )", typ, typ, pv)
 }
+func (m *QueueAckLevel) Marshal() (dAtA []byte, err error) {
+	size := m.Size()
+	dAtA = make([]byte, size)
+	n, err := m.MarshalToSizedBuffer(dAtA[:size])
+	if err != nil {
+		return nil, err
+	}
+	return dAtA[:n], nil
+}
+
+func (m *QueueAckLevel) MarshalTo(dAtA []byte) (int, error) {
+	size := m.Size()
+	return m.MarshalToSizedBuffer(dAtA[:size])
+}
+
+func (m *QueueAckLevel) MarshalToSizedBuffer(dAtA []byte) (int, error) {
+	i := len(dAtA)
+	_ = i
+	var l int
+	_ = l
+	if len(m.ClusterAckLevel) > 0 {
+		for k := range m.ClusterAckLevel {
+			v := m.ClusterAckLevel[k]
+			baseI := i
+			i = encodeVarintQueues(dAtA, i, uint64(v))
+			i--
+			dAtA[i] = 0x10
+			i -= len(k)
+			copy(dAtA[i:], k)
+			i = encodeVarintQueues(dAtA, i, uint64(len(k)))
+			i--
+			dAtA[i] = 0xa
+			i = encodeVarintQueues(dAtA, i, uint64(baseI-i))
+			i--
+			dAtA[i] = 0x12
+		}
+	}
+	if m.AckLevel != 0 {
+		i = encodeVarintQueues(dAtA, i, uint64(m.AckLevel))
+		i--
+		dAtA[i] = 0x8
+	}
+	return len(dAtA) - i, nil
+}
+
 func (m *QueueState) Marshal() (dAtA []byte, err error) {
 	size := m.Size()
 	dAtA = make([]byte, size)
@@ -493,10 +659,17 @@ func (m *QueueState) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.ExclusiveMaxReadKey != 0 {
-		i = encodeVarintQueues(dAtA, i, uint64(m.ExclusiveMaxReadKey))
+	if m.ExclusiveReaderHighWatermark != nil {
+		{
+			size, err := m.ExclusiveReaderHighWatermark.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQueues(dAtA, i, uint64(size))
+		}
 		i--
-		dAtA[i] = 0x10
+		dAtA[i] = 0x12
 	}
 	if len(m.ReaderStates) > 0 {
 		for k := range m.ReaderStates {
@@ -629,15 +802,29 @@ func (m *QueueSliceRange) MarshalToSizedBuffer(dAtA []byte) (int, error) {
 	_ = i
 	var l int
 	_ = l
-	if m.ExclusiveMax != 0 {
-		i = encodeVarintQueues(dAtA, i, uint64(m.ExclusiveMax))
+	if m.ExclusiveMax != nil {
+		{
+			size, err := m.ExclusiveMax.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQueues(dAtA, i, uint64(size))
+		}
 		i--
-		dAtA[i] = 0x10
+		dAtA[i] = 0x12
 	}
-	if m.InclusiveMin != 0 {
-		i = encodeVarintQueues(dAtA, i, uint64(m.InclusiveMin))
+	if m.InclusiveMin != nil {
+		{
+			size, err := m.InclusiveMin.MarshalToSizedBuffer(dAtA[:i])
+			if err != nil {
+				return 0, err
+			}
+			i -= size
+			i = encodeVarintQueues(dAtA, i, uint64(size))
+		}
 		i--
-		dAtA[i] = 0x8
+		dAtA[i] = 0xa
 	}
 	return len(dAtA) - i, nil
 }
@@ -653,6 +840,26 @@ func encodeVarintQueues(dAtA []byte, offset int, v uint64) int {
 	dAtA[offset] = uint8(v)
 	return base
 }
+func (m *QueueAckLevel) Size() (n int) {
+	if m == nil {
+		return 0
+	}
+	var l int
+	_ = l
+	if m.AckLevel != 0 {
+		n += 1 + sovQueues(uint64(m.AckLevel))
+	}
+	if len(m.ClusterAckLevel) > 0 {
+		for k, v := range m.ClusterAckLevel {
+			_ = k
+			_ = v
+			mapEntrySize := 1 + len(k) + sovQueues(uint64(len(k))) + 1 + sovQueues(uint64(v))
+			n += mapEntrySize + 1 + sovQueues(uint64(mapEntrySize))
+		}
+	}
+	return n
+}
+
 func (m *QueueState) Size() (n int) {
 	if m == nil {
 		return 0
@@ -672,8 +879,9 @@ func (m *QueueState) Size() (n int) {
 			n += mapEntrySize + 1 + sovQueues(uint64(mapEntrySize))
 		}
 	}
-	if m.ExclusiveMaxReadKey != 0 {
-		n += 1 + sovQueues(uint64(m.ExclusiveMaxReadKey))
+	if m.ExclusiveReaderHighWatermark != nil {
+		l = m.ExclusiveReaderHighWatermark.Size()
+		n += 1 + l + sovQueues(uint64(l))
 	}
 	return n
 }
@@ -716,11 +924,13 @@ func (m *QueueSliceRange) Size() (n int) {
 	}
 	var l int
 	_ = l
-	if m.InclusiveMin != 0 {
-		n += 1 + sovQueues(uint64(m.InclusiveMin))
+	if m.InclusiveMin != nil {
+		l = m.InclusiveMin.Size()
+		n += 1 + l + sovQueues(uint64(l))
 	}
-	if m.ExclusiveMax != 0 {
-		n += 1 + sovQueues(uint64(m.ExclusiveMax))
+	if m.ExclusiveMax != nil {
+		l = m.ExclusiveMax.Size()
+		n += 1 + l + sovQueues(uint64(l))
 	}
 	return n
 }
@@ -730,6 +940,27 @@ func sovQueues(x uint64) (n int) {
 }
 func sozQueues(x uint64) (n int) {
 	return sovQueues(uint64((x << 1) ^ uint64((int64(x) >> 63))))
+}
+func (this *QueueAckLevel) String() string {
+	if this == nil {
+		return "nil"
+	}
+	keysForClusterAckLevel := make([]string, 0, len(this.ClusterAckLevel))
+	for k, _ := range this.ClusterAckLevel {
+		keysForClusterAckLevel = append(keysForClusterAckLevel, k)
+	}
+	github_com_gogo_protobuf_sortkeys.Strings(keysForClusterAckLevel)
+	mapStringForClusterAckLevel := "map[string]int64{"
+	for _, k := range keysForClusterAckLevel {
+		mapStringForClusterAckLevel += fmt.Sprintf("%v: %v,", k, this.ClusterAckLevel[k])
+	}
+	mapStringForClusterAckLevel += "}"
+	s := strings.Join([]string{`&QueueAckLevel{`,
+		`AckLevel:` + fmt.Sprintf("%v", this.AckLevel) + `,`,
+		`ClusterAckLevel:` + mapStringForClusterAckLevel + `,`,
+		`}`,
+	}, "")
+	return s
 }
 func (this *QueueState) String() string {
 	if this == nil {
@@ -747,7 +978,7 @@ func (this *QueueState) String() string {
 	mapStringForReaderStates += "}"
 	s := strings.Join([]string{`&QueueState{`,
 		`ReaderStates:` + mapStringForReaderStates + `,`,
-		`ExclusiveMaxReadKey:` + fmt.Sprintf("%v", this.ExclusiveMaxReadKey) + `,`,
+		`ExclusiveReaderHighWatermark:` + strings.Replace(fmt.Sprintf("%v", this.ExclusiveReaderHighWatermark), "TaskKey", "TaskKey", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -783,8 +1014,8 @@ func (this *QueueSliceRange) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&QueueSliceRange{`,
-		`InclusiveMin:` + fmt.Sprintf("%v", this.InclusiveMin) + `,`,
-		`ExclusiveMax:` + fmt.Sprintf("%v", this.ExclusiveMax) + `,`,
+		`InclusiveMin:` + strings.Replace(fmt.Sprintf("%v", this.InclusiveMin), "TaskKey", "TaskKey", 1) + `,`,
+		`ExclusiveMax:` + strings.Replace(fmt.Sprintf("%v", this.ExclusiveMax), "TaskKey", "TaskKey", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -796,6 +1027,191 @@ func valueToStringQueues(v interface{}) string {
 	}
 	pv := reflect.Indirect(rv).Interface()
 	return fmt.Sprintf("*%v", pv)
+}
+func (m *QueueAckLevel) Unmarshal(dAtA []byte) error {
+	l := len(dAtA)
+	iNdEx := 0
+	for iNdEx < l {
+		preIndex := iNdEx
+		var wire uint64
+		for shift := uint(0); ; shift += 7 {
+			if shift >= 64 {
+				return ErrIntOverflowQueues
+			}
+			if iNdEx >= l {
+				return io.ErrUnexpectedEOF
+			}
+			b := dAtA[iNdEx]
+			iNdEx++
+			wire |= uint64(b&0x7F) << shift
+			if b < 0x80 {
+				break
+			}
+		}
+		fieldNum := int32(wire >> 3)
+		wireType := int(wire & 0x7)
+		if wireType == 4 {
+			return fmt.Errorf("proto: QueueAckLevel: wiretype end group for non-group")
+		}
+		if fieldNum <= 0 {
+			return fmt.Errorf("proto: QueueAckLevel: illegal tag %d (wire type %d)", fieldNum, wire)
+		}
+		switch fieldNum {
+		case 1:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AckLevel", wireType)
+			}
+			m.AckLevel = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQueues
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				m.AckLevel |= int64(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ClusterAckLevel", wireType)
+			}
+			var msglen int
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowQueues
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := dAtA[iNdEx]
+				iNdEx++
+				msglen |= int(b&0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			if msglen < 0 {
+				return ErrInvalidLengthQueues
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ClusterAckLevel == nil {
+				m.ClusterAckLevel = make(map[string]int64)
+			}
+			var mapkey string
+			var mapvalue int64
+			for iNdEx < postIndex {
+				entryPreIndex := iNdEx
+				var wire uint64
+				for shift := uint(0); ; shift += 7 {
+					if shift >= 64 {
+						return ErrIntOverflowQueues
+					}
+					if iNdEx >= l {
+						return io.ErrUnexpectedEOF
+					}
+					b := dAtA[iNdEx]
+					iNdEx++
+					wire |= uint64(b&0x7F) << shift
+					if b < 0x80 {
+						break
+					}
+				}
+				fieldNum := int32(wire >> 3)
+				if fieldNum == 1 {
+					var stringLenmapkey uint64
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowQueues
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						stringLenmapkey |= uint64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+					intStringLenmapkey := int(stringLenmapkey)
+					if intStringLenmapkey < 0 {
+						return ErrInvalidLengthQueues
+					}
+					postStringIndexmapkey := iNdEx + intStringLenmapkey
+					if postStringIndexmapkey < 0 {
+						return ErrInvalidLengthQueues
+					}
+					if postStringIndexmapkey > l {
+						return io.ErrUnexpectedEOF
+					}
+					mapkey = string(dAtA[iNdEx:postStringIndexmapkey])
+					iNdEx = postStringIndexmapkey
+				} else if fieldNum == 2 {
+					for shift := uint(0); ; shift += 7 {
+						if shift >= 64 {
+							return ErrIntOverflowQueues
+						}
+						if iNdEx >= l {
+							return io.ErrUnexpectedEOF
+						}
+						b := dAtA[iNdEx]
+						iNdEx++
+						mapvalue |= int64(b&0x7F) << shift
+						if b < 0x80 {
+							break
+						}
+					}
+				} else {
+					iNdEx = entryPreIndex
+					skippy, err := skipQueues(dAtA[iNdEx:])
+					if err != nil {
+						return err
+					}
+					if skippy < 0 {
+						return ErrInvalidLengthQueues
+					}
+					if (iNdEx + skippy) > postIndex {
+						return io.ErrUnexpectedEOF
+					}
+					iNdEx += skippy
+				}
+			}
+			m.ClusterAckLevel[mapkey] = mapvalue
+			iNdEx = postIndex
+		default:
+			iNdEx = preIndex
+			skippy, err := skipQueues(dAtA[iNdEx:])
+			if err != nil {
+				return err
+			}
+			if skippy < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if (iNdEx + skippy) < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if (iNdEx + skippy) > l {
+				return io.ErrUnexpectedEOF
+			}
+			iNdEx += skippy
+		}
+	}
+
+	if iNdEx > l {
+		return io.ErrUnexpectedEOF
+	}
+	return nil
 }
 func (m *QueueState) Unmarshal(dAtA []byte) error {
 	l := len(dAtA)
@@ -942,10 +1358,10 @@ func (m *QueueState) Unmarshal(dAtA []byte) error {
 			m.ReaderStates[mapkey] = mapvalue
 			iNdEx = postIndex
 		case 2:
-			if wireType != 0 {
-				return fmt.Errorf("proto: wrong wireType = %d for field ExclusiveMaxReadKey", wireType)
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ExclusiveReaderHighWatermark", wireType)
 			}
-			m.ExclusiveMaxReadKey = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowQueues
@@ -955,11 +1371,28 @@ func (m *QueueState) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ExclusiveMaxReadKey |= int64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthQueues
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExclusiveReaderHighWatermark == nil {
+				m.ExclusiveReaderHighWatermark = &TaskKey{}
+			}
+			if err := m.ExclusiveReaderHighWatermark.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQueues(dAtA[iNdEx:])
@@ -1226,10 +1659,10 @@ func (m *QueueSliceRange) Unmarshal(dAtA []byte) error {
 		}
 		switch fieldNum {
 		case 1:
-			if wireType != 0 {
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field InclusiveMin", wireType)
 			}
-			m.InclusiveMin = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowQueues
@@ -1239,16 +1672,33 @@ func (m *QueueSliceRange) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.InclusiveMin |= int64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthQueues
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.InclusiveMin == nil {
+				m.InclusiveMin = &TaskKey{}
+			}
+			if err := m.InclusiveMin.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		case 2:
-			if wireType != 0 {
+			if wireType != 2 {
 				return fmt.Errorf("proto: wrong wireType = %d for field ExclusiveMax", wireType)
 			}
-			m.ExclusiveMax = 0
+			var msglen int
 			for shift := uint(0); ; shift += 7 {
 				if shift >= 64 {
 					return ErrIntOverflowQueues
@@ -1258,11 +1708,28 @@ func (m *QueueSliceRange) Unmarshal(dAtA []byte) error {
 				}
 				b := dAtA[iNdEx]
 				iNdEx++
-				m.ExclusiveMax |= int64(b&0x7F) << shift
+				msglen |= int(b&0x7F) << shift
 				if b < 0x80 {
 					break
 				}
 			}
+			if msglen < 0 {
+				return ErrInvalidLengthQueues
+			}
+			postIndex := iNdEx + msglen
+			if postIndex < 0 {
+				return ErrInvalidLengthQueues
+			}
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			if m.ExclusiveMax == nil {
+				m.ExclusiveMax = &TaskKey{}
+			}
+			if err := m.ExclusiveMax.Unmarshal(dAtA[iNdEx:postIndex]); err != nil {
+				return err
+			}
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipQueues(dAtA[iNdEx:])

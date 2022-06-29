@@ -58,12 +58,12 @@ type (
 		shutdownCh chan struct{}
 		shutdownWG sync.WaitGroup
 
-		category        tasks.Category
-		options         *QueueOptions
-		rescheduler     Rescheduler
-		timeSource      clock.TimeSource
-		logger          log.Logger
-		metricsProvider metrics.MetricProvider
+		category       tasks.Category
+		options        *QueueOptions
+		rescheduler    Rescheduler
+		timeSource     clock.TimeSource
+		logger         log.Logger
+		metricsHandler metrics.MetricsHandler
 
 		paginationFnProvider  PaginationFnProvider
 		executableInitializer ExecutableInitializer
@@ -98,14 +98,14 @@ func newQueueBase(
 	executor Executor,
 	options *QueueOptions,
 	logger log.Logger,
-	metricsProvider metrics.MetricProvider,
+	metricsHandler metrics.MetricsHandler,
 ) *queueBase {
 	timeSource := shard.GetTimeSource()
 	rescheduler := NewRescheduler(
 		scheduler,
 		timeSource,
 		logger,
-		metricsProvider,
+		metricsHandler,
 	)
 
 	executableInitializer := func(t tasks.Task) Executable {
@@ -127,7 +127,7 @@ func newQueueBase(
 	var exclusiveCompletedTaskKey tasks.Key
 	var exclusiveMaxReadKey tasks.Key
 	if persistenceState, ok := shard.GetQueueState(category); ok {
-		queueState := FromPersistenceQueueState(persistenceState, category.Type())
+		queueState := FromPersistenceQueueState(persistenceState)
 		readerScopes = queueState.readerScopes
 		exclusiveMaxReadKey = queueState.exclusiveMaxReadKey
 		exclusiveCompletedTaskKey = queueState.exclusiveMaxReadKey
@@ -152,7 +152,7 @@ func newQueueBase(
 			rescheduler,
 			timeSource,
 			logger,
-			metricsProvider,
+			metricsHandler,
 		)
 
 		if len(scopes) != 0 {
@@ -170,12 +170,12 @@ func newQueueBase(
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
 
-		category:        category,
-		options:         options,
-		rescheduler:     rescheduler,
-		timeSource:      shard.GetTimeSource(),
-		logger:          logger,
-		metricsProvider: metricsProvider,
+		category:       category,
+		options:        options,
+		rescheduler:    rescheduler,
+		timeSource:     shard.GetTimeSource(),
+		logger:         logger,
+		metricsHandler: metricsHandler,
 
 		paginationFnProvider:  paginationFnProvider,
 		executableInitializer: executableInitializer,
@@ -298,6 +298,6 @@ func (p *queueBase) completeTaskAndPersistState() {
 	persistenceState := ToPersistenceQueueState(&queueState{
 		readerScopes:        readerScopes,
 		exclusiveMaxReadKey: p.nonReadableRange.InclusiveMin,
-	}, p.category.Type())
+	})
 	err = p.shard.UpdateQueueState(p.category, persistenceState)
 }

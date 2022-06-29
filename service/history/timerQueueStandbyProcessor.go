@@ -67,9 +67,8 @@ func newTimerQueueStandbyProcessor(
 	clientBean client.Bean,
 	rateLimiter quotas.RateLimiter,
 	logger log.Logger,
-	metricProvider metrics.MetricProvider,
+	metricProvider metrics.MetricsHandler,
 ) *timerQueueStandbyProcessorImpl {
-
 	timeNow := func() time.Time {
 		return shard.GetCurrentTime(clusterName)
 	}
@@ -195,7 +194,6 @@ func (t *timerQueueStandbyProcessorImpl) Stop() {
 func (t *timerQueueStandbyProcessorImpl) setCurrentTime(
 	currentTime time.Time,
 ) {
-
 	t.timerGate.SetCurrentTime(currentTime)
 }
 
@@ -213,6 +211,5 @@ func (t *timerQueueStandbyProcessorImpl) getReadLevel() tasks.Key {
 func (t *timerQueueStandbyProcessorImpl) notifyNewTimers(
 	timerTasks []tasks.Task,
 ) {
-
 	t.timerQueueProcessorBase.notifyNewTimers(timerTasks)
 }

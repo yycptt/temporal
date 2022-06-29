@@ -70,7 +70,7 @@ func (s *rescheudulerSuite) SetupTest() {
 		s.mockScheduler,
 		s.timeSource,
 		log.NewTestLogger(),
-		metrics.NoopMetricProvider,
+		metrics.NoopMetricsHandler,
 	)
 }
 
