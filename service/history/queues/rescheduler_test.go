@@ -78,6 +78,61 @@ func (s *rescheudulerSuite) TearDownTest() {
 	s.controller.Finish()
 }
 
+func (s *rescheudulerSuite) TestStartStop() {
+	timeSource := clock.NewRealTimeSource()
+	rescheduler := NewRescheduler(
+		s.mockScheduler,
+		timeSource,
+		log.NewTestLogger(),
+		metrics.NoopMetricsHandler,
+	)
+
+	rescheduler.Start()
+
+	numTasks := 20
+	taskCh := make(chan struct{})
+	s.mockScheduler.EXPECT().TrySubmit(gomock.Any()).DoAndReturn(func(_ Executable) (bool, error) {
+		taskCh <- struct{}{}
+		return true, nil
+	}).Times(numTasks)
+
+	for i := 0; i != numTasks; i++ {
+		rescheduler.Add(
+			NewMockExecutable(s.controller),
+			timeSource.Now().Add(time.Duration(rand.Int63n(300))*time.Millisecond),
+		)
+	}
+
+	for i := 0; i != numTasks; i++ {
+		<-taskCh
+	}
+	rescheduler.Stop()
+
+	s.Equal(0, rescheduler.Len())
+}
+
+func (s *rescheudulerSuite) TestDrain() {
+	timeSource := clock.NewRealTimeSource()
+	rescheduler := NewRescheduler(
+		s.mockScheduler,
+		timeSource,
+		log.NewTestLogger(),
+		metrics.NoopMetricsHandler,
+	)
+
+	rescheduler.Start()
+	rescheduler.Stop()
+
+	for i := 0; i != 10; i++ {
+		rescheduler.Add(
+			NewMockExecutable(s.controller),
+			timeSource.Now().Add(time.Duration(rand.Int63n(300))*time.Second),
+		)
+	}
+
+	s.Equal(0, rescheduler.Len())
+}
+
 func (s *rescheudulerSuite) TestReschedule_NoRescheduleLimit() {
 	now := time.Now()
 	s.timeSource.Update(now)
@@ -135,8 +190,3 @@ func (s *rescheudulerSuite) TestReschedule_SubmissionFailed() {
 	s.rescheduler.reschedule()
 	s.Equal(numExecutable-numSubmitted, s.rescheduler.Len())
 }
-
-// TODO: add test for
-// 1. reschedule loop
-// 2. shutdown/drain logic
-// 3. submission after stop

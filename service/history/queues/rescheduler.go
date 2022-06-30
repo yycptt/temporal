@@ -189,7 +189,7 @@ func (r *reschedulerImpl) reschedule() {
 
 		submitted, err := r.scheduler.TrySubmit(executable)
 		if err != nil {
-			rescheduled.executable.Logger().Error("Failed to reschedule task", tag.Error(err))
+			executable.Logger().Error("Failed to reschedule task", tag.Error(err))
 		}
 
 		if !submitted {

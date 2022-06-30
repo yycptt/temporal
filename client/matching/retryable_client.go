@@ -1,7 +1,5 @@
 // The MIT License
 //
-// Copyright (c) 2021 Datadog, Inc.
-//
 // Copyright (c) 2020 Temporal Technologies Inc.  All rights reserved.
 //
 // Copyright (c) 2020 Uber Technologies, Inc.
@@ -24,38 +22,26 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package sqlite
+package matching
 
 import (
-	"errors"
-	"regexp"
-
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
+	"go.temporal.io/server/api/matchingservice/v1"
+	"go.temporal.io/server/common/backoff"
 )
 
-const (
-	goSqlDriverName       = "sqlite"
-	sqlConstraintCodes    = sqlite3.SQLITE_CONSTRAINT | sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY | sqlite3.SQLITE_CONSTRAINT_UNIQUE
-	sqlTableExistsPattern = "SQL logic error: table .* already exists \\(1\\)"
-)
+var _ matchingservice.MatchingServiceClient = (*retryableClient)(nil)
 
-var sqlTableExistsRegex = regexp.MustCompile(sqlTableExistsPattern)
-
-func (*db) IsDupEntryError(err error) bool {
-	var sqlErr *sqlite.Error
-	if errors.As(err, &sqlErr) {
-		return sqlErr.Code()&sqlConstraintCodes != 0
-	}
-
-	return false
+type retryableClient struct {
+	client      matchingservice.MatchingServiceClient
+	policy      backoff.RetryPolicy
+	isRetryable backoff.IsRetryable
 }
 
-func isTableExistsError(err error) bool {
-	var sqlErr *sqlite.Error
-	if errors.As(err, &sqlErr) {
-		return sqlTableExistsRegex.MatchString(sqlErr.Error())
+// NewRetryableClient creates a new instance of matchingservice.MatchingServiceClient with retry policy
+func NewRetryableClient(client matchingservice.MatchingServiceClient, policy backoff.RetryPolicy, isRetryable backoff.IsRetryable) matchingservice.MatchingServiceClient {
+	return &retryableClient{
+		client:      client,
+		policy:      policy,
+		isRetryable: isRetryable,
 	}
-
-	return false
 }

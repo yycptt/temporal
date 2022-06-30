@@ -311,7 +311,7 @@ func (e *executableImpl) Nack(err error) {
 	}
 
 	if !submitted {
-		e.rescheduler.Add(e, e.rescheduleTime(e.Attempt(), err))
+		e.rescheduler.Add(e, e.rescheduleTime(e.Attempt()))
 	}
 }
 
@@ -320,7 +320,7 @@ func (e *executableImpl) Reschedule() {
 		return
 	}
 
-	e.rescheduler.Add(e, e.rescheduleTime(e.Attempt(), nil))
+	e.rescheduler.Add(e, e.rescheduleTime(e.Attempt()))
 }
 
 func (e *executableImpl) State() ctasks.State {
@@ -379,7 +379,7 @@ func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 		e.IsRetryableError(err)
 }
 
-func (e *executableImpl) rescheduleTime(attempt int, err error) time.Time {
+func (e *executableImpl) rescheduleTime(attempt int) time.Time {
 	// elapsedTime (the first parameter) is not relevant here since reschedule policy
 	// has no expiration interval.
 	return e.timeSource.Now().Add(reschedulePolicy.ComputeNextDelay(0, attempt))

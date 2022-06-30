@@ -1,7 +1,5 @@
 // The MIT License
 //
-// Copyright (c) 2021 Datadog, Inc.
-//
 // Copyright (c) 2020 Temporal Technologies Inc.  All rights reserved.
 //
 // Copyright (c) 2020 Uber Technologies, Inc.
@@ -24,38 +22,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package sqlite
+package admin
 
 import (
-	"errors"
-	"regexp"
-
-	"modernc.org/sqlite"
-	sqlite3 "modernc.org/sqlite/lib"
+	"go.temporal.io/server/api/adminservice/v1"
+	"go.temporal.io/server/common/metrics"
 )
 
-const (
-	goSqlDriverName       = "sqlite"
-	sqlConstraintCodes    = sqlite3.SQLITE_CONSTRAINT | sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY | sqlite3.SQLITE_CONSTRAINT_UNIQUE
-	sqlTableExistsPattern = "SQL logic error: table .* already exists \\(1\\)"
-)
+var _ adminservice.AdminServiceClient = (*metricClient)(nil)
 
-var sqlTableExistsRegex = regexp.MustCompile(sqlTableExistsPattern)
-
-func (*db) IsDupEntryError(err error) bool {
-	var sqlErr *sqlite.Error
-	if errors.As(err, &sqlErr) {
-		return sqlErr.Code()&sqlConstraintCodes != 0
-	}
-
-	return false
+type metricClient struct {
+	client        adminservice.AdminServiceClient
+	metricsClient metrics.Client
 }
 
-func isTableExistsError(err error) bool {
-	var sqlErr *sqlite.Error
-	if errors.As(err, &sqlErr) {
-		return sqlTableExistsRegex.MatchString(sqlErr.Error())
+// NewMetricClient creates a new instance of adminservice.AdminServiceClient that emits metrics
+func NewMetricClient(client adminservice.AdminServiceClient, metricsClient metrics.Client) adminservice.AdminServiceClient {
+	return &metricClient{
+		client:        client,
+		metricsClient: metricsClient,
 	}
-
-	return false
 }

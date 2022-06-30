@@ -33,44 +33,44 @@ import (
 )
 
 type (
-	allSuite struct {
+	universalSuite struct {
 		suite.Suite
 		*require.Assertions
 
-		all Predicate[int]
+		universal Predicate[int]
 	}
 )
 
-func TestAllSuite(t *testing.T) {
-	s := new(allSuite)
+func TestUniversalSuite(t *testing.T) {
+	s := new(universalSuite)
 	suite.Run(t, s)
 }
 
-func (s *allSuite) SetupTest() {
+func (s *universalSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 
-	s.all = Universal[int]()
+	s.universal = Universal[int]()
 }
 
-func (s *allSuite) TestAll_Test() {
+func (s *universalSuite) TestUniversal_Test() {
 	for i := 0; i != 10; i++ {
-		s.True(s.all.Test(rand.Int()))
+		s.True(s.universal.Test(rand.Int()))
 	}
 }
 
-func (s *allSuite) TestAll_Equals() {
-	s.True(s.all.Equals(s.all))
-	s.True(s.all.Equals(Universal[int]()))
+func (s *universalSuite) TestUniversal_Equals() {
+	s.True(s.universal.Equals(s.universal))
+	s.True(s.universal.Equals(Universal[int]()))
 
-	s.False(s.all.Equals(newTestPredicate(1, 2, 3)))
-	s.False(s.all.Equals(And[int](
+	s.False(s.universal.Equals(newTestPredicate(1, 2, 3)))
+	s.False(s.universal.Equals(And[int](
 		newTestPredicate(1, 2, 3),
 		newTestPredicate(2, 3, 4),
 	)))
-	s.False(s.all.Equals(Or[int](
+	s.False(s.universal.Equals(Or[int](
 		newTestPredicate(1, 2, 3),
 		newTestPredicate(4, 5, 6),
 	)))
-	s.False(s.all.Equals(Not[int](newTestPredicate(1, 2, 3))))
-	s.False(s.all.Equals(Empty[int]()))
+	s.False(s.universal.Equals(Not[int](newTestPredicate(1, 2, 3))))
+	s.False(s.universal.Equals(Empty[int]()))
 }

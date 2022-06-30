@@ -118,7 +118,7 @@ type (
 		shardInfo                          *persistence.ShardInfoWithFailover
 		taskSequenceNumber                 int64
 		maxTaskSequenceNumber              int64
-		immediateExclusiveTaskMaxReadLevel int64
+		immediateTaskExclusiveMaxReadLevel int64
 		scheduledTaskMaxReadLevelMap       map[string]time.Time // cluster -> scheduledTaskMaxReadLevel
 
 		// exist only in memory
@@ -268,7 +268,7 @@ func (s *ContextImpl) GetQueueExclusiveHighReadWatermark(
 ) tasks.Key {
 	switch categoryType := category.Type(); categoryType {
 	case tasks.CategoryTypeImmediate:
-		return s.getImmediateExclusiveTaskMaxReadLevel()
+		return s.getImmediateTaskExclusiveMaxReadLevel()
 	case tasks.CategoryTypeScheduled:
 		return s.updateScheduledTaskMaxReadLevel(cluster)
 	default:
@@ -276,10 +276,10 @@ func (s *ContextImpl) GetQueueExclusiveHighReadWatermark(
 	}
 }
 
-func (s *ContextImpl) getImmediateExclusiveTaskMaxReadLevel() tasks.Key {
+func (s *ContextImpl) getImmediateTaskExclusiveMaxReadLevel() tasks.Key {
 	s.rLock()
 	defer s.rUnlock()
-	return tasks.NewImmediateKey(s.immediateExclusiveTaskMaxReadLevel)
+	return tasks.NewImmediateKey(s.immediateTaskExclusiveMaxReadLevel)
 }
 
 func (s *ContextImpl) getScheduledTaskMaxReadLevel(cluster string) tasks.Key {
@@ -1189,16 +1189,16 @@ func (s *ContextImpl) renewRangeLocked(isStealing bool) error {
 
 	s.taskSequenceNumber = updatedShardInfo.GetRangeId() << s.config.RangeSizeBits
 	s.maxTaskSequenceNumber = (updatedShardInfo.GetRangeId() + 1) << s.config.RangeSizeBits
-	s.immediateExclusiveTaskMaxReadLevel = s.taskSequenceNumber
+	s.immediateTaskExclusiveMaxReadLevel = s.taskSequenceNumber
 	s.shardInfo = updatedShardInfo
 
 	return nil
 }
 
 func (s *ContextImpl) updateMaxReadLevelLocked(rl int64) {
-	if rl > s.immediateExclusiveTaskMaxReadLevel {
+	if rl > s.immediateTaskExclusiveMaxReadLevel {
 		s.contextTaggedLogger.Debug("Updating MaxTaskID", tag.MaxLevel(rl))
-		s.immediateExclusiveTaskMaxReadLevel = rl
+		s.immediateTaskExclusiveMaxReadLevel = rl
 	}
 }
 
@@ -1265,10 +1265,10 @@ func (s *ContextImpl) emitShardInfoMetricsLogsLocked() {
 	diffTransferLevel := maxTransferLevel.TaskID - minTransferLevel.TaskID
 	diffTimerLevel := maxTimerLevel.FireTime.Sub(minTimerLevel.FireTime)
 
-	replicationLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryReplication).TaskID - 1
-	transferLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryTransfer).TaskID - 1
+	replicationLag := s.immediateTaskExclusiveMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryReplication).TaskID - 1
+	transferLag := s.immediateTaskExclusiveMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryTransfer).TaskID - 1
 	timerLag := s.timeSource.Now().Sub(s.getQueueAckLevelLocked(tasks.CategoryTimer).FireTime)
-	visibilityLag := s.immediateExclusiveTaskMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryVisibility).TaskID - 1
+	visibilityLag := s.immediateTaskExclusiveMaxReadLevel - s.getQueueAckLevelLocked(tasks.CategoryVisibility).TaskID - 1
 
 	transferFailoverInProgress := len(s.shardInfo.FailoverLevels[tasks.CategoryTransfer])
 	timerFailoverInProgress := len(s.shardInfo.FailoverLevels[tasks.CategoryTimer])
@@ -1792,7 +1792,7 @@ func (s *ContextImpl) getOrUpdateRemoteClusterInfoLocked(clusterName string) *re
 func (s *ContextImpl) acquireShard() {
 	// Retry for 5m, with interval up to 10s (default)
 	policy := backoff.NewExponentialRetryPolicy(50 * time.Millisecond)
-	policy.SetExpirationInterval(8 * time.Second)
+	policy.SetExpirationInterval(5 * time.Minute)
 
 	// Remember this value across attempts
 	ownershipChanged := false

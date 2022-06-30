@@ -91,7 +91,7 @@ func NewTestContext(
 		engineFuture:                       future.NewFuture[Engine](),
 		shardInfo:                          shardInfo,
 		taskSequenceNumber:                 shardInfo.RangeId << int64(config.RangeSizeBits),
-		immediateExclusiveTaskMaxReadLevel: shardInfo.RangeId << int64(config.RangeSizeBits),
+		immediateTaskExclusiveMaxReadLevel: shardInfo.RangeId << int64(config.RangeSizeBits),
 		maxTaskSequenceNumber:              (shardInfo.RangeId + 1) << int64(config.RangeSizeBits),
 		scheduledTaskMaxReadLevelMap:       make(map[string]time.Time),
 		remoteClusterInfos:                 make(map[string]*remoteClusterInfo),
