@@ -61,6 +61,7 @@ type (
 
 		config         *configs.Config
 		options        *QueueOptions
+		monitor        *Monitor
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 	}
@@ -128,6 +129,7 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 		s.mockScheduler,
 		nil,
 		s.options,
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
@@ -215,6 +217,7 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 		s.mockScheduler,
 		nil,
 		s.options,
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
@@ -272,6 +275,7 @@ func (s *processorBaseSuite) TestStartStop() {
 		s.mockScheduler,
 		nil,
 		s.options,
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
@@ -318,6 +322,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		s.mockScheduler,
 		nil,
 		s.options,
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
@@ -372,6 +377,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		s.mockScheduler,
 		nil,
 		s.options,
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)

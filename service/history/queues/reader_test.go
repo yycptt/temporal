@@ -55,6 +55,7 @@ type (
 		logger                log.Logger
 		metricsHandler        metrics.MetricsHandler
 		executableInitializer ExecutableInitializer
+		monitor               *Monitor
 	}
 )
 
@@ -76,6 +77,17 @@ func (s *readerSuite) SetupTest() {
 	s.executableInitializer = func(t tasks.Task) Executable {
 		return NewMockExecutable(s.controller)
 	}
+	s.monitor = NewMonitor(Thresholds{
+		taskStatsThreshold: taskStatsThreshold{
+			maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
+		},
+		readerStatsThreshold: readerStatsThreshold{
+			maxWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
+		},
+		sliceStatsThreshold: sliceStatsThreshold{
+			maxTotalSlices: dynamicconfig.GetIntPropertyFn(1000),
+		},
+	})
 }
 
 func (s *readerSuite) TearDownTest() {
@@ -166,7 +178,7 @@ func (s *readerSuite) TestMergeSlices() {
 	incomingScopes := NewRandomScopes(rand.Intn(10))
 	incomingSlices := make([]Slice, 0, len(incomingScopes))
 	for _, incomingScope := range incomingScopes {
-		incomingSlices = append(incomingSlices, NewSlice(nil, s.executableInitializer, incomingScope))
+		incomingSlices = append(incomingSlices, NewSlice(nil, s.executableInitializer, s.monitor, incomingScope))
 	}
 
 	reader.MergeSlices(incomingSlices...)
@@ -393,6 +405,7 @@ func (s *readerSuite) newTestReader(
 	paginationFnProvider PaginationFnProvider,
 ) *ReaderImpl {
 	return NewReader(
+		defaultReaderId,
 		paginationFnProvider,
 		s.executableInitializer,
 		scopes,
@@ -406,6 +419,7 @@ func (s *readerSuite) newTestReader(
 		s.mockScheduler,
 		s.mockRescheduler,
 		clock.NewRealTimeSource(),
+		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)

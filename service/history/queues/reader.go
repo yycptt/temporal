@@ -62,10 +62,12 @@ type (
 	ReaderImpl struct {
 		sync.Mutex
 
+		readerID       int32
 		options        *ReaderOptions
 		scheduler      Scheduler
 		rescheduler    Rescheduler
 		timeSource     clock.TimeSource
+		monitor        *Monitor
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 
@@ -82,6 +84,7 @@ type (
 )
 
 func NewReader(
+	readerID int32,
 	paginationFnProvider PaginationFnProvider,
 	executableInitializer ExecutableInitializer,
 	scopes []Scope,
@@ -89,6 +92,7 @@ func NewReader(
 	scheduler Scheduler,
 	rescheduler Rescheduler,
 	timeSource clock.TimeSource,
+	monitor *Monitor,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *ReaderImpl {
@@ -98,15 +102,18 @@ func NewReader(
 		slices.PushBack(NewSlice(
 			paginationFnProvider,
 			executableInitializer,
+			monitor,
 			scope,
 		))
 	}
 
 	return &ReaderImpl{
+		readerID:       readerID,
 		options:        options,
 		scheduler:      scheduler,
 		rescheduler:    rescheduler,
 		timeSource:     timeSource,
+		monitor:        monitor,
 		logger:         logger,
 		metricsHandler: metricsHandler,
 
@@ -282,12 +289,16 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 	tasks, err := loadSlice.SelectTasks(r.options.BatchSize())
 	if err != nil {
 		r.logger.Error("Queue reader unable to retrieve tasks", tag.Error(err))
-		r.notify()
 	}
 
-	for _, task := range tasks {
-		r.submit(task)
+	if len(tasks) != 0 {
+		for _, task := range tasks {
+			r.submit(task)
+		}
+		r.monitor.SetReaderWatermark(r.readerID, tasks[len(tasks)-1].GetKey())
 	}
+
+	// TODO: in error case, we probably need some backoff
 
 	if loadSlice.MoreTasks() {
 		r.notify()

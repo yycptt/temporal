@@ -62,6 +62,7 @@ type (
 		options        *QueueOptions
 		rescheduler    Rescheduler
 		timeSource     clock.TimeSource
+		monitor        *Monitor
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 
@@ -97,6 +98,7 @@ func newQueueBase(
 	scheduler Scheduler,
 	executor Executor,
 	options *QueueOptions,
+	monitor *Monitor,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *queueBase {
@@ -144,6 +146,7 @@ func newQueueBase(
 	readers := make(map[int32]Reader, len(readerScopes))
 	for key, scopes := range readerScopes {
 		readers[key] = NewReader(
+			key,
 			paginationFnProvider,
 			executableInitializer,
 			scopes,
@@ -151,6 +154,7 @@ func newQueueBase(
 			scheduler,
 			rescheduler,
 			timeSource,
+			monitor,
 			logger,
 			metricsHandler,
 		)
@@ -242,6 +246,7 @@ func (p *queueBase) processNewRange() {
 	p.readers[defaultReaderId].MergeSlices(NewSlice(
 		p.paginationFnProvider,
 		p.executableInitializer,
+		p.monitor,
 		NewScope(newRange, predicates.Universal[tasks.Task]()),
 	))
 }
@@ -264,14 +269,18 @@ func (p *queueBase) completeTaskAndPersistState() {
 
 	exclusiveMaxCompletedTaskKey := tasks.MaximumKey
 	readerScopes := make(map[int32][]Scope)
+	totalSlices := 0
 
 	for id, reader := range p.readers {
 		scopes := reader.Scopes()
+		totalSlices += len(scopes)
 		readerScopes[id] = scopes
 		for _, scope := range scopes {
 			exclusiveMaxCompletedTaskKey = tasks.MinKey(exclusiveMaxCompletedTaskKey, scope.Range.InclusiveMin)
 		}
 	}
+
+	p.monitor.SetTotalSlices(totalSlices)
 
 	// NOTE: Must range complete task first.
 	// Otherwise, if state is updated first, later deletion fails and shard get reloaded

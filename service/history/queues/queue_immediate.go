@@ -32,6 +32,7 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/collection"
+	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
@@ -87,6 +88,17 @@ func newImmediateQueue(
 			scheduler,
 			executor,
 			options,
+			NewMonitor(Thresholds{
+				taskStatsThreshold: taskStatsThreshold{
+					maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
+				},
+				readerStatsThreshold: readerStatsThreshold{
+					maxWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
+				},
+				sliceStatsThreshold: sliceStatsThreshold{
+					maxTotalSlices: dynamicconfig.GetIntPropertyFn(1000),
+				},
+			}),
 			logger,
 			metricsHandler,
 		),
