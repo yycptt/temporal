@@ -232,7 +232,7 @@ func (p *queueBase) UnlockTaskProcessing() {
 }
 
 func (p *queueBase) processNewRange() {
-	newMaxKey := p.shard.GetQueueExclusiveMaxReadLevel(p.category, "")
+	newMaxKey := p.shard.GetQueueExclusiveHighReadWatermark(p.category, "")
 
 	if !p.nonReadableRange.CanSplit(newMaxKey) {
 		return
