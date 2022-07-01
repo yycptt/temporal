@@ -34,9 +34,26 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+var _ Monitor = (*monitorImpl)(nil)
+
 type (
-	Monitor struct {
+	Monitor interface {
+		GetTotalTasks() int
+		GetTasksPerNamespace() map[namespace.ID]int
+		GetTasksPerSlice(namespace.ID) map[Slice]int
+		SetTasksPerSlice(Slice, map[namespace.ID]int)
+
+		GetReaderWatermark(readerID int32) tasks.Key
+		SetReaderWatermark(readerID int32, watermark tasks.Key)
+
+		GetTotalSlices() int
+		SetTotalSlices(int)
+	}
+
+	monitorImpl struct {
 		sync.Mutex
+
+		mitigator Mitigator
 
 		stats      stats
 		thresholds Thresholds
@@ -91,10 +108,10 @@ type (
 	}
 )
 
-func NewMonitor(
+func newMonitor(
 	thresholds Thresholds,
-) *Monitor {
-	return &Monitor{
+) *monitorImpl {
+	return &monitorImpl{
 		stats: stats{
 			taskStats: taskStats{
 				tasksPerNamespace:         make(map[namespace.ID]int),
@@ -108,14 +125,14 @@ func NewMonitor(
 	}
 }
 
-func (m *Monitor) GetTotalTasks() int {
+func (m *monitorImpl) GetTotalTasks() int {
 	m.Lock()
 	defer m.Unlock()
 
 	return m.stats.totalTasks
 }
 
-func (m *Monitor) GetTasksPerNamespace() map[namespace.ID]int {
+func (m *monitorImpl) GetTasksPerNamespace() map[namespace.ID]int {
 	m.Lock()
 	defer m.Unlock()
 
@@ -125,7 +142,7 @@ func (m *Monitor) GetTasksPerNamespace() map[namespace.ID]int {
 	return taskPerNamespace
 }
 
-func (m *Monitor) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
+func (m *monitorImpl) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
 	m.Lock()
 	defer m.Unlock()
 
@@ -139,7 +156,7 @@ func (m *Monitor) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
 	return tasksPerSlice
 }
 
-func (m *Monitor) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[namespace.ID]int) {
+func (m *monitorImpl) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[namespace.ID]int) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -175,19 +192,26 @@ func (m *Monitor) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[namespa
 		delete(m.stats.taskStats.tasksPerSlicePerNamespace, slice)
 	}
 
-	if m.stats.totalTasks > m.thresholds.maxTotalTasks() {
-		// TODO: send alert to mitigator
+	maxTotalTasks := m.thresholds.maxTotalTasks()
+	if m.stats.totalTasks > maxTotalTasks && m.mitigator != nil {
+		m.mitigator.Alert(Alert{
+			AlertType: AlertTypeQueuePendingTask,
+			AlertQueuePendingTaskAttributes: &AlertQueuePendingTaskAttributes{
+				CurrentPendingTasks: m.stats.totalTasks,
+				MaxPendingTasks:     maxTotalTasks,
+			},
+		})
 	}
 }
 
-func (m *Monitor) GetReaderWatermark(readerID int32) tasks.Key {
+func (m *monitorImpl) GetReaderWatermark(readerID int32) tasks.Key {
 	m.Lock()
 	defer m.Unlock()
 
 	return m.stats.progressPerReader[readerID].watermark
 }
 
-func (m *Monitor) SetReaderWatermark(readerID int32, watermark tasks.Key) {
+func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 	if readerID != defaultReaderId {
 		// for now we only track watermark for the default reader
 		return
@@ -217,25 +241,48 @@ func (m *Monitor) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 	}
 
 	progress.attempts++
-	if progress.attempts > m.thresholds.maxWatermarkAttempts() {
-		// TODO: send alert to mitigator
+	if progress.attempts > m.thresholds.maxWatermarkAttempts() && m.mitigator != nil {
+		m.mitigator.Alert(Alert{
+			AlertType: AlertTypeQueueReaderWatermark,
+			AlertQueueReaderWatermarkAttributes: &AlertQueueReaderWatermarkAttributes{
+				ReaderID:         readerID,
+				CurrentWatermark: progress.watermark,
+			},
+		})
 	}
 }
 
-func (m *Monitor) GetTotalSlices() int {
+func (m *monitorImpl) GetTotalSlices() int {
 	m.Lock()
 	defer m.Unlock()
 
 	return m.stats.totalSlices
 }
 
-func (m *Monitor) SetTotalSlices(totalSlices int) {
+func (m *monitorImpl) SetTotalSlices(totalSlices int) {
 	m.Lock()
 	defer m.Unlock()
 
 	m.stats.totalSlices = totalSlices
 
-	if totalSlices > m.thresholds.maxTotalSlices() {
-		// TODO: send alert to mitigator
+	maxSliceCount := m.thresholds.maxTotalSlices()
+	if totalSlices > maxSliceCount && m.mitigator != nil {
+		m.mitigator.Alert(Alert{
+			AlertType: AlertTypeQueueSliceCount,
+			AlertQueueSliceCountAttributes: &AlertQueueSliceCountAttributes{
+				CurrentSliceCount: m.stats.totalSlices,
+				MaxSliceCount:     maxSliceCount,
+			},
+		})
 	}
+}
+
+func (m *monitorImpl) registerMitigator(
+	mitigator Mitigator,
+) {
+	if m.mitigator != nil {
+		panic("Mitigator already registered on queue monitor")
+	}
+
+	m.mitigator = mitigator
 }

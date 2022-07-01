@@ -62,7 +62,7 @@ type (
 		options        *QueueOptions
 		rescheduler    Rescheduler
 		timeSource     clock.TimeSource
-		monitor        *Monitor
+		monitor        *monitorImpl
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 
@@ -98,7 +98,7 @@ func newQueueBase(
 	scheduler Scheduler,
 	executor Executor,
 	options *QueueOptions,
-	monitor *Monitor,
+	monitor *monitorImpl,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *queueBase {

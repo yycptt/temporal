@@ -63,7 +63,7 @@ type (
 		iterators []Iterator
 
 		// TODO: make task tracking a separate component
-		monitor             *Monitor
+		monitor             *monitorImpl
 		pendingExecutables  map[tasks.Key]Executable
 		pendingPerNamesapce map[namespace.ID]int
 	}
@@ -72,7 +72,7 @@ type (
 func NewSlice(
 	paginationFnProvider PaginationFnProvider,
 	executableInitializer ExecutableInitializer,
-	monitor *Monitor,
+	monitor *monitorImpl,
 	scope Scope,
 ) *SliceImpl {
 	return &SliceImpl{

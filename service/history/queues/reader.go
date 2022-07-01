@@ -67,7 +67,7 @@ type (
 		scheduler      Scheduler
 		rescheduler    Rescheduler
 		timeSource     clock.TimeSource
-		monitor        *Monitor
+		monitor        *monitorImpl
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 
@@ -92,7 +92,7 @@ func NewReader(
 	scheduler Scheduler,
 	rescheduler Rescheduler,
 	timeSource clock.TimeSource,
-	monitor *Monitor,
+	monitor *monitorImpl,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *ReaderImpl {

@@ -55,7 +55,7 @@ type (
 		logger                log.Logger
 		metricsHandler        metrics.MetricsHandler
 		executableInitializer ExecutableInitializer
-		monitor               *Monitor
+		monitor               *monitorImpl
 	}
 )
 
@@ -77,7 +77,7 @@ func (s *readerSuite) SetupTest() {
 	s.executableInitializer = func(t tasks.Task) Executable {
 		return NewMockExecutable(s.controller)
 	}
-	s.monitor = NewMonitor(Thresholds{
+	s.monitor = newMonitor(Thresholds{
 		taskStatsThreshold: taskStatsThreshold{
 			maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
 		},

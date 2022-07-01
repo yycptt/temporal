@@ -61,7 +61,7 @@ type (
 
 		config         *configs.Config
 		options        *QueueOptions
-		monitor        *Monitor
+		monitor        *monitorImpl
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 	}

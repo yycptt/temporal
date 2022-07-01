@@ -93,7 +93,7 @@ func newScheduledQueue(
 			scheduler,
 			executor,
 			options,
-			NewMonitor(Thresholds{
+			newMonitor(Thresholds{
 				taskStatsThreshold: taskStatsThreshold{
 					maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
 				},

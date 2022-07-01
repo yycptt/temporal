@@ -24,49 +24,55 @@
 
 package queues
 
-import (
-	"go.temporal.io/server/service/history/tasks"
-)
+import "sync"
+
+var _ Mitigator = (*mitigatorImpl)(nil)
 
 type (
-	Alert struct {
-		AlertType                           AlertType
-		AlertQueuePendingTaskAttributes     *AlertQueuePendingTaskAttributes
-		AlertHostPendingTaskAttributes      *AlertHostPendingTaskAttributes
-		AlertQueueReaderWatermarkAttributes *AlertQueueReaderWatermarkAttributes
-		AlertQueueSliceCountAttributes      *AlertQueueSliceCountAttributes
-		AlertTaskAttemptsAttributes         *AlertTaskAttemptsAttributes
+	Mitigator interface {
+		Alert(Alert) bool
 	}
 
-	AlertType int
+	mitigatorImpl struct {
+		sync.Mutex
 
-	AlertQueuePendingTaskAttributes struct {
-		CurrentPendingTasks int
-		MaxPendingTasks     int
-	}
+		queueBase *queueBase
+		monitor   Monitor
 
-	AlertHostPendingTaskAttributes struct{}
-
-	AlertQueueReaderWatermarkAttributes struct {
-		ReaderID         int32
-		CurrentWatermark tasks.Key
-	}
-
-	AlertQueueSliceCountAttributes struct {
-		CurrentSliceCount int
-		MaxSliceCount     int
-	}
-
-	AlertTaskAttemptsAttributes struct {
-		Task tasks.Task
+		pendingAlerts map[AlertType]Alert
 	}
 )
 
-const (
-	AlertTypeUnspecified AlertType = iota
-	AlertTypeQueuePendingTask
-	AlertTypeHostPendingTask
-	AlertTypeQueueReaderWatermark
-	AlertTypeQueueSliceCount
-	AlertTypeTaskAttempts
-)
+func newMitigator(
+	queueBase *queueBase,
+	monitor Monitor,
+) *mitigatorImpl {
+	return &mitigatorImpl{
+		queueBase:     queueBase,
+		monitor:       monitor,
+		pendingAlerts: make(map[AlertType]Alert),
+	}
+}
+
+func (m *mitigatorImpl) Alert(alert Alert) bool {
+	m.Lock()
+
+	if _, ok := m.pendingAlerts[alert.AlertType]; ok {
+		m.Unlock()
+		return false
+	}
+
+	m.pendingAlerts[alert.AlertType] = alert
+	m.Unlock()
+
+	// handle alert here
+
+	return true
+}
+
+func (m *mitigatorImpl) resolve(alertType AlertType) {
+	m.Lock()
+	defer m.Unlock()
+
+	delete(m.pendingAlerts, alertType)
+}
