@@ -33,7 +33,6 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/collection"
-	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
@@ -56,7 +55,7 @@ type (
 	}
 )
 
-func newScheduledQueue(
+func NewScheduledQueue(
 	shard shard.Context,
 	category tasks.Category,
 	scheduler Scheduler,
@@ -66,6 +65,7 @@ func newScheduledQueue(
 	metricsHandler metrics.MetricsHandler,
 ) *scheduledQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
+		// TODO: handle time precision issue in persistence layer, time will be truncated
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			request := &persistence.GetHistoryTasksRequest{
 				ShardID:             shard.GetShardID(),
@@ -93,17 +93,6 @@ func newScheduledQueue(
 			scheduler,
 			executor,
 			options,
-			newMonitor(Thresholds{
-				taskStatsThreshold: taskStatsThreshold{
-					maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
-				},
-				readerStatsThreshold: readerStatsThreshold{
-					maxWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
-				},
-				sliceStatsThreshold: sliceStatsThreshold{
-					maxTotalSlices: dynamicconfig.GetIntPropertyFn(1000),
-				},
-			}),
 			logger,
 			metricsHandler,
 		),
@@ -187,9 +176,10 @@ func (p *scheduledQueue) processEventLoop() {
 				p.options.MaxPollInterval(),
 				p.options.MaxPollIntervalJitterCoefficient(),
 			))
-		case <-p.completeTaskTimer.C:
-			p.completeTaskAndPersistState()
-			// TODO: add a case for polling a channel of split policy
+		case <-p.checkpointTimer.C:
+			p.checkpoint()
+		case action := <-p.actionCh:
+			action.run(p.readerGroup)
 		}
 	}
 }

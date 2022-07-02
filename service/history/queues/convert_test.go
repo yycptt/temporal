@@ -252,8 +252,8 @@ func (s *convertSuite) TestConvertQueueState() {
 	}
 
 	queueState := &queueState{
-		readerScopes:        readerScopes,
-		exclusiveMaxReadKey: tasks.NewKey(time.Unix(0, rand.Int63()).UTC(), 0),
+		readerScopes:                 readerScopes,
+		exclusiveReaderHighWatermark: tasks.NewKey(time.Unix(0, rand.Int63()).UTC(), 0),
 	}
 
 	s.Equal(queueState, FromPersistenceQueueState(

@@ -50,7 +50,7 @@ func ToPersistenceQueueState(
 
 	return &persistencespb.QueueState{
 		ReaderStates:                 readerStates,
-		ExclusiveReaderHighWatermark: ToPersistenceTaskKey(queueState.exclusiveMaxReadKey),
+		ExclusiveReaderHighWatermark: ToPersistenceTaskKey(queueState.exclusiveReaderHighWatermark),
 	}
 }
 
@@ -67,8 +67,8 @@ func FromPersistenceQueueState(
 	}
 
 	return &queueState{
-		readerScopes:        readerScopes,
-		exclusiveMaxReadKey: FromPersistenceTaskKey(state.ExclusiveReaderHighWatermark),
+		readerScopes:                 readerScopes,
+		exclusiveReaderHighWatermark: FromPersistenceTaskKey(state.ExclusiveReaderHighWatermark),
 	}
 }
 

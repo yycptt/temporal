@@ -68,16 +68,10 @@ func (s *sliceSuite) SetupTest() {
 	s.executableInitializer = func(t tasks.Task) Executable {
 		return NewMockExecutable(s.controller)
 	}
-	s.monitor = newMonitor(Thresholds{
-		taskStatsThreshold: taskStatsThreshold{
-			maxTotalTasks: dynamicconfig.GetIntPropertyFn(1000),
-		},
-		readerStatsThreshold: readerStatsThreshold{
-			maxWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
-		},
-		sliceStatsThreshold: sliceStatsThreshold{
-			maxTotalSlices: dynamicconfig.GetIntPropertyFn(1000),
-		},
+	s.monitor = newMonitor(&MonitorOptions{
+		CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(1000),
+		CriticalWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
+		CriticalTotalSlices:       dynamicconfig.GetIntPropertyFn(1000),
 	})
 }
 

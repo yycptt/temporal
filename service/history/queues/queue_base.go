@@ -45,10 +45,14 @@ const (
 	defaultReaderId = 0
 )
 
+var (
+	checkpointRetryPolicy = createCheckpointRetryPolicy()
+)
+
 type (
 	queueState struct {
-		readerScopes        map[int32][]Scope
-		exclusiveMaxReadKey tasks.Key
+		readerScopes                 map[int32][]Scope
+		exclusiveReaderHighWatermark tasks.Key
 	}
 
 	queueBase struct {
@@ -58,34 +62,36 @@ type (
 		shutdownCh chan struct{}
 		shutdownWG sync.WaitGroup
 
-		category       tasks.Category
-		options        *QueueOptions
-		rescheduler    Rescheduler
-		timeSource     clock.TimeSource
-		monitor        *monitorImpl
-		logger         log.Logger
-		metricsHandler metrics.MetricsHandler
+		category    tasks.Category
+		options     *QueueOptions
+		rescheduler Rescheduler
+		timeSource  clock.TimeSource
+		monitor     *monitorImpl
+		mitigator   *mitigatorImpl
+		logger      log.Logger
 
+		// TODO: allow adding scope to reader directly and get rid of these two fields
 		paginationFnProvider  PaginationFnProvider
 		executableInitializer ExecutableInitializer
 
-		exclusiveCompletedTaskKey tasks.Key
-		nonReadableRange          Range
-		readers                   map[int32]Reader
-		lastPollTime              time.Time
+		inclusiveLowWatermark tasks.Key
+		nonReadableRange      Range
+		readerGroup           *readerGroup
+		lastPollTime          time.Time
 
-		completeTaskTimer   *time.Timer
-		completeTaskAttempt int
-		completeRetryPolicy backoff.RetryPolicy
+		checkpointTimer   *time.Timer
+		checkpointAttempt int
+
+		actionCh <-chan action
 	}
 
 	QueueOptions struct {
-		// TODO: remove duplicate for complete task and shrink range
 		ReaderOptions
+		MonitorOptions
 
 		MaxPollInterval                  dynamicconfig.DurationPropertyFn
 		MaxPollIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
-		CompleteTaskInterval             dynamicconfig.DurationPropertyFn
+		CheckpointInterval               dynamicconfig.DurationPropertyFn
 		TaskMaxRetryCount                dynamicconfig.IntPropertyFn
 		QueueType                        QueueType
 	}
@@ -98,10 +104,30 @@ func newQueueBase(
 	scheduler Scheduler,
 	executor Executor,
 	options *QueueOptions,
-	monitor *monitorImpl,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *queueBase {
+	var readerScopes map[int32][]Scope
+	var inclusiveLowWatermark tasks.Key
+	var exclusiveHighWatermark tasks.Key
+
+	if persistenceState, ok := shard.GetQueueState(category); ok {
+		queueState := FromPersistenceQueueState(persistenceState)
+
+		readerScopes = queueState.readerScopes
+		exclusiveHighWatermark = queueState.exclusiveReaderHighWatermark
+		inclusiveLowWatermark = queueState.exclusiveReaderHighWatermark
+	} else {
+		ackLevel := shard.GetQueueAckLevel(category)
+		if category.Type() == tasks.CategoryTypeImmediate {
+			// convert to exclusive ack level
+			ackLevel = ackLevel.Next()
+		}
+
+		exclusiveHighWatermark = ackLevel
+		inclusiveLowWatermark = ackLevel
+	}
+
 	timeSource := shard.GetTimeSource()
 	rescheduler := NewRescheduler(
 		scheduler,
@@ -109,6 +135,10 @@ func newQueueBase(
 		logger,
 		metricsHandler,
 	)
+
+	monitor := newMonitor(&options.MonitorOptions)
+	mitigator, actionCh := newMitigator(monitor)
+	monitor.registerMitigator(mitigator)
 
 	executableInitializer := func(t tasks.Task) Executable {
 		return NewExecutable(
@@ -125,28 +155,9 @@ func newQueueBase(
 		)
 	}
 
-	readerScopes := make(map[int32][]Scope)
-	var exclusiveCompletedTaskKey tasks.Key
-	var exclusiveMaxReadKey tasks.Key
-	if persistenceState, ok := shard.GetQueueState(category); ok {
-		queueState := FromPersistenceQueueState(persistenceState)
-		readerScopes = queueState.readerScopes
-		exclusiveMaxReadKey = queueState.exclusiveMaxReadKey
-		exclusiveCompletedTaskKey = queueState.exclusiveMaxReadKey
-	} else {
-		ackLevel := shard.GetQueueAckLevel(category)
-		if category.Type() == tasks.CategoryTypeImmediate {
-			// convert to exclusive ack level
-			ackLevel = ackLevel.Next()
-		}
-		exclusiveMaxReadKey = ackLevel
-		exclusiveCompletedTaskKey = ackLevel
-	}
-
-	readers := make(map[int32]Reader, len(readerScopes))
-	for key, scopes := range readerScopes {
-		readers[key] = NewReader(
-			key,
+	readerInitializer := func(readerID int32, scopes []Scope) Reader {
+		return NewReader(
+			readerID,
 			paginationFnProvider,
 			executableInitializer,
 			scopes,
@@ -158,15 +169,16 @@ func newQueueBase(
 			logger,
 			metricsHandler,
 		)
-
-		if len(scopes) != 0 {
-			exclusiveCompletedTaskKey = tasks.MinKey(exclusiveCompletedTaskKey, scopes[0].Range.InclusiveMin)
-		}
 	}
 
-	completeRetryPolicy := backoff.NewExponentialRetryPolicy(100 * time.Millisecond)
-	completeRetryPolicy.SetMaximumInterval(5 * time.Second)
-	completeRetryPolicy.SetExpirationInterval(backoff.NoInterval)
+	readerGroup := newReaderGroup(readerInitializer)
+	for readerID, scopes := range readerScopes {
+		readerGroup.newReader(readerID, scopes)
+
+		if len(scopes) != 0 {
+			inclusiveLowWatermark = tasks.MinKey(inclusiveLowWatermark, scopes[0].Range.InclusiveMin)
+		}
+	}
 
 	return &queueBase{
 		shard: shard,
@@ -174,42 +186,40 @@ func newQueueBase(
 		status:     common.DaemonStatusInitialized,
 		shutdownCh: make(chan struct{}),
 
-		category:       category,
-		options:        options,
-		rescheduler:    rescheduler,
-		timeSource:     shard.GetTimeSource(),
-		logger:         logger,
-		metricsHandler: metricsHandler,
+		category:    category,
+		options:     options,
+		rescheduler: rescheduler,
+		timeSource:  shard.GetTimeSource(),
+		monitor:     monitor,
+		mitigator:   mitigator,
+		logger:      logger,
 
 		paginationFnProvider:  paginationFnProvider,
 		executableInitializer: executableInitializer,
 
-		exclusiveCompletedTaskKey: exclusiveCompletedTaskKey,
-		nonReadableRange:          NewRange(exclusiveMaxReadKey, tasks.MaximumKey),
-		readers:                   readers,
+		inclusiveLowWatermark: inclusiveLowWatermark,
+		nonReadableRange:      NewRange(exclusiveHighWatermark, tasks.MaximumKey),
+		readerGroup:           readerGroup,
 
-		completeRetryPolicy: completeRetryPolicy,
+		actionCh: actionCh,
 	}
 }
 
 func (p *queueBase) Start() {
-	for _, reader := range p.readers {
-		reader.Start()
-	}
+	p.readerGroup.start()
 	p.rescheduler.Start()
 
-	p.completeTaskTimer = time.NewTimer(backoff.JitDuration(
-		p.options.CompleteTaskInterval(),
+	p.checkpointTimer = time.NewTimer(backoff.JitDuration(
+		p.options.CheckpointInterval(),
 		p.options.ShrinkRangeIntervalJitterCoefficient(),
 	))
 }
 
 func (p *queueBase) Stop() {
-	for _, reader := range p.readers {
-		reader.Stop()
-	}
+	p.mitigator.close()
+	p.readerGroup.stop()
 	p.rescheduler.Stop()
-	p.completeTaskTimer.Stop()
+	p.checkpointTimer.Stop()
 }
 
 func (p *queueBase) Category() tasks.Category {
@@ -242,41 +252,47 @@ func (p *queueBase) processNewRange() {
 
 	var newRange Range
 	newRange, p.nonReadableRange = p.nonReadableRange.Split(newMaxKey)
+	newScope := NewScope(newRange, predicates.Universal[tasks.Task]())
 
-	p.readers[defaultReaderId].MergeSlices(NewSlice(
-		p.paginationFnProvider,
-		p.executableInitializer,
-		p.monitor,
-		NewScope(newRange, predicates.Universal[tasks.Task]()),
-	))
+	reader, ok := p.readerGroup.readerByID(defaultReaderId)
+	if !ok {
+		p.readerGroup.newReader(defaultReaderId, []Scope{newScope})
+	} else {
+		reader.MergeSlices(NewSlice(
+			p.paginationFnProvider,
+			p.executableInitializer,
+			p.monitor,
+			newScope,
+		))
+	}
 }
 
-func (p *queueBase) completeTaskAndPersistState() {
+func (p *queueBase) checkpoint() {
 	var err error
 	defer func() {
 		if err == nil {
-			p.completeTaskAttempt = 0
-			p.completeTaskTimer.Reset(backoff.JitDuration(
-				p.options.CompleteTaskInterval(),
+			p.checkpointAttempt = 0
+			p.checkpointTimer.Reset(backoff.JitDuration(
+				p.options.CheckpointInterval(),
 				p.options.ShrinkRangeIntervalJitterCoefficient(),
 			))
 		} else {
-			p.completeTaskAttempt++
-			backoff := p.completeRetryPolicy.ComputeNextDelay(0, p.completeTaskAttempt)
-			p.completeTaskTimer.Reset(backoff)
+			p.checkpointAttempt++
+			backoff := checkpointRetryPolicy.ComputeNextDelay(0, p.checkpointAttempt)
+			p.checkpointTimer.Reset(backoff)
 		}
 	}()
 
-	exclusiveMaxCompletedTaskKey := tasks.MaximumKey
+	newTaskLowWatermark := tasks.MaximumKey
 	readerScopes := make(map[int32][]Scope)
 	totalSlices := 0
 
-	for id, reader := range p.readers {
+	for id, reader := range p.readerGroup.readers() {
 		scopes := reader.Scopes()
 		totalSlices += len(scopes)
 		readerScopes[id] = scopes
 		for _, scope := range scopes {
-			exclusiveMaxCompletedTaskKey = tasks.MinKey(exclusiveMaxCompletedTaskKey, scope.Range.InclusiveMin)
+			newTaskLowWatermark = tasks.MinKey(newTaskLowWatermark, scope.Range.InclusiveMin)
 		}
 	}
 
@@ -285,28 +301,35 @@ func (p *queueBase) completeTaskAndPersistState() {
 	// NOTE: Must range complete task first.
 	// Otherwise, if state is updated first, later deletion fails and shard get reloaded
 	// some tasks will never be deleted.
-	if exclusiveMaxCompletedTaskKey != tasks.MaximumKey && exclusiveMaxCompletedTaskKey.CompareTo(p.exclusiveCompletedTaskKey) > 0 {
-		lastCompletedTaskKey := p.exclusiveCompletedTaskKey
+	if newTaskLowWatermark != tasks.MaximumKey && newTaskLowWatermark.CompareTo(p.inclusiveLowWatermark) > 0 {
+		oldTaskLowWatermark := p.inclusiveLowWatermark
 		if p.category.Type() == tasks.CategoryTypeScheduled {
-			lastCompletedTaskKey = tasks.NewKey(lastCompletedTaskKey.FireTime, 0)
-			exclusiveMaxCompletedTaskKey = tasks.NewKey(exclusiveMaxCompletedTaskKey.FireTime, 0)
+			oldTaskLowWatermark = tasks.NewKey(oldTaskLowWatermark.FireTime, 0)
+			newTaskLowWatermark = tasks.NewKey(newTaskLowWatermark.FireTime, 0)
 		}
 
 		if err = p.shard.GetExecutionManager().RangeCompleteHistoryTasks(context.TODO(), &persistence.RangeCompleteHistoryTasksRequest{
 			ShardID:             p.shard.GetShardID(),
 			TaskCategory:        p.category,
-			InclusiveMinTaskKey: lastCompletedTaskKey,
-			ExclusiveMaxTaskKey: exclusiveMaxCompletedTaskKey,
+			InclusiveMinTaskKey: oldTaskLowWatermark,
+			ExclusiveMaxTaskKey: newTaskLowWatermark,
 		}); err != nil {
 			return
 		}
 
-		p.exclusiveCompletedTaskKey = exclusiveMaxCompletedTaskKey
+		p.inclusiveLowWatermark = newTaskLowWatermark
 	}
 
-	persistenceState := ToPersistenceQueueState(&queueState{
-		readerScopes:        readerScopes,
-		exclusiveMaxReadKey: p.nonReadableRange.InclusiveMin,
-	})
-	err = p.shard.UpdateQueueState(p.category, persistenceState)
+	err = p.shard.UpdateQueueState(p.category, ToPersistenceQueueState(&queueState{
+		readerScopes:                 readerScopes,
+		exclusiveReaderHighWatermark: p.nonReadableRange.InclusiveMin,
+	}))
+}
+
+func createCheckpointRetryPolicy() backoff.RetryPolicy {
+	policy := backoff.NewExponentialRetryPolicy(100 * time.Millisecond)
+	policy.SetMaximumInterval(5 * time.Second)
+	policy.SetExpirationInterval(backoff.NoInterval)
+
+	return policy
 }

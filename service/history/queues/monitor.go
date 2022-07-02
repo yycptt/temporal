@@ -50,19 +50,22 @@ type (
 		SetTotalSlices(int)
 	}
 
+	MonitorOptions struct {
+		CriticalTotalTasks        dynamicconfig.IntPropertyFn
+		CriticalWatermarkAttempts dynamicconfig.IntPropertyFn
+		CriticalTotalSlices       dynamicconfig.IntPropertyFn
+	}
+
 	monitorImpl struct {
 		sync.Mutex
 
 		mitigator Mitigator
 
-		stats      stats
-		thresholds Thresholds
-	}
-
-	stats struct {
 		taskStats
 		readerStats
 		sliceStats
+
+		options *MonitorOptions
 	}
 
 	taskStats struct {
@@ -76,8 +79,8 @@ type (
 	}
 
 	readerStats struct {
-		watermarkTimePrecision time.Duration
-		progressPerReader      map[int32]*readerProgess
+		readerWatermarkPrecision time.Duration
+		progressByReader         map[int32]*readerProgess
 	}
 
 	readerProgess struct {
@@ -88,40 +91,20 @@ type (
 	sliceStats struct {
 		totalSlices int
 	}
-
-	Thresholds struct {
-		taskStatsThreshold
-		readerStatsThreshold
-		sliceStatsThreshold
-	}
-
-	taskStatsThreshold struct {
-		maxTotalTasks dynamicconfig.IntPropertyFn
-	}
-
-	readerStatsThreshold struct {
-		maxWatermarkAttempts dynamicconfig.IntPropertyFn
-	}
-
-	sliceStatsThreshold struct {
-		maxTotalSlices dynamicconfig.IntPropertyFn
-	}
 )
 
 func newMonitor(
-	thresholds Thresholds,
+	options *MonitorOptions,
 ) *monitorImpl {
 	return &monitorImpl{
-		stats: stats{
-			taskStats: taskStats{
-				tasksPerNamespace:         make(map[namespace.ID]int),
-				tasksPerSlicePerNamespace: make(map[Slice]map[namespace.ID]int),
-			},
-			readerStats: readerStats{
-				progressPerReader: make(map[int32]*readerProgess),
-			},
+		taskStats: taskStats{
+			tasksPerNamespace:         make(map[namespace.ID]int),
+			tasksPerSlicePerNamespace: make(map[Slice]map[namespace.ID]int),
 		},
-		thresholds: thresholds,
+		readerStats: readerStats{
+			progressByReader: make(map[int32]*readerProgess),
+		},
+		options: options,
 	}
 }
 
@@ -129,15 +112,15 @@ func (m *monitorImpl) GetTotalTasks() int {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.stats.totalTasks
+	return m.totalTasks
 }
 
 func (m *monitorImpl) GetTasksPerNamespace() map[namespace.ID]int {
 	m.Lock()
 	defer m.Unlock()
 
-	taskPerNamespace := make(map[namespace.ID]int, len(m.stats.tasksPerNamespace))
-	maps.Copy(taskPerNamespace, m.stats.tasksPerNamespace)
+	taskPerNamespace := make(map[namespace.ID]int, len(m.tasksPerNamespace))
+	maps.Copy(taskPerNamespace, m.tasksPerNamespace)
 
 	return taskPerNamespace
 }
@@ -146,8 +129,8 @@ func (m *monitorImpl) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
 	m.Lock()
 	defer m.Unlock()
 
-	tasksPerSlice := make(map[Slice]int, len(m.stats.tasksPerSlicePerNamespace))
-	for slice, tasksPerNamespace := range m.stats.tasksPerSlicePerNamespace {
+	tasksPerSlice := make(map[Slice]int, len(m.tasksPerSlicePerNamespace))
+	for slice, tasksPerNamespace := range m.tasksPerSlicePerNamespace {
 		if pendingTask, ok := tasksPerNamespace[namespaceID]; ok {
 			tasksPerSlice[slice] = pendingTask
 		}
@@ -164,14 +147,14 @@ func (m *monitorImpl) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[nam
 		newTasksPerNamespace = make(map[namespace.ID]int)
 	}
 
-	if _, ok := m.stats.tasksPerSlicePerNamespace[slice]; !ok {
-		m.stats.tasksPerSlicePerNamespace[slice] = make(map[namespace.ID]int, len(newTasksPerNamespace))
+	if _, ok := m.tasksPerSlicePerNamespace[slice]; !ok {
+		m.tasksPerSlicePerNamespace[slice] = make(map[namespace.ID]int, len(newTasksPerNamespace))
 	}
-	oldTasksPerNamespace := m.stats.tasksPerSlicePerNamespace[slice]
+	oldTasksPerNamespace := m.tasksPerSlicePerNamespace[slice]
 	for namespaceID, oldPendingTasks := range oldTasksPerNamespace {
 		if _, ok := newTasksPerNamespace[namespaceID]; !ok {
-			m.stats.tasksPerNamespace[namespaceID] -= oldPendingTasks
-			m.stats.totalTasks -= oldPendingTasks
+			m.tasksPerNamespace[namespaceID] -= oldPendingTasks
+			m.totalTasks -= oldPendingTasks
 		}
 	}
 
@@ -184,20 +167,20 @@ func (m *monitorImpl) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[nam
 		}
 
 		delta := newPendingTasks - oldPendingTasks
-		m.stats.tasksPerNamespace[namespaceID] += delta
-		m.stats.totalTasks += delta
+		m.tasksPerNamespace[namespaceID] += delta
+		m.totalTasks += delta
 	}
 
 	if !hasPendingTasks {
-		delete(m.stats.taskStats.tasksPerSlicePerNamespace, slice)
+		delete(m.taskStats.tasksPerSlicePerNamespace, slice)
 	}
 
-	maxTotalTasks := m.thresholds.maxTotalTasks()
-	if m.stats.totalTasks > maxTotalTasks && m.mitigator != nil {
+	maxTotalTasks := m.options.CriticalTotalTasks()
+	if m.totalTasks > maxTotalTasks && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
 			AlertType: AlertTypeQueuePendingTask,
 			AlertQueuePendingTaskAttributes: &AlertQueuePendingTaskAttributes{
-				CurrentPendingTasks: m.stats.totalTasks,
+				CurrentPendingTasks: m.totalTasks,
 				MaxPendingTasks:     maxTotalTasks,
 			},
 		})
@@ -208,7 +191,7 @@ func (m *monitorImpl) GetReaderWatermark(readerID int32) tasks.Key {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.stats.progressPerReader[readerID].watermark
+	return m.progressByReader[readerID].watermark
 }
 
 func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
@@ -225,15 +208,15 @@ func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 	m.Lock()
 	defer m.Unlock()
 
-	if _, ok := m.stats.progressPerReader[readerID]; !ok {
-		m.stats.progressPerReader[readerID] = &readerProgess{
+	if _, ok := m.progressByReader[readerID]; !ok {
+		m.progressByReader[readerID] = &readerProgess{
 			watermark: tasks.NewKey(tasks.DefaultFireTime, 0),
 			attempts:  1,
 		}
 	}
 
-	watermark.FireTime = watermark.FireTime.Truncate(m.stats.watermarkTimePrecision)
-	progress := m.stats.progressPerReader[readerID]
+	watermark.FireTime = watermark.FireTime.Truncate(m.readerWatermarkPrecision)
+	progress := m.progressByReader[readerID]
 	if !watermark.FireTime.Equal(progress.watermark.FireTime) {
 		progress.watermark = watermark
 		progress.attempts = 1
@@ -241,7 +224,7 @@ func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 	}
 
 	progress.attempts++
-	if progress.attempts > m.thresholds.maxWatermarkAttempts() && m.mitigator != nil {
+	if progress.attempts > m.options.CriticalWatermarkAttempts() && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
 			AlertType: AlertTypeQueueReaderWatermark,
 			AlertQueueReaderWatermarkAttributes: &AlertQueueReaderWatermarkAttributes{
@@ -256,21 +239,21 @@ func (m *monitorImpl) GetTotalSlices() int {
 	m.Lock()
 	defer m.Unlock()
 
-	return m.stats.totalSlices
+	return m.totalSlices
 }
 
 func (m *monitorImpl) SetTotalSlices(totalSlices int) {
 	m.Lock()
 	defer m.Unlock()
 
-	m.stats.totalSlices = totalSlices
+	m.totalSlices = totalSlices
 
-	maxSliceCount := m.thresholds.maxTotalSlices()
+	maxSliceCount := m.options.CriticalTotalSlices()
 	if totalSlices > maxSliceCount && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
 			AlertType: AlertTypeQueueSliceCount,
 			AlertQueueSliceCountAttributes: &AlertQueueSliceCountAttributes{
-				CurrentSliceCount: m.stats.totalSlices,
+				CurrentSliceCount: m.totalSlices,
 				MaxSliceCount:     maxSliceCount,
 			},
 		})

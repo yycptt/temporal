@@ -63,7 +63,7 @@ type (
 		iterators []Iterator
 
 		// TODO: make task tracking a separate component
-		monitor             *monitorImpl
+		monitor             Monitor
 		pendingExecutables  map[tasks.Key]Executable
 		pendingPerNamesapce map[namespace.ID]int
 	}
@@ -72,7 +72,7 @@ type (
 func NewSlice(
 	paginationFnProvider PaginationFnProvider,
 	executableInitializer ExecutableInitializer,
-	monitor *monitorImpl,
+	monitor Monitor,
 	scope Scope,
 ) *SliceImpl {
 	return &SliceImpl{
@@ -477,7 +477,7 @@ func (s *SliceImpl) Clear() {
 	if executableMaxKey != tasks.MinimumKey {
 		iterator := NewIterator(
 			s.paginationFnProvider,
-			NewRange(s.scope.Range.InclusiveMin, executableMaxKey),
+			NewRange(s.scope.Range.InclusiveMin, executableMaxKey.Next()),
 		)
 
 		iterators := make([]Iterator, 0, len(s.iterators)+1)

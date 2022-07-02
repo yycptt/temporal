@@ -61,7 +61,6 @@ type (
 
 		config         *configs.Config
 		options        *QueueOptions
-		monitor        *monitorImpl
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 	}
@@ -88,9 +87,14 @@ func (s *processorBaseSuite) SetupTest() {
 			MaxReschdulerSize:                    dynamicconfig.GetIntPropertyFn(100),
 			PollBackoffInterval:                  dynamicconfig.GetDurationPropertyFn(200 * time.Millisecond),
 		},
+		MonitorOptions: MonitorOptions{
+			CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(1000),
+			CriticalWatermarkAttempts: dynamicconfig.GetIntPropertyFn(1000),
+			CriticalTotalSlices:       dynamicconfig.GetIntPropertyFn(1000),
+		},
 		MaxPollInterval:                  dynamicconfig.GetDurationPropertyFn(time.Minute * 5),
 		MaxPollIntervalJitterCoefficient: dynamicconfig.GetFloatPropertyFn(0.15),
-		CompleteTaskInterval:             dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
+		CheckpointInterval:               dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
 		TaskMaxRetryCount:                dynamicconfig.GetIntPropertyFn(100),
 	}
 	s.logger = log.NewTestLogger()
@@ -129,13 +133,13 @@ func (s *processorBaseSuite) TestNewProcessBase_NoPreviousState() {
 		s.mockScheduler,
 		nil,
 		s.options,
-		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
 
-	s.Len(base.readers, 1)
-	defaultReader := base.readers[defaultReaderId]
+	readers := base.readerGroup.readers()
+	s.Len(readers, 1)
+	defaultReader := readers[defaultReaderId]
 	readerScopes := defaultReader.Scopes()
 	s.Len(readerScopes, 1)
 	s.Equal(ackLevel, readerScopes[0].Range.InclusiveMin.TaskID)
@@ -217,18 +221,17 @@ func (s *processorBaseSuite) TestNewProcessBase_WithPreviousState() {
 		s.mockScheduler,
 		nil,
 		s.options,
-		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
 
 	readerScopes := make(map[int32][]Scope)
-	for id, reader := range base.readers {
+	for id, reader := range base.readerGroup.readers() {
 		readerScopes[id] = reader.Scopes()
 	}
 	queueState := &queueState{
-		readerScopes:        readerScopes,
-		exclusiveMaxReadKey: base.nonReadableRange.InclusiveMin,
+		readerScopes:                 readerScopes,
+		exclusiveReaderHighWatermark: base.nonReadableRange.InclusiveMin,
 	}
 
 	s.Equal(persistenceState, ToPersistenceQueueState(queueState))
@@ -275,7 +278,6 @@ func (s *processorBaseSuite) TestStartStop() {
 		s.mockScheduler,
 		nil,
 		s.options,
-		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
@@ -284,11 +286,11 @@ func (s *processorBaseSuite) TestStartStop() {
 	s.mockRescheduler.EXPECT().Start().Times(1)
 	base.Start()
 	<-doneCh
-	<-base.completeTaskTimer.C
+	<-base.checkpointTimer.C
 
 	s.mockRescheduler.EXPECT().Stop().Times(1)
 	base.Stop()
-	s.False(base.completeTaskTimer.Stop())
+	s.False(base.checkpointTimer.Stop())
 }
 
 func (s *processorBaseSuite) TestProcessNewRange() {
@@ -296,7 +298,7 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		readerScopes: map[int32][]Scope{
 			defaultReaderId: {},
 		},
-		exclusiveMaxReadKey: tasks.MinimumKey,
+		exclusiveReaderHighWatermark: tasks.MinimumKey,
 	}
 
 	persistenceState := ToPersistenceQueueState(queueState)
@@ -322,14 +324,15 @@ func (s *processorBaseSuite) TestProcessNewRange() {
 		s.mockScheduler,
 		nil,
 		s.options,
-		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
 	s.True(base.nonReadableRange.Equals(NewRange(tasks.MinimumKey, tasks.MaximumKey)))
 
 	base.processNewRange()
-	scopes := base.readers[defaultReaderId].Scopes()
+	defaultReader, ok := base.readerGroup.readerByID(defaultReaderId)
+	s.True(ok)
+	scopes := defaultReader.Scopes()
 	s.Len(scopes, 1)
 	s.True(scopes[0].Range.InclusiveMin.CompareTo(tasks.MinimumKey) == 0)
 	s.True(scopes[0].Predicate.Equals(predicates.Universal[tasks.Task]()))
@@ -351,7 +354,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		readerScopes: map[int32][]Scope{
 			defaultReaderId: {},
 		},
-		exclusiveMaxReadKey: tasks.MaximumKey,
+		exclusiveReaderHighWatermark: tasks.MaximumKey,
 	}
 
 	persistenceState := ToPersistenceQueueState(queueState)
@@ -377,14 +380,13 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		s.mockScheduler,
 		nil,
 		s.options,
-		s.monitor,
 		s.logger,
 		s.metricsHandler,
 	)
-	base.completeTaskTimer = time.NewTimer(s.options.CompleteTaskInterval())
+	base.checkpointTimer = time.NewTimer(s.options.CheckpointInterval())
 
-	s.Equal(minKey.FireTime.UTC(), base.exclusiveCompletedTaskKey.FireTime)
-	base.exclusiveCompletedTaskKey = tasks.MinimumKey // set to a smaller value to that delete will be triggered
+	s.Equal(minKey.FireTime.UTC(), base.inclusiveLowWatermark.FireTime)
+	base.inclusiveLowWatermark = tasks.MinimumKey // set to a smaller value to that delete will be triggered
 
 	mockShard.Resource.ClusterMetadata.EXPECT().GetCurrentClusterName().Return(cluster.TestCurrentClusterName).AnyTimes()
 	mockShard.Resource.ClusterMetadata.EXPECT().GetAllClusterInfo().Return(cluster.TestAllClusterInfo).AnyTimes()
@@ -404,7 +406,7 @@ func (s *processorBaseSuite) TestCompleteTaskAndPersistState() {
 		),
 	)
 
-	base.completeTaskAndPersistState()
+	base.checkpoint()
 
-	s.Equal(minKey.FireTime.UTC(), base.exclusiveCompletedTaskKey.FireTime)
+	s.Equal(minKey.FireTime.UTC(), base.inclusiveLowWatermark.FireTime)
 }

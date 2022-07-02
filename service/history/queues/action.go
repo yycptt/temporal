@@ -24,62 +24,8 @@
 
 package queues
 
-import (
-	"sync"
-)
-
-var _ Mitigator = (*mitigatorImpl)(nil)
-
 type (
-	Mitigator interface {
-		Alert(Alert) bool
-	}
-
-	mitigatorImpl struct {
-		sync.Mutex
-
-		monitor Monitor
-
-		pendingAlerts map[AlertType]Alert
-		actionCh      chan<- action
+	action interface {
+		run(*readerGroup)
 	}
 )
-
-func newMitigator(
-	monitor Monitor,
-) (*mitigatorImpl, <-chan action) {
-	actionCh := make(chan action, 10)
-
-	return &mitigatorImpl{
-		monitor:       monitor,
-		pendingAlerts: make(map[AlertType]Alert),
-		actionCh:      actionCh,
-	}, actionCh
-}
-
-func (m *mitigatorImpl) Alert(alert Alert) bool {
-	m.Lock()
-
-	if _, ok := m.pendingAlerts[alert.AlertType]; ok {
-		m.Unlock()
-		return false
-	}
-
-	m.pendingAlerts[alert.AlertType] = alert
-	m.Unlock()
-
-	// handle alert here
-
-	return true
-}
-
-func (m *mitigatorImpl) resolve(alertType AlertType) {
-	m.Lock()
-	defer m.Unlock()
-
-	delete(m.pendingAlerts, alertType)
-}
-
-func (m *mitigatorImpl) close() {
-	close(m.actionCh)
-}
