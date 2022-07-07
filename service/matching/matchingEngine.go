@@ -307,12 +307,6 @@ func (e *matchingEngineImpl) AddActivityTask(
 	taskQueueName := addRequest.TaskQueue.GetName()
 	taskQueueKind := addRequest.TaskQueue.GetKind()
 
-	e.logger.Debug(
-		fmt.Sprintf("Received AddActivityTask for taskQueue=%v WorkflowId=%v, RunId=%v",
-			taskQueueName,
-			addRequest.Execution.WorkflowId,
-			addRequest.Execution.RunId))
-
 	taskQueue, err := newTaskQueueID(namespaceID, taskQueueName, enumspb.TASK_QUEUE_TYPE_ACTIVITY)
 	if err != nil {
 		return false, err
@@ -707,6 +701,52 @@ func (e *matchingEngineImpl) listTaskQueuePartitions(request *matchingservice.Li
 	return partitionHostInfo, nil
 }
 
+func (e *matchingEngineImpl) UpdateWorkerBuildIdOrdering(
+	hCtx *handlerContext,
+	req *matchingservice.UpdateWorkerBuildIdOrderingRequest,
+) (*matchingservice.UpdateWorkerBuildIdOrderingResponse, error) {
+	namespaceID := namespace.ID(req.GetNamespaceId())
+	taskQueueName := req.GetRequest().GetTaskQueue()
+	taskQueue, err := newTaskQueueID(namespaceID, taskQueueName, enumspb.TASK_QUEUE_TYPE_WORKFLOW)
+	tqMgr, err := e.getTaskQueueManager(taskQueue, enumspb.TASK_QUEUE_KIND_NORMAL)
+	if err != nil {
+		return nil, err
+	}
+	err = tqMgr.MutateVersioningData(hCtx.Context, func(data *persistencespb.VersioningData) error {
+		return UpdateVersionsGraph(data, req.GetRequest(), e.config.MaxVersionGraphSize())
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &matchingservice.UpdateWorkerBuildIdOrderingResponse{}, nil
+}
+
+func (e *matchingEngineImpl) GetWorkerBuildIdOrdering(
+	hCtx *handlerContext,
+	req *matchingservice.GetWorkerBuildIdOrderingRequest,
+) (*matchingservice.GetWorkerBuildIdOrderingResponse, error) {
+	namespaceID := namespace.ID(req.GetNamespaceId())
+	taskQueueName := req.GetRequest().GetTaskQueue()
+	taskQueue, err := newTaskQueueID(namespaceID, taskQueueName, enumspb.TASK_QUEUE_TYPE_WORKFLOW)
+	tqMgr, err := e.getTaskQueueManager(taskQueue, enumspb.TASK_QUEUE_KIND_NORMAL)
+	if err != nil {
+		if _, ok := err.(*serviceerror.NotFound); ok {
+			return &matchingservice.GetWorkerBuildIdOrderingResponse{}, nil
+		}
+		return nil, err
+	}
+	verDat, err := tqMgr.GetVersioningData(hCtx.Context)
+	if err != nil {
+		if _, ok := err.(*serviceerror.NotFound); ok {
+			return &matchingservice.GetWorkerBuildIdOrderingResponse{}, nil
+		}
+		return nil, err
+	}
+	return &matchingservice.GetWorkerBuildIdOrderingResponse{
+		Response: ToBuildIdOrderingResponse(verDat, int(req.GetRequest().GetMaxDepth())),
+	}, nil
+}
+
 func (e *matchingEngineImpl) getHostInfo(partitionKey string) (string, error) {
 	host, err := e.keyResolver.Lookup(partitionKey)
 	if err != nil {
@@ -903,12 +943,12 @@ func (e *matchingEngineImpl) recordWorkflowTaskStarted(
 		PollRequest:       pollReq,
 	}
 	var resp *historyservice.RecordWorkflowTaskStartedResponse
-	op := func() error {
+	op := func(ctx context.Context) error {
 		var err error
 		resp, err = e.historyService.RecordWorkflowTaskStarted(ctx, request)
 		return err
 	}
-	err := backoff.Retry(op, historyServiceOperationRetryPolicy, func(err error) bool {
+	err := backoff.ThrottleRetryContext(ctx, op, historyServiceOperationRetryPolicy, func(err error) bool {
 		switch err.(type) {
 		case *serviceerror.NotFound, *serviceerror.NamespaceNotFound, *serviceerrors.TaskAlreadyStarted:
 			return false
@@ -933,12 +973,12 @@ func (e *matchingEngineImpl) recordActivityTaskStarted(
 		PollRequest:       pollReq,
 	}
 	var resp *historyservice.RecordActivityTaskStartedResponse
-	op := func() error {
+	op := func(ctx context.Context) error {
 		var err error
 		resp, err = e.historyService.RecordActivityTaskStarted(ctx, request)
 		return err
 	}
-	err := backoff.Retry(op, historyServiceOperationRetryPolicy, func(err error) bool {
+	err := backoff.ThrottleRetryContext(ctx, op, historyServiceOperationRetryPolicy, func(err error) bool {
 		switch err.(type) {
 		case *serviceerror.NotFound, *serviceerror.NamespaceNotFound, *serviceerrors.TaskAlreadyStarted:
 			return false

@@ -94,6 +94,10 @@ type (
 		// DispatchQueryTask will dispatch query to local or remote poller. If forwarded then result or error is returned,
 		// if dispatched to local poller then nil and nil is returned.
 		DispatchQueryTask(ctx context.Context, taskID string, request *matchingservice.QueryWorkflowRequest) (*matchingservice.QueryWorkflowResponse, error)
+		// GetVersioningData returns the versioning data for this task queue
+		GetVersioningData(ctx context.Context) (*persistencespb.VersioningData, error)
+		// MutateVersioningData allows callers to update versioning data for this task queue
+		MutateVersioningData(ctx context.Context, mutator func(*persistencespb.VersioningData) error) error
 		CancelPoller(pollerID string)
 		GetAllPollerInfo() []*taskqueuepb.PollerInfo
 		HasPollerAfter(accessTime time.Time) bool
@@ -279,7 +283,7 @@ func (c *taskQueueManagerImpl) AddTask(
 	}
 
 	var syncMatch bool
-	err := executeWithRetry(func() error {
+	err := executeWithRetry(ctx, func(_ context.Context) error {
 		taskInfo := params.taskInfo
 
 		namespaceEntry, err := c.namespaceRegistry.GetNamespaceByID(namespace.ID(taskInfo.GetNamespaceId()))
@@ -398,6 +402,16 @@ func (c *taskQueueManagerImpl) DispatchQueryTask(
 	return c.matcher.OfferQuery(ctx, task)
 }
 
+func (c *taskQueueManagerImpl) GetVersioningData(ctx context.Context) (*persistencespb.VersioningData, error) {
+	return c.db.GetVersioningData(ctx)
+}
+
+func (c *taskQueueManagerImpl) MutateVersioningData(ctx context.Context, mutator func(*persistencespb.VersioningData) error) error {
+	err := c.db.MutateVersioningData(ctx, mutator)
+	c.signalIfFatal(err)
+	return err
+}
+
 // GetAllPollerInfo returns all pollers that polled from this taskqueue in last few minutes
 func (c *taskQueueManagerImpl) GetAllPollerInfo() []*taskqueuepb.PollerInfo {
 	return c.pollerHistory.getPollerInfo(time.Time{})
@@ -479,7 +493,7 @@ func (c *taskQueueManagerImpl) completeTask(task *persistencespb.AllocatedTaskIn
 		// again the underlying reason for failing to start will be resolved.
 		// Note that RecordTaskStarted only fails after retrying for a long time, so a single task will not be
 		// re-written to persistence frequently.
-		err = executeWithRetry(func() error {
+		err = executeWithRetry(context.Background(), func(_ context.Context) error {
 			wf := &commonpb.WorkflowExecution{WorkflowId: task.Data.GetWorkflowId(), RunId: task.Data.GetRunId()}
 			_, err := c.taskWriter.appendTask(wf, task.Data)
 			return err
@@ -513,9 +527,10 @@ func rangeIDToTaskIDBlock(rangeID int64, rangeSize int64) taskIDBlock {
 
 // Retry operation on transient error.
 func executeWithRetry(
-	operation func() error,
+	ctx context.Context,
+	operation func(context.Context) error,
 ) error {
-	err := backoff.Retry(operation, persistenceOperationRetryPolicy, func(err error) bool {
+	err := backoff.ThrottleRetryContext(ctx, operation, persistenceOperationRetryPolicy, func(err error) bool {
 		if common.IsContextDeadlineExceededErr(err) || common.IsContextCanceledErr(err) {
 			return false
 		}
