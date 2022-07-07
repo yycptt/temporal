@@ -441,8 +441,11 @@ func (s *ContextImpl) UpdateQueueState(
 	// so after rollback or disabling the feature, we won't load too many tombstones
 	minAckLevel := tasks.MaximumKey
 	for _, readerState := range state.ReaderStates {
-		for _, scope := range readerState.Scopes {
-			minAckLevel = tasks.MinKey(minAckLevel, convertFromPersistenceTaskKey(scope.Range.InclusiveMin))
+		if len(readerState.Scopes) != 0 {
+			minAckLevel = tasks.MinKey(
+				minAckLevel,
+				convertFromPersistenceTaskKey(readerState.Scopes[0].Range.InclusiveMin),
+			)
 		}
 	}
 
@@ -1719,7 +1722,6 @@ func (s *ContextImpl) loadShardMetadata(ownershipChanged *bool) error {
 				continue
 			}
 
-			// TODO: double check the logic here
 			maxReadTime = common.MaxTime(maxReadTime, timestamp.TimeValue(queueState.ExclusiveReaderHighWatermark.FireTime))
 		}
 

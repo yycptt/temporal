@@ -76,6 +76,9 @@ func NewTestContext(
 	if shardInfo.QueueAckLevels == nil {
 		shardInfo.QueueAckLevels = make(map[int32]*persistencespb.QueueAckLevel)
 	}
+	if shardInfo.QueueStates == nil {
+		shardInfo.QueueStates = make(map[int32]*persistencespb.QueueState)
+	}
 	shard := &ContextImpl{
 		shardID:             shardInfo.GetShardId(),
 		executionManager:    resourceTest.ExecutionMgr,
