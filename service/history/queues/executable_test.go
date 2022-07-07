@@ -197,8 +197,6 @@ func (s *executableSuite) TestTaskNack_Reschedule() {
 	s.Equal(ctasks.TaskStatePending, executable.State())
 }
 
-// TODO: add test for handling not ready scheduled task
-
 func (s *executableSuite) newTestExecutable(
 	filter TaskFilter,
 ) Executable {

@@ -63,7 +63,7 @@ type (
 		shutdownWG sync.WaitGroup
 
 		category    tasks.Category
-		options     *QueueOptions
+		options     *Options
 		rescheduler Rescheduler
 		timeSource  clock.TimeSource
 		monitor     *monitorImpl
@@ -85,15 +85,16 @@ type (
 		actionCh <-chan action
 	}
 
-	QueueOptions struct {
+	Options struct {
 		ReaderOptions
 		MonitorOptions
 
-		MaxPollInterval                  dynamicconfig.DurationPropertyFn
-		MaxPollIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
-		CheckpointInterval               dynamicconfig.DurationPropertyFn
-		TaskMaxRetryCount                dynamicconfig.IntPropertyFn
-		QueueType                        QueueType
+		MaxPollInterval                     dynamicconfig.DurationPropertyFn
+		MaxPollIntervalJitterCoefficient    dynamicconfig.FloatPropertyFn
+		CheckpointInterval                  dynamicconfig.DurationPropertyFn
+		CheckpointIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
+		TaskMaxRetryCount                   dynamicconfig.IntPropertyFn
+		QueueType                           QueueType
 	}
 )
 
@@ -103,7 +104,7 @@ func newQueueBase(
 	paginationFnProvider PaginationFnProvider,
 	scheduler Scheduler,
 	executor Executor,
-	options *QueueOptions,
+	options *Options,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *queueBase {
@@ -242,7 +243,10 @@ func (p *queueBase) UnlockTaskProcessing() {
 }
 
 func (p *queueBase) processNewRange() {
-	newMaxKey := p.shard.GetQueueExclusiveHighReadWatermark(p.category, "")
+	newMaxKey := p.shard.GetQueueExclusiveHighReadWatermark(
+		p.category,
+		p.shard.GetClusterMetadata().GetCurrentClusterName(),
+	)
 
 	if !p.nonReadableRange.CanSplit(newMaxKey) {
 		return

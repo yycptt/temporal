@@ -55,23 +55,26 @@ type (
 	}
 )
 
+const (
+	scheduledTaskPrecision = time.Millisecond
+)
+
 func NewScheduledQueue(
 	shard shard.Context,
 	category tasks.Category,
 	scheduler Scheduler,
 	executor Executor,
-	options *QueueOptions,
+	options *Options,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *scheduledQueue {
 	paginationFnProvider := func(r Range) collection.PaginationFn[tasks.Task] {
-		// TODO: handle time precision issue in persistence layer, time will be truncated
 		return func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			request := &persistence.GetHistoryTasksRequest{
 				ShardID:             shard.GetShardID(),
 				TaskCategory:        category,
 				InclusiveMinTaskKey: tasks.NewKey(r.InclusiveMin.FireTime, 0),
-				ExclusiveMaxTaskKey: tasks.NewKey(r.ExclusiveMax.FireTime, 0),
+				ExclusiveMaxTaskKey: tasks.NewKey(r.ExclusiveMax.FireTime.Add(scheduledTaskPrecision), 0),
 				BatchSize:           options.BatchSize(),
 				NextPageToken:       paginationToken,
 			}
@@ -79,6 +82,15 @@ func NewScheduledQueue(
 			resp, err := shard.GetExecutionManager().GetHistoryTasks(context.TODO(), request)
 			if err != nil {
 				return nil, nil, err
+			}
+
+			for len(resp.Tasks) > 0 && !r.ContainsKey(resp.Tasks[0].GetKey()) {
+				resp.Tasks = resp.Tasks[1:]
+			}
+
+			for len(resp.Tasks) > 0 && !r.ContainsKey(resp.Tasks[len(resp.Tasks)-1].GetKey()) {
+				resp.Tasks = resp.Tasks[:len(resp.Tasks)-1]
+				resp.NextPageToken = nil
 			}
 
 			return resp.Tasks, resp.NextPageToken, nil
@@ -97,7 +109,8 @@ func NewScheduledQueue(
 			metricsHandler,
 		),
 
-		timerGate: timer.NewLocalGate(shard.GetTimeSource()),
+		timerGate:  timer.NewLocalGate(shard.GetTimeSource()),
+		newTimerCh: make(chan struct{}, 1),
 	}
 }
 
@@ -237,5 +250,5 @@ func (p *scheduledQueue) lookAheadTask() {
 		p.timerGate.Update(response.Tasks[0].GetVisibilityTime())
 	}
 
-	// no look ahead task, wait for max poll interval
+	// no look ahead task, wait for max poll interval or new task notification
 }

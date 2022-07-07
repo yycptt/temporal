@@ -111,12 +111,12 @@ func (g *readerGroup) newReader(readerID int32, scopes []Scope) Reader {
 	}
 
 	g.readerMap[readerID] = reader
-	if !g.isStopped() {
+	if g.isStarted() {
 		reader.Start()
 	}
 	return reader
 }
 
-func (g *readerGroup) isStopped() bool {
-	return atomic.LoadInt32(&g.status) == common.DaemonStatusStopped
+func (g *readerGroup) isStarted() bool {
+	return atomic.LoadInt32(&g.status) == common.DaemonStatusStarted
 }

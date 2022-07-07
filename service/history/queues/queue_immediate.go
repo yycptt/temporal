@@ -55,7 +55,7 @@ func NewImmediateQueue(
 	category tasks.Category,
 	scheduler Scheduler,
 	executor Executor,
-	options *QueueOptions,
+	options *Options,
 	logger log.Logger,
 	metricsHandler metrics.MetricsHandler,
 ) *immediateQueue {

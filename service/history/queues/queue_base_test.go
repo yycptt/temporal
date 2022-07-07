@@ -60,7 +60,7 @@ type (
 		mockRescheduler *MockRescheduler
 
 		config         *configs.Config
-		options        *QueueOptions
+		options        *Options
 		logger         log.Logger
 		metricsHandler metrics.MetricsHandler
 	}
@@ -79,7 +79,7 @@ func (s *processorBaseSuite) SetupTest() {
 	s.mockRescheduler = NewMockRescheduler(s.controller)
 
 	s.config = tests.NewDynamicConfig()
-	s.options = &QueueOptions{
+	s.options = &Options{
 		ReaderOptions: ReaderOptions{
 			BatchSize:                            dynamicconfig.GetIntPropertyFn(10),
 			ShrinkRangeInterval:                  dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
@@ -259,7 +259,7 @@ func (s *processorBaseSuite) TestStartStop() {
 			mockTask := tasks.NewMockTask(s.controller)
 			key := NewRandomKeyInRange(paginationRange)
 			mockTask.EXPECT().GetKey().Return(key).AnyTimes()
-			mockTask.EXPECT().GetVisibilityTime().Return(key.FireTime).AnyTimes() // TODO: remove this
+			mockTask.EXPECT().GetNamespaceID().Return(uuid.New()).AnyTimes()
 			return []tasks.Task{mockTask}, nil, nil
 		}
 	}
@@ -285,6 +285,8 @@ func (s *processorBaseSuite) TestStartStop() {
 
 	s.mockRescheduler.EXPECT().Start().Times(1)
 	base.Start()
+	base.processNewRange()
+
 	<-doneCh
 	<-base.checkpointTimer.C
 

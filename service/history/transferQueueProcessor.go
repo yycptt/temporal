@@ -97,7 +97,7 @@ func newTransferQueueProcessor(
 ) queues.Queue {
 
 	singleProcessor := !shard.GetClusterMetadata().IsGlobalNamespaceEnabled() ||
-		shard.GetConfig().TransferProcessorEnableSingleCursor()
+		shard.GetConfig().TransferProcessorEnableSingleProcessor()
 
 	logger := log.With(shard.GetLogger(), tag.ComponentTransferQueue)
 	currentClusterName := shard.GetClusterMetadata().GetCurrentClusterName()
