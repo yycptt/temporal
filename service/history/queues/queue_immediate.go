@@ -152,6 +152,7 @@ func (p *immediateQueue) processEventLoop() {
 		case <-p.notifyCh:
 			p.processNewRange()
 		case <-pollTimer.C:
+			// TODO see if this logic can be moved to queue base
 			if p.lastPollTime.Add(p.options.MaxPollInterval()).Before(p.timeSource.Now()) {
 				p.processNewRange()
 			}

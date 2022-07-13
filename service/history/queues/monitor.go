@@ -36,6 +36,10 @@ import (
 
 var _ Monitor = (*monitorImpl)(nil)
 
+const (
+	monitorWatermarkPrecision = time.Second
+)
+
 type (
 	Monitor interface {
 		GetTotalTasks() int
@@ -79,8 +83,7 @@ type (
 	}
 
 	readerStats struct {
-		readerWatermarkPrecision time.Duration
-		progressByReader         map[int32]*readerProgess
+		progressByReader map[int32]*readerProgess
 	}
 
 	readerProgess struct {
@@ -200,6 +203,8 @@ func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 		return
 	}
 
+	// TODO: do not track watermark to max readerID
+
 	if watermark.FireTime == tasks.DefaultFireTime {
 		// for now we only track watermark for scheduled queue
 		return
@@ -215,7 +220,7 @@ func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 		}
 	}
 
-	watermark.FireTime = watermark.FireTime.Truncate(m.readerWatermarkPrecision)
+	watermark.FireTime = watermark.FireTime.Truncate(monitorWatermarkPrecision)
 	progress := m.progressByReader[readerID]
 	if !watermark.FireTime.Equal(progress.watermark.FireTime) {
 		progress.watermark = watermark
@@ -226,8 +231,8 @@ func (m *monitorImpl) SetReaderWatermark(readerID int32, watermark tasks.Key) {
 	progress.attempts++
 	if progress.attempts > m.options.CriticalWatermarkAttempts() && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
-			AlertType: AlertTypeQueueReaderWatermark,
-			AlertQueueReaderWatermarkAttributes: &AlertQueueReaderWatermarkAttributes{
+			AlertType: AlertTypeReaderWatermark,
+			AlertReaderWatermarkAttributes: &AlertReaderWatermarkAttributes{
 				ReaderID:         readerID,
 				CurrentWatermark: progress.watermark,
 			},
@@ -251,8 +256,8 @@ func (m *monitorImpl) SetTotalSlices(totalSlices int) {
 	maxSliceCount := m.options.CriticalTotalSlices()
 	if totalSlices > maxSliceCount && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
-			AlertType: AlertTypeQueueSliceCount,
-			AlertQueueSliceCountAttributes: &AlertQueueSliceCountAttributes{
+			AlertType: AlertTypeSliceCount,
+			AlertSliceCountAttributes: &AlertSliceCountAttributes{
 				CurrentSliceCount: m.totalSlices,
 				MaxSliceCount:     maxSliceCount,
 			},

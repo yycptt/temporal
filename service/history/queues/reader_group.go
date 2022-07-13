@@ -100,8 +100,26 @@ func (g *readerGroup) readerByID(readerID int32) (Reader, bool) {
 	return reader, ok
 }
 
-func (g *readerGroup) newReader(readerID int32, scopes []Scope) Reader {
+func (g *readerGroup) newReaderWithScopes(readerID int32, scopes ...Scope) Reader {
 	reader := g.initializer(readerID, scopes)
+
+	g.Lock()
+	defer g.Unlock()
+
+	if _, ok := g.readerMap[readerID]; ok {
+		panic(fmt.Sprintf("reader with ID %v already exists", readerID))
+	}
+
+	g.readerMap[readerID] = reader
+	if g.isStarted() {
+		reader.Start()
+	}
+	return reader
+}
+
+func (g *readerGroup) newReaderWithSlices(readerID int32, slices ...Slice) Reader {
+	reader := g.initializer(readerID, nil)
+	reader.MergeSlices(slices...)
 
 	g.Lock()
 	defer g.Unlock()

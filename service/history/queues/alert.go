@@ -30,12 +30,10 @@ import (
 
 type (
 	Alert struct {
-		AlertType                           AlertType
-		AlertQueuePendingTaskAttributes     *AlertQueuePendingTaskAttributes
-		AlertHostPendingTaskAttributes      *AlertHostPendingTaskAttributes
-		AlertQueueReaderWatermarkAttributes *AlertQueueReaderWatermarkAttributes
-		AlertQueueSliceCountAttributes      *AlertQueueSliceCountAttributes
-		AlertTaskAttemptsAttributes         *AlertTaskAttemptsAttributes
+		AlertType                       AlertType
+		AlertQueuePendingTaskAttributes *AlertQueuePendingTaskAttributes
+		AlertReaderWatermarkAttributes  *AlertReaderWatermarkAttributes
+		AlertSliceCountAttributes       *AlertSliceCountAttributes
 	}
 
 	AlertType int
@@ -45,28 +43,20 @@ type (
 		MaxPendingTasks     int
 	}
 
-	AlertHostPendingTaskAttributes struct{}
-
-	AlertQueueReaderWatermarkAttributes struct {
+	AlertReaderWatermarkAttributes struct {
 		ReaderID         int32
 		CurrentWatermark tasks.Key
 	}
 
-	AlertQueueSliceCountAttributes struct {
+	AlertSliceCountAttributes struct {
 		CurrentSliceCount int
 		MaxSliceCount     int
-	}
-
-	AlertTaskAttemptsAttributes struct {
-		Task tasks.Task
 	}
 )
 
 const (
 	AlertTypeUnspecified AlertType = iota
 	AlertTypeQueuePendingTask
-	AlertTypeHostPendingTask
-	AlertTypeQueueReaderWatermark
-	AlertTypeQueueSliceCount
-	AlertTypeTaskAttempts
+	AlertTypeReaderWatermark
+	AlertTypeSliceCount
 )

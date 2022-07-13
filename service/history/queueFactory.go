@@ -160,6 +160,8 @@ func QueueFactoryLifetimeHooks(
 	)
 }
 
+// TODO: split into multiple files
+
 func NewTransferQueueFactory(
 	params transferQueueFactoryParams,
 ) queues.Factory {

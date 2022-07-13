@@ -138,7 +138,7 @@ func newQueueBase(
 	)
 
 	monitor := newMonitor(&options.MonitorOptions)
-	mitigator, actionCh := newMitigator(monitor)
+	mitigator, actionCh := newMitigator(monitor, logger, metricsHandler)
 	monitor.registerMitigator(mitigator)
 
 	executableInitializer := func(t tasks.Task) Executable {
@@ -174,7 +174,7 @@ func newQueueBase(
 
 	readerGroup := newReaderGroup(readerInitializer)
 	for readerID, scopes := range readerScopes {
-		readerGroup.newReader(readerID, scopes)
+		readerGroup.newReaderWithScopes(readerID, scopes...)
 
 		if len(scopes) != 0 {
 			inclusiveLowWatermark = tasks.MinKey(inclusiveLowWatermark, scopes[0].Range.InclusiveMin)
@@ -260,7 +260,7 @@ func (p *queueBase) processNewRange() {
 
 	reader, ok := p.readerGroup.readerByID(defaultReaderId)
 	if !ok {
-		p.readerGroup.newReader(defaultReaderId, []Scope{newScope})
+		p.readerGroup.newReaderWithScopes(defaultReaderId, newScope)
 	} else {
 		reader.MergeSlices(NewSlice(
 			p.paginationFnProvider,

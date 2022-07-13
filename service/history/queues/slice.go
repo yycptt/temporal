@@ -28,6 +28,7 @@ import (
 	"fmt"
 
 	"go.temporal.io/server/common/namespace"
+	"go.temporal.io/server/common/predicates"
 	ctasks "go.temporal.io/server/common/tasks"
 	"go.temporal.io/server/service/history/tasks"
 )
@@ -45,6 +46,7 @@ type (
 		SplitByPredicate(tasks.Predicate) (pass Slice, fail Slice)
 		CanMergeWithSlice(Slice) bool
 		MergeWithSlice(Slice) []Slice
+		CompactWithSlice(Slice) Slice
 		ShrinkRange()
 		SelectTasks(int) ([]Executable, error)
 		MoreTasks() bool
@@ -380,6 +382,45 @@ func (s *SliceImpl) appendIterator(
 	}
 
 	return append(iterators, iterator)
+}
+
+func (s *SliceImpl) CompactWithSlice(slice Slice) Slice {
+	s.stateSanityCheck()
+
+	incomingSlice, ok := slice.(*SliceImpl)
+	if !ok {
+		panic(fmt.Sprintf("Unable to compact queue slice of type %T with type %T", s, slice))
+	}
+	incomingSlice.stateSanityCheck()
+
+	compactedScope := NewScope(
+		NewRange(
+			tasks.MinKey(s.scope.Range.InclusiveMin, incomingSlice.scope.Range.InclusiveMin),
+			tasks.MaxKey(s.scope.Range.ExclusiveMax, incomingSlice.scope.Range.ExclusiveMax),
+		),
+		// TODO: special check if the predicates are the same type
+		// define tasks.UnionPredicate?
+		predicates.Or(s.scope.Predicate, incomingSlice.scope.Predicate),
+	)
+
+	mergedOutstandingExecutables, mergedPendingTasks := s.mergeExecutables(incomingSlice)
+
+	compactedSlice := &SliceImpl{
+		paginationFnProvider:  s.paginationFnProvider,
+		executableInitializer: s.executableInitializer,
+		scope:                 compactedScope,
+		iterators:             s.mergeIterators(incomingSlice),
+		monitor:               s.monitor,
+		pendingExecutables:    mergedOutstandingExecutables,
+		pendingPerNamesapce:   mergedPendingTasks,
+	}
+
+	s.destroy()
+	incomingSlice.destroy()
+
+	compactedSlice.monitor.SetTasksPerSlice(compactedSlice, compactedSlice.pendingPerNamesapce)
+
+	return nil
 }
 
 func (s *SliceImpl) ShrinkRange() {

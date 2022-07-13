@@ -26,6 +26,10 @@ package queues
 
 import (
 	"sync"
+
+	"go.temporal.io/server/common/log"
+	"go.temporal.io/server/common/log/tag"
+	"go.temporal.io/server/common/metrics"
 )
 
 var _ Mitigator = (*mitigatorImpl)(nil)
@@ -38,7 +42,9 @@ type (
 	mitigatorImpl struct {
 		sync.Mutex
 
-		monitor Monitor
+		monitor        Monitor
+		logger         log.Logger
+		metricsHandler metrics.MetricsHandler
 
 		pendingAlerts map[AlertType]Alert
 		actionCh      chan<- action
@@ -47,30 +53,48 @@ type (
 
 func newMitigator(
 	monitor Monitor,
+	logger log.Logger,
+	metricsHandler metrics.MetricsHandler,
 ) (*mitigatorImpl, <-chan action) {
 	actionCh := make(chan action, 10)
 
 	return &mitigatorImpl{
-		monitor:       monitor,
-		pendingAlerts: make(map[AlertType]Alert),
-		actionCh:      actionCh,
+		monitor:        monitor,
+		logger:         logger,
+		metricsHandler: metricsHandler,
+		pendingAlerts:  make(map[AlertType]Alert),
+		actionCh:       actionCh,
 	}, actionCh
 }
 
 func (m *mitigatorImpl) Alert(alert Alert) bool {
 	m.Lock()
+	defer m.Unlock()
 
 	if _, ok := m.pendingAlerts[alert.AlertType]; ok {
-		m.Unlock()
-		return false
+		return true
 	}
 
-	m.pendingAlerts[alert.AlertType] = alert
-	m.Unlock()
+	var action action
+	switch alert.AlertType {
+	case AlertTypeQueuePendingTask:
+		action = newQueuePendingTaskAction(m, m.monitor, alert.AlertQueuePendingTaskAttributes)
+	case AlertTypeReaderWatermark:
+		action = newReaderWatermarkAction(m, alert.AlertReaderWatermarkAttributes)
+	case AlertTypeSliceCount:
+		action = newSliceCountAction(m, alert.AlertSliceCountAttributes)
+	default:
+		m.logger.Error("Unknown queue alert type", tag.Value(alert.AlertType))
+	}
 
-	// handle alert here
-
-	return true
+	select {
+	case m.actionCh <- action:
+		m.pendingAlerts[alert.AlertType] = alert
+		return true
+	default:
+		m.logger.Warn("Too many pending queue actions")
+		return false
+	}
 }
 
 func (m *mitigatorImpl) resolve(alertType AlertType) {

@@ -44,8 +44,12 @@ type (
 		common.Daemon
 
 		Scopes() []Scope
+		// WalkSlices(SliceIterator)
 		SplitSlices(SliceSplitter)
 		MergeSlices(...Slice)
+		ClearSlices(SliceSelector)
+		CompactSlices(SliceSelector)
+
 		Throttle(time.Duration)
 	}
 
@@ -57,7 +61,12 @@ type (
 		PollBackoffInterval                  dynamicconfig.DurationPropertyFn
 	}
 
+	SliceIterator func(s Slice)
+
 	SliceSplitter func(s Slice) (remaining []Slice)
+
+	// TODO: use ReadOnlySlice interface ?
+	SliceSelector func(s Slice) bool
 
 	ReaderImpl struct {
 		sync.Mutex
@@ -225,6 +234,49 @@ func (r *ReaderImpl) MergeSlices(incomingSlices ...Slice) {
 	r.resetNextLoadSliceLocked()
 }
 
+func (r *ReaderImpl) ClearSlices(selector SliceSelector) {
+	r.Lock()
+	defer r.Unlock()
+
+	for element := r.slices.Front(); element != nil; element = element.Next() {
+		slice := element.Value.(Slice)
+		if selector(slice) {
+			slice.Clear()
+		}
+	}
+
+	r.resetNextLoadSliceLocked()
+}
+
+func (r *ReaderImpl) CompactSlices(selector SliceSelector) {
+	r.Lock()
+	defer r.Unlock()
+
+	var prev *list.Element
+	var next *list.Element
+	for element := r.slices.Front(); element != nil; element = next {
+		next = element.Next()
+
+		slice := element.Value.(Slice)
+		if !selector(slice) || prev == nil {
+			prev = element
+			continue
+		}
+
+		compacted := r.slices.InsertAfter(
+			prev.Value.(Slice).CompactWithSlice(slice),
+			element,
+		)
+
+		r.slices.Remove(prev)
+		r.slices.Remove(element)
+
+		prev = compacted
+	}
+
+	r.resetNextLoadSliceLocked()
+}
+
 func (r *ReaderImpl) Throttle(backoff time.Duration) {
 	r.Lock()
 	defer r.Unlock()
@@ -272,6 +324,8 @@ func (r *ReaderImpl) eventLoop() {
 }
 
 func (r *ReaderImpl) loadAndSubmitTasks() {
+	// TODO: need a ratelimiter here
+
 	r.Lock()
 	defer r.Unlock()
 
