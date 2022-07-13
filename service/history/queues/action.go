@@ -33,6 +33,10 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	targetThresholdCoefficient = 0.8
+)
+
 type (
 	action interface {
 		run(*readerGroup)
@@ -70,38 +74,29 @@ func newQueuePendingTaskAction(
 	}
 }
 
-type namespacePendingTask struct {
-	namespaceID namespace.ID
-	pendingTask int
-}
-
 type slicePendingTask struct {
-	slice       Slice
-	pendingTask int
+	slice                Slice
+	namespacePendingTask int
 }
 
 func (a *actionQueuePendingTask) run(readerGroup *readerGroup) {
 	defer a.mitigator.resolve(AlertTypeQueuePendingTask)
 
 	tasksPerNamespace := a.monitor.GetTasksPerNamespace()
-	pq := collection.NewPriorityQueue(func(this, that *namespacePendingTask) bool {
-		return this.pendingTask > that.pendingTask
+	pq := collection.NewPriorityQueue(func(this, that namespace.ID) bool {
+		return tasksPerNamespace[this] > tasksPerNamespace[that]
 	})
-	for namespaceID, pendinTask := range tasksPerNamespace {
-		pq.Add(&namespacePendingTask{
-			namespaceID: namespaceID,
-			pendingTask: pendinTask,
-		})
+	for namespaceID := range tasksPerNamespace {
+		pq.Add(namespaceID)
 	}
 
-	slicesPerNamespace := make(map[namespace.ID][]slicePendingTask)
 	slicesToClear := make(map[Slice][]string)
+	slicesPerNamespace := make(map[namespace.ID][]slicePendingTask) // slices reversely ordered
 
 	currentPendingTasks := a.attributes.CurrentPendingTasks
-	targetPendingTasks := int(float64(a.attributes.MaxPendingTasks) * 0.8)
+	targetPendingTasks := int(float64(a.attributes.MaxPendingTasks) * targetThresholdCoefficient)
 	for currentPendingTasks > targetPendingTasks && !pq.IsEmpty() {
-		element := pq.Remove()
-		namespaceID := element.namespaceID
+		namespaceID := pq.Remove()
 
 		namespaceSlices, ok := slicesPerNamespace[namespaceID]
 		if !ok {
@@ -109,8 +104,8 @@ func (a *actionQueuePendingTask) run(readerGroup *readerGroup) {
 			namespaceSlices = make([]slicePendingTask, 0, len(namespaceSlices))
 			for slice, pendingTask := range namespaceSlicesMap {
 				namespaceSlices = append(namespaceSlices, slicePendingTask{
-					slice:       slice,
-					pendingTask: pendingTask,
+					slice:                slice,
+					namespacePendingTask: pendingTask,
 				})
 			}
 
@@ -130,9 +125,9 @@ func (a *actionQueuePendingTask) run(readerGroup *readerGroup) {
 		sliceToClear := namespaceSlices[0].slice
 		slicesToClear[sliceToClear] = append(slicesToClear[sliceToClear], namespaceID.String())
 
-		element.pendingTask -= namespaceSlices[0].pendingTask
-		if element.pendingTask > 0 {
-			pq.Add(element)
+		tasksPerNamespace[namespaceID] -= namespaceSlices[0].namespacePendingTask
+		if tasksPerNamespace[namespaceID] > 0 {
+			pq.Add(namespaceID)
 		}
 
 		namespaceSlices = namespaceSlices[1:]
@@ -257,20 +252,15 @@ func newSliceCountAction(
 	}
 }
 
-type sliceKey struct {
-	readerID int32
-	sliceIdx int
-}
-
 type compactCandidate struct {
-	sliceKey sliceKey
+	slice    Slice
 	distance tasks.Key
 }
 
 func (a *actionSliceCount) run(readerGroup *readerGroup) {
 	defer a.mitigator.resolve(AlertTypeSliceCount)
 
-	targetSliceCount := int(float64(a.attributes.MaxSliceCount) * 0.8)
+	targetSliceCount := int(float64(a.attributes.MaxSliceCount) * targetThresholdCoefficient)
 	numSliceToCompact := a.attributes.CurrentSliceCount - targetSliceCount
 	pq := collection.NewPriorityQueue(func(this, that *compactCandidate) bool {
 		return this.distance.CompareTo(this.distance) < 0
@@ -282,40 +272,33 @@ func (a *actionSliceCount) run(readerGroup *readerGroup) {
 			continue
 		}
 
-		scopes := reader.Scopes()
-		for idx, scope := range scopes {
-			if idx == 0 {
-				continue
+		var prevRange *Range
+		reader.WalkSlices(func(s Slice) {
+			if prevRange == nil {
+				return
 			}
 
+			currentRange := s.Scope().Range
 			pq.Add(&compactCandidate{
-				sliceKey: sliceKey{
-					readerID: readerID,
-					sliceIdx: idx,
-				},
-				distance: scope.Range.InclusiveMin.Sub(scopes[idx-1].Range.ExclusiveMax),
+				slice:    s,
+				distance: currentRange.InclusiveMin.Sub(prevRange.ExclusiveMax),
 			})
-		}
+			prevRange = &currentRange
+		})
 	}
 
-	sliceToCompact := make(map[sliceKey]struct{}, numSliceToCompact)
+	sliceToCompact := make(map[Slice]struct{}, numSliceToCompact)
 	for numSliceToCompact > 0 && !pq.IsEmpty() {
-		sliceToCompact[pq.Remove().sliceKey] = struct{}{}
+		sliceToCompact[pq.Remove().slice] = struct{}{}
 	}
 
-	// TODO: fix the impl, we can rely on idx
 	for readerID, reader := range readers {
 		if readerID == defaultReaderId {
 			continue
 		}
 
-		sliceKey := sliceKey{
-			readerID: readerID,
-			sliceIdx: 0,
-		}
-		reader.CompactSlices(func(_ Slice) bool {
-			_, ok := sliceToCompact[sliceKey]
-			sliceKey.sliceIdx++
+		reader.CompactSlices(func(s Slice) bool {
+			_, ok := sliceToCompact[s]
 			return ok
 		})
 	}

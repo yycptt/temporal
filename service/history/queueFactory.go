@@ -259,11 +259,9 @@ func (f *transferQueueFactory) CreateQueue(
 			executor,
 			&queues.Options{
 				ReaderOptions: queues.ReaderOptions{
-					BatchSize:                            f.Config.TransferTaskBatchSize,
-					ShrinkRangeInterval:                  f.Config.TransferProcessorUpdateAckInterval,
-					ShrinkRangeIntervalJitterCoefficient: f.Config.TransferProcessorUpdateAckIntervalJitterCoefficient,
-					MaxReschdulerSize:                    f.Config.TransferProcessorMaxReschedulerSize,
-					PollBackoffInterval:                  f.Config.TransferProcessorPollBackoffInterval,
+					BatchSize:           f.Config.TransferTaskBatchSize,
+					MaxReschdulerSize:   f.Config.TransferProcessorMaxReschedulerSize,
+					PollBackoffInterval: f.Config.TransferProcessorPollBackoffInterval,
 				},
 				MonitorOptions: queues.MonitorOptions{ // TODO
 					CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(10000),
@@ -407,11 +405,9 @@ func (f *timerQueueFactory) CreateQueue(
 			executor,
 			&queues.Options{
 				ReaderOptions: queues.ReaderOptions{
-					BatchSize:                            f.Config.TimerTaskBatchSize,
-					ShrinkRangeInterval:                  f.Config.TimerProcessorUpdateAckInterval,
-					ShrinkRangeIntervalJitterCoefficient: f.Config.TimerProcessorUpdateAckIntervalJitterCoefficient,
-					MaxReschdulerSize:                    f.Config.TimerProcessorMaxReschedulerSize,
-					PollBackoffInterval:                  f.Config.TimerProcessorPollBackoffInterval,
+					BatchSize:           f.Config.TimerTaskBatchSize,
+					MaxReschdulerSize:   f.Config.TimerProcessorMaxReschedulerSize,
+					PollBackoffInterval: f.Config.TimerProcessorPollBackoffInterval,
 				},
 				MonitorOptions: queues.MonitorOptions{ // TODO
 					CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(10000),
@@ -504,11 +500,9 @@ func (f *visibilityQueueFactory) CreateQueue(
 			executor,
 			&queues.Options{
 				ReaderOptions: queues.ReaderOptions{
-					BatchSize:                            f.Config.VisibilityTaskBatchSize,
-					ShrinkRangeInterval:                  f.Config.VisibilityProcessorUpdateAckInterval,
-					ShrinkRangeIntervalJitterCoefficient: f.Config.VisibilityProcessorUpdateAckIntervalJitterCoefficient,
-					MaxReschdulerSize:                    f.Config.VisibilityProcessorMaxReschedulerSize,
-					PollBackoffInterval:                  f.Config.VisibilityProcessorPollBackoffInterval,
+					BatchSize:           f.Config.VisibilityTaskBatchSize,
+					MaxReschdulerSize:   f.Config.VisibilityProcessorMaxReschedulerSize,
+					PollBackoffInterval: f.Config.VisibilityProcessorPollBackoffInterval,
 				},
 				MonitorOptions: queues.MonitorOptions{ // TODO
 					CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(10000),

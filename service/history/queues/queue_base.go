@@ -212,7 +212,7 @@ func (p *queueBase) Start() {
 
 	p.checkpointTimer = time.NewTimer(backoff.JitDuration(
 		p.options.CheckpointInterval(),
-		p.options.ShrinkRangeIntervalJitterCoefficient(),
+		p.options.CheckpointIntervalJitterCoefficient(),
 	))
 }
 
@@ -278,7 +278,7 @@ func (p *queueBase) checkpoint() {
 			p.checkpointAttempt = 0
 			p.checkpointTimer.Reset(backoff.JitDuration(
 				p.options.CheckpointInterval(),
-				p.options.ShrinkRangeIntervalJitterCoefficient(),
+				p.options.CheckpointIntervalJitterCoefficient(),
 			))
 		} else {
 			p.checkpointAttempt++
@@ -292,6 +292,7 @@ func (p *queueBase) checkpoint() {
 	totalSlices := 0
 
 	for id, reader := range p.readerGroup.readers() {
+		reader.ShrinkSlices()
 		scopes := reader.Scopes()
 		totalSlices += len(scopes)
 		readerScopes[id] = scopes

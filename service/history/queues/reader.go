@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"go.temporal.io/server/common"
-	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
@@ -44,21 +43,21 @@ type (
 		common.Daemon
 
 		Scopes() []Scope
-		// WalkSlices(SliceIterator)
+
+		WalkSlices(SliceIterator)
 		SplitSlices(SliceSplitter)
 		MergeSlices(...Slice)
 		ClearSlices(SliceSelector)
 		CompactSlices(SliceSelector)
+		ShrinkSlices()
 
 		Throttle(time.Duration)
 	}
 
 	ReaderOptions struct {
-		BatchSize                            dynamicconfig.IntPropertyFn
-		ShrinkRangeInterval                  dynamicconfig.DurationPropertyFn
-		ShrinkRangeIntervalJitterCoefficient dynamicconfig.FloatPropertyFn
-		MaxReschdulerSize                    dynamicconfig.IntPropertyFn
-		PollBackoffInterval                  dynamicconfig.DurationPropertyFn
+		BatchSize           dynamicconfig.IntPropertyFn
+		MaxReschdulerSize   dynamicconfig.IntPropertyFn
+		PollBackoffInterval dynamicconfig.DurationPropertyFn
 	}
 
 	SliceIterator func(s Slice)
@@ -178,6 +177,15 @@ func (r *ReaderImpl) Scopes() []Scope {
 	}
 
 	return scopes
+}
+
+func (r *ReaderImpl) WalkSlices(iterator SliceIterator) {
+	r.Lock()
+	defer r.Unlock()
+
+	for element := r.slices.Front(); element != nil; element = element.Next() {
+		iterator(element.Value.(Slice))
+	}
 }
 
 func (r *ReaderImpl) SplitSlices(splitter SliceSplitter) {
@@ -301,24 +309,12 @@ func (r *ReaderImpl) throttleLocked(backoff time.Duration) {
 func (r *ReaderImpl) eventLoop() {
 	defer r.shutdownWG.Done()
 
-	shrinkRangeTimer := time.NewTimer(backoff.JitDuration(
-		r.options.ShrinkRangeInterval(),
-		r.options.ShrinkRangeIntervalJitterCoefficient(),
-	))
-	defer shrinkRangeTimer.Stop()
-
 	for {
 		select {
 		case <-r.shutdownCh:
 			return
 		case <-r.notifyCh:
 			r.loadAndSubmitTasks()
-		case <-shrinkRangeTimer.C:
-			r.shrinkRanges()
-			shrinkRangeTimer.Reset(backoff.JitDuration(
-				r.options.ShrinkRangeInterval(),
-				r.options.ShrinkRangeIntervalJitterCoefficient(),
-			))
 		}
 	}
 }
@@ -364,7 +360,7 @@ func (r *ReaderImpl) loadAndSubmitTasks() {
 	}
 }
 
-func (r *ReaderImpl) shrinkRanges() {
+func (r *ReaderImpl) ShrinkSlices() {
 	r.Lock()
 	defer r.Unlock()
 

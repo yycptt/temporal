@@ -81,11 +81,9 @@ func (s *processorBaseSuite) SetupTest() {
 	s.config = tests.NewDynamicConfig()
 	s.options = &Options{
 		ReaderOptions: ReaderOptions{
-			BatchSize:                            dynamicconfig.GetIntPropertyFn(10),
-			ShrinkRangeInterval:                  dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
-			ShrinkRangeIntervalJitterCoefficient: dynamicconfig.GetFloatPropertyFn(0.15),
-			MaxReschdulerSize:                    dynamicconfig.GetIntPropertyFn(100),
-			PollBackoffInterval:                  dynamicconfig.GetDurationPropertyFn(200 * time.Millisecond),
+			BatchSize:           dynamicconfig.GetIntPropertyFn(10),
+			MaxReschdulerSize:   dynamicconfig.GetIntPropertyFn(100),
+			PollBackoffInterval: dynamicconfig.GetDurationPropertyFn(200 * time.Millisecond),
 		},
 		MonitorOptions: MonitorOptions{
 			CriticalTotalTasks:        dynamicconfig.GetIntPropertyFn(1000),

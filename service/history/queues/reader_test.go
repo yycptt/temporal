@@ -334,7 +334,7 @@ func (s *readerSuite) TestLoadAndSubmitTasks_NoMoreTasks_NoNextSlice() {
 	s.Nil(reader.nextLoadSlice)
 }
 
-func (s *readerSuite) TestShrinkRanges() {
+func (s *readerSuite) TestShrinkSlices() {
 	numScopes := 10
 	scopes := NewRandomScopes(numScopes)
 
@@ -345,7 +345,7 @@ func (s *readerSuite) TestShrinkRanges() {
 	}
 
 	reader := s.newTestReader(scopes, nil)
-	reader.shrinkRanges()
+	reader.ShrinkSlices()
 
 	actualScopes := reader.Scopes()
 	s.Len(actualScopes, numScopes-len(emptyIdx))
@@ -404,11 +404,9 @@ func (s *readerSuite) newTestReader(
 		s.executableInitializer,
 		scopes,
 		&ReaderOptions{
-			BatchSize:                            dynamicconfig.GetIntPropertyFn(10),
-			ShrinkRangeInterval:                  dynamicconfig.GetDurationPropertyFn(100 * time.Millisecond),
-			ShrinkRangeIntervalJitterCoefficient: dynamicconfig.GetFloatPropertyFn(0.15),
-			MaxReschdulerSize:                    dynamicconfig.GetIntPropertyFn(100),
-			PollBackoffInterval:                  dynamicconfig.GetDurationPropertyFn(200 * time.Millisecond),
+			BatchSize:           dynamicconfig.GetIntPropertyFn(10),
+			MaxReschdulerSize:   dynamicconfig.GetIntPropertyFn(100),
+			PollBackoffInterval: dynamicconfig.GetDurationPropertyFn(200 * time.Millisecond),
 		},
 		s.mockScheduler,
 		s.mockRescheduler,
