@@ -83,6 +83,8 @@ func (m *mitigatorImpl) Alert(alert Alert) bool {
 		action = newReaderWatermarkAction(m, alert.AlertReaderWatermarkAttributes)
 	case AlertTypeSliceCount:
 		action = newSliceCountAction(m, alert.AlertSliceCountAttributes)
+	case AlertTypeSliceAckedTasks:
+		action = newSliceAckedTasksAction(m, m.monitor, alert.AlertSliceAckedTasksAttributes)
 	default:
 		m.logger.Error("Unknown queue alert type", tag.Value(alert.AlertType))
 	}

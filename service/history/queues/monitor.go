@@ -44,7 +44,8 @@ type (
 	Monitor interface {
 		GetTotalTasks() int
 		GetTasksPerNamespace() map[namespace.ID]int
-		GetTasksPerSlice(namespace.ID) map[Slice]int
+		GetTasksForNamespace(namespace.ID) map[Slice]int
+		GetTasksPerSlice(slice Slice) map[namespace.ID]int
 		SetTasksPerSlice(Slice, map[namespace.ID]int)
 
 		GetReaderWatermark(readerID int32) tasks.Key
@@ -52,12 +53,16 @@ type (
 
 		GetTotalSlices() int
 		SetTotalSlices(int)
+
+		GetSliceAckedTaskCount(Slice) int
+		SetSlicedAckedTaskCount(Slice, int)
 	}
 
 	MonitorOptions struct {
 		CriticalTotalTasks        dynamicconfig.IntPropertyFn
 		CriticalWatermarkAttempts dynamicconfig.IntPropertyFn
 		CriticalTotalSlices       dynamicconfig.IntPropertyFn
+		CriticalSliceAckedTasks   dynamicconfig.IntPropertyFn
 	}
 
 	monitorImpl struct {
@@ -65,14 +70,14 @@ type (
 
 		mitigator Mitigator
 
-		taskStats
+		pendingTaskStats
 		readerStats
 		sliceStats
 
 		options *MonitorOptions
 	}
 
-	taskStats struct {
+	pendingTaskStats struct {
 		totalTasks int
 
 		// track per namespace stats so that we can know which namespace is offending
@@ -92,7 +97,8 @@ type (
 	}
 
 	sliceStats struct {
-		totalSlices int
+		totalSlices       int
+		ackedTaskPerSlice map[Slice]int
 	}
 )
 
@@ -100,7 +106,7 @@ func newMonitor(
 	options *MonitorOptions,
 ) *monitorImpl {
 	return &monitorImpl{
-		taskStats: taskStats{
+		pendingTaskStats: pendingTaskStats{
 			tasksPerNamespace:         make(map[namespace.ID]int),
 			tasksPerSlicePerNamespace: make(map[Slice]map[namespace.ID]int),
 		},
@@ -128,7 +134,7 @@ func (m *monitorImpl) GetTasksPerNamespace() map[namespace.ID]int {
 	return taskPerNamespace
 }
 
-func (m *monitorImpl) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
+func (m *monitorImpl) GetTasksForNamespace(namespaceID namespace.ID) map[Slice]int {
 	m.Lock()
 	defer m.Unlock()
 
@@ -137,6 +143,18 @@ func (m *monitorImpl) GetTasksPerSlice(namespaceID namespace.ID) map[Slice]int {
 		if pendingTask, ok := tasksPerNamespace[namespaceID]; ok {
 			tasksPerSlice[slice] = pendingTask
 		}
+	}
+
+	return tasksPerSlice
+}
+
+func (m *monitorImpl) GetTasksPerSlice(slice Slice) map[namespace.ID]int {
+	m.Lock()
+	defer m.Unlock()
+
+	tasksPerSlice := make(map[namespace.ID]int, len(m.tasksPerSlicePerNamespace[slice]))
+	for namespaceID, pendingTasks := range m.tasksPerSlicePerNamespace[slice] {
+		tasksPerSlice[namespaceID] = pendingTasks
 	}
 
 	return tasksPerSlice
@@ -175,7 +193,7 @@ func (m *monitorImpl) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[nam
 	}
 
 	if !hasPendingTasks {
-		delete(m.taskStats.tasksPerSlicePerNamespace, slice)
+		delete(m.pendingTaskStats.tasksPerSlicePerNamespace, slice)
 	}
 
 	maxTotalTasks := m.options.CriticalTotalTasks()
@@ -183,8 +201,8 @@ func (m *monitorImpl) SetTasksPerSlice(slice Slice, newTasksPerNamespace map[nam
 		m.mitigator.Alert(Alert{
 			AlertType: AlertTypeQueuePendingTask,
 			AlertQueuePendingTaskAttributes: &AlertQueuePendingTaskAttributes{
-				CurrentPendingTasks: m.totalTasks,
-				MaxPendingTasks:     maxTotalTasks,
+				CurrentPendingTasks:   m.totalTasks,
+				CiriticalPendingTasks: maxTotalTasks,
 			},
 		})
 	}
@@ -253,13 +271,39 @@ func (m *monitorImpl) SetTotalSlices(totalSlices int) {
 
 	m.totalSlices = totalSlices
 
-	maxSliceCount := m.options.CriticalTotalSlices()
-	if totalSlices > maxSliceCount && m.mitigator != nil {
+	criticalSliceCount := m.options.CriticalTotalSlices()
+	if totalSlices > criticalSliceCount && m.mitigator != nil {
 		m.mitigator.Alert(Alert{
 			AlertType: AlertTypeSliceCount,
 			AlertSliceCountAttributes: &AlertSliceCountAttributes{
-				CurrentSliceCount: m.totalSlices,
-				MaxSliceCount:     maxSliceCount,
+				CurrentSliceCount:  m.totalSlices,
+				CriticalSliceCount: criticalSliceCount,
+			},
+		})
+	}
+}
+
+func (m *monitorImpl) GetSliceAckedTaskCount(slice Slice) int {
+	m.Lock()
+	defer m.Unlock()
+
+	return m.sliceStats.ackedTaskPerSlice[slice]
+}
+
+func (m *monitorImpl) SetSlicedAckedTaskCount(slice Slice, ackedTasks int) {
+	m.Lock()
+	defer m.Unlock()
+
+	m.sliceStats.ackedTaskPerSlice[slice] = ackedTasks
+
+	criticalSliceAckedTasks := m.options.CriticalSliceAckedTasks()
+	if ackedTasks > criticalSliceAckedTasks && m.mitigator != nil {
+		m.mitigator.Alert(Alert{
+			AlertType: AlertTypeSliceAckedTasks,
+			AlertSliceAckedTasksAttributes: &AlertSliceAckedTasksAttributes{
+				Slice:              slice,
+				CurrentAckedTasks:  ackedTasks,
+				CriticalAckedTasks: criticalSliceAckedTasks,
 			},
 		})
 	}

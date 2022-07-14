@@ -128,37 +128,37 @@ func (s *readerSuite) TestSplitSlices() {
 	scopes := NewRandomScopes(3)
 	reader := s.newTestReader(scopes, nil)
 
-	splitter := func(s Slice) []Slice {
+	splitter := func(s Slice) ([]Slice, bool) {
 		// split head
 		if scope := s.Scope(); !scope.Equals(scopes[0]) {
-			return []Slice{s}
+			return nil, false
 		}
 
 		// test remove slice
-		return nil
+		return nil, true
 	}
 	reader.SplitSlices(splitter)
 	s.Len(reader.Scopes(), 2)
 	s.validateSlicesOrdered(reader)
 
-	splitter = func(s Slice) []Slice {
+	splitter = func(s Slice) ([]Slice, bool) {
 		// split tail
 		if scope := s.Scope(); !scope.Equals(scopes[2]) {
-			return []Slice{s}
+			return nil, false
 		}
 
 		left, right := s.SplitByRange(NewRandomKeyInRange(s.Scope().Range))
 		_, right = right.SplitByRange(NewRandomKeyInRange(right.Scope().Range))
 
-		return []Slice{left, right}
+		return []Slice{left, right}, true
 	}
 	reader.SplitSlices(splitter)
 	s.Len(reader.Scopes(), 3)
 	s.validateSlicesOrdered(reader)
 
-	splitter = func(s Slice) []Slice {
+	splitter = func(s Slice) ([]Slice, bool) {
 		left, right := s.SplitByRange(NewRandomKeyInRange(s.Scope().Range))
-		return []Slice{left, right}
+		return []Slice{left, right}, true
 	}
 	reader.SplitSlices(splitter)
 	s.Len(reader.Scopes(), 6)

@@ -62,7 +62,7 @@ type (
 
 	SliceIterator func(s Slice)
 
-	SliceSplitter func(s Slice) (remaining []Slice)
+	SliceSplitter func(s Slice) (remaining []Slice, split bool)
 
 	// TODO: use ReadOnlySlice interface ?
 	SliceSelector func(s Slice) bool
@@ -196,7 +196,12 @@ func (r *ReaderImpl) SplitSlices(splitter SliceSplitter) {
 	for element := r.slices.Front(); element != nil; element = next {
 		next = element.Next()
 
-		for _, newSlice := range splitter(element.Value.(Slice)) {
+		newSlices, split := splitter(element.Value.(Slice))
+		if !split {
+			continue
+		}
+
+		for _, newSlice := range newSlices {
 			r.slices.InsertBefore(newSlice, element)
 		}
 

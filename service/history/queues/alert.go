@@ -34,13 +34,14 @@ type (
 		AlertQueuePendingTaskAttributes *AlertQueuePendingTaskAttributes
 		AlertReaderWatermarkAttributes  *AlertReaderWatermarkAttributes
 		AlertSliceCountAttributes       *AlertSliceCountAttributes
+		AlertSliceAckedTasksAttributes  *AlertSliceAckedTasksAttributes
 	}
 
 	AlertType int
 
 	AlertQueuePendingTaskAttributes struct {
-		CurrentPendingTasks int
-		MaxPendingTasks     int
+		CurrentPendingTasks   int
+		CiriticalPendingTasks int
 	}
 
 	AlertReaderWatermarkAttributes struct {
@@ -49,8 +50,14 @@ type (
 	}
 
 	AlertSliceCountAttributes struct {
-		CurrentSliceCount int
-		MaxSliceCount     int
+		CurrentSliceCount  int
+		CriticalSliceCount int
+	}
+
+	AlertSliceAckedTasksAttributes struct {
+		Slice              Slice
+		CurrentAckedTasks  int
+		CriticalAckedTasks int
 	}
 )
 
@@ -59,4 +66,5 @@ const (
 	AlertTypeQueuePendingTask
 	AlertTypeReaderWatermark
 	AlertTypeSliceCount
+	AlertTypeSliceAckedTasks
 )

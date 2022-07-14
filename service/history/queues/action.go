@@ -60,6 +60,13 @@ type (
 
 		attributes *AlertSliceCountAttributes
 	}
+
+	actionSliceAckedTasks struct {
+		mitigator *mitigatorImpl
+		monitor   Monitor
+
+		attributes *AlertSliceAckedTasksAttributes
+	}
 )
 
 func newQueuePendingTaskAction(
@@ -94,13 +101,13 @@ func (a *actionQueuePendingTask) run(readerGroup *readerGroup) {
 	slicesPerNamespace := make(map[namespace.ID][]slicePendingTask) // slices reversely ordered
 
 	currentPendingTasks := a.attributes.CurrentPendingTasks
-	targetPendingTasks := int(float64(a.attributes.MaxPendingTasks) * targetThresholdCoefficient)
+	targetPendingTasks := int(float64(a.attributes.CiriticalPendingTasks) * targetThresholdCoefficient)
 	for currentPendingTasks > targetPendingTasks && !pq.IsEmpty() {
 		namespaceID := pq.Remove()
 
 		namespaceSlices, ok := slicesPerNamespace[namespaceID]
 		if !ok {
-			namespaceSlicesMap := a.monitor.GetTasksPerSlice(namespaceID)
+			namespaceSlicesMap := a.monitor.GetTasksForNamespace(namespaceID)
 			namespaceSlices = make([]slicePendingTask, 0, len(namespaceSlices))
 			for slice, pendingTask := range namespaceSlicesMap {
 				namespaceSlices = append(namespaceSlices, slicePendingTask{
@@ -150,16 +157,16 @@ func (a *actionQueuePendingTask) run(readerGroup *readerGroup) {
 		}
 
 		var splitSlices []Slice
-		reader.SplitSlices(func(s Slice) (remaining []Slice) {
+		reader.SplitSlices(func(s Slice) ([]Slice, bool) {
 			namespaceIDs, ok := slicesToClear[s]
 			if !ok {
-				return []Slice{s}
+				return nil, false
 			}
 
 			split, remain := s.SplitByPredicate(tasks.NewNamespacePredicate(namespaceIDs))
 			split.Clear()
 			splitSlices = append(splitSlices, split)
-			return []Slice{remain}
+			return []Slice{remain}, true
 		})
 
 		if len(splitSlices) == 0 {
@@ -205,11 +212,11 @@ func (a *actionReaderWatermark) run(readerGroup *readerGroup) {
 	)
 
 	var splitSlices []Slice
-	reader.SplitSlices(func(s Slice) []Slice {
+	reader.SplitSlices(func(s Slice) ([]Slice, bool) {
 		r := s.Scope().Range
 		if stuckRange.ContainsRange(r) {
 			splitSlices = append(splitSlices, s)
-			return nil
+			return nil, true
 		}
 
 		remaining := make([]Slice, 0, 2)
@@ -226,7 +233,7 @@ func (a *actionReaderWatermark) run(readerGroup *readerGroup) {
 		}
 
 		splitSlices = append(splitSlices, s)
-		return remaining
+		return remaining, true
 	})
 
 	if len(splitSlices) == 0 {
@@ -260,7 +267,7 @@ type compactCandidate struct {
 func (a *actionSliceCount) run(readerGroup *readerGroup) {
 	defer a.mitigator.resolve(AlertTypeSliceCount)
 
-	targetSliceCount := int(float64(a.attributes.MaxSliceCount) * targetThresholdCoefficient)
+	targetSliceCount := int(float64(a.attributes.CriticalSliceCount) * targetThresholdCoefficient)
 	numSliceToCompact := a.attributes.CurrentSliceCount - targetSliceCount
 	pq := collection.NewPriorityQueue(func(this, that *compactCandidate) bool {
 		return this.distance.CompareTo(this.distance) < 0
@@ -301,5 +308,56 @@ func (a *actionSliceCount) run(readerGroup *readerGroup) {
 			_, ok := sliceToCompact[s]
 			return ok
 		})
+	}
+}
+
+func newSliceAckedTasksAction(
+	mitigator *mitigatorImpl,
+	monitor Monitor,
+	attributes *AlertSliceAckedTasksAttributes,
+) action {
+	return &actionSliceAckedTasks{
+		mitigator:  mitigator,
+		monitor:    monitor,
+		attributes: attributes,
+	}
+}
+
+func (a *actionSliceAckedTasks) run(readerGroup *readerGroup) {
+	defer a.mitigator.resolve(AlertTypeQueuePendingTask)
+
+	// NOTE: this action can not handle stuck task
+
+	var namespaceID namespace.ID
+	maxPendingTasks := 0
+	for currNamespaceID, pendingTasks := range a.monitor.GetTasksPerSlice(a.attributes.Slice) {
+		if pendingTasks > maxPendingTasks {
+			maxPendingTasks = pendingTasks
+			namespaceID = currNamespaceID
+		}
+	}
+
+	for readerID, reader := range readerGroup.readers() {
+		var splitSlice Slice
+		reader.SplitSlices(func(s Slice) ([]Slice, bool) {
+			if s != a.attributes.Slice {
+				return nil, false
+			}
+
+			var remainSlice Slice
+			splitSlice, remainSlice = s.SplitByPredicate(tasks.NewNamespacePredicate([]string{namespaceID.String()}))
+			return []Slice{remainSlice}, true
+		})
+
+		if splitSlice == nil {
+			continue
+		}
+
+		nextReader, ok := readerGroup.readerByID(readerID + 1)
+		if ok {
+			nextReader.MergeSlices(splitSlice)
+		} else {
+			readerGroup.newReaderWithSlices(readerID+1, splitSlice)
+		}
 	}
 }
