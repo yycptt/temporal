@@ -162,11 +162,11 @@ func newVisibilityQueueProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				visibilityTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				shard.GetConfig().VisibilityTaskMaxRetryCount,
 				queues.QueueTypeVisibility,

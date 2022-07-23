@@ -43,7 +43,8 @@ type (
 	}
 
 	PriorityAssignerOptions struct {
-		HighPriorityRPS       dynamicconfig.IntPropertyFnWithNamespaceFilter
+		HighPriorityHostRPS   dynamicconfig.IntPropertyFnWithNamespaceFilter
+		HighPriorityShardRPS  dynamicconfig.IntPropertyFnWithNamespaceFilter
 		CriticalRetryAttempts dynamicconfig.IntPropertyFn
 	}
 
@@ -54,7 +55,8 @@ type (
 		options            PriorityAssignerOptions
 
 		sync.RWMutex
-		rateLimiters map[string]quotas.RateLimiter
+		namespaceHostRateLimiter  map[string]quotas.RateLimiter
+		namespaceShardRateLimiter map[string]map[int32]quotas.RateLimiter
 	}
 )
 
@@ -65,11 +67,12 @@ func NewPriorityAssigner(
 	metricsProvider metrics.MetricsHandler,
 ) PriorityAssigner {
 	return &priorityAssignerImpl{
-		currentClusterName: currentClusterName,
-		namespaceRegistry:  namespaceRegistry,
-		metricsProvider:    metricsProvider.WithTags(metrics.OperationTag(OperationTaskPriorityAssigner)),
-		options:            options,
-		rateLimiters:       make(map[string]quotas.RateLimiter),
+		currentClusterName:        currentClusterName,
+		namespaceRegistry:         namespaceRegistry,
+		metricsProvider:           metricsProvider.WithTags(metrics.OperationTag(OperationTaskPriorityAssigner)),
+		options:                   options,
+		namespaceHostRateLimiter:  make(map[string]quotas.RateLimiter),
+		namespaceShardRateLimiter: make(map[string]map[int32]quotas.RateLimiter),
 	}
 }
 
@@ -139,7 +142,7 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 		return nil
 	}
 
-	ratelimiter := a.getOrCreateRateLimiter(executable.GetNamespaceID())
+	ratelimiter := a.getOrCreateRateLimiter(namespaceName, executable.GetShardID())
 	if !ratelimiter.Allow() {
 		executable.SetPriority(tasks.PriorityMedium)
 
@@ -158,25 +161,64 @@ func (a *priorityAssignerImpl) Assign(executable Executable) error {
 
 func (a *priorityAssignerImpl) getOrCreateRateLimiter(
 	namespaceName string,
+	shardID int32,
 ) quotas.RateLimiter {
 	a.RLock()
-	rateLimiter, ok := a.rateLimiters[namespaceName]
+	shardRateLimiter, ok := a.namespaceShardRateLimiter[namespaceName][shardID]
 	a.RUnlock()
 	if ok {
-		return rateLimiter
+		return shardRateLimiter
 	}
 
-	newRateLimiter := quotas.NewDefaultIncomingRateLimiter(
-		func() float64 { return float64(a.options.HighPriorityRPS(namespaceName)) },
+	newShardRateLimiter := quotas.NewMultiRateLimiter(
+		[]quotas.RateLimiter{
+			quotas.NewRateLimiter(
+				float64(a.options.HighPriorityShardRPS(namespaceName)),
+				a.options.HighPriorityShardRPS(namespaceName),
+			),
+			a.getOrCreateNamespaceHostRateLimiter(namespaceName),
+		},
 	)
 
 	a.Lock()
 	defer a.Unlock()
 
-	rateLimiter, ok = a.rateLimiters[namespaceName]
+	shardRateLimiter, ok = a.namespaceShardRateLimiter[namespaceName][shardID]
 	if ok {
-		return rateLimiter
+		return shardRateLimiter
 	}
-	a.rateLimiters[namespaceName] = newRateLimiter
-	return newRateLimiter
+
+	shardRateLimiters, ok := a.namespaceShardRateLimiter[namespaceName]
+	if !ok {
+		shardRateLimiters = make(map[int32]quotas.RateLimiter)
+		a.namespaceShardRateLimiter[namespaceName] = shardRateLimiters
+	}
+	shardRateLimiters[shardID] = newShardRateLimiter
+	return newShardRateLimiter
+}
+
+func (a *priorityAssignerImpl) getOrCreateNamespaceHostRateLimiter(
+	namespaceName string,
+) quotas.RateLimiter {
+	a.RLock()
+	hostRateLimiter, ok := a.namespaceHostRateLimiter[namespaceName]
+	a.RUnlock()
+	if ok {
+		return hostRateLimiter
+	}
+
+	newHostRateLimiter := quotas.NewDefaultIncomingRateLimiter(
+		func() float64 { return float64(a.options.HighPriorityHostRPS(namespaceName)) },
+	)
+
+	a.Lock()
+	defer a.Unlock()
+
+	hostRateLimiter, ok = a.namespaceHostRateLimiter[namespaceName]
+	if ok {
+		return hostRateLimiter
+	}
+
+	a.namespaceHostRateLimiter[namespaceName] = newHostRateLimiter
+	return newHostRateLimiter
 }

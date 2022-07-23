@@ -171,11 +171,11 @@ func newTimerQueueActiveProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				timerTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				config.TimerTaskMaxRetryCount,
 				queueType,
@@ -287,11 +287,11 @@ func newTimerQueueFailoverProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				timerTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				shard.GetConfig().TimerTaskMaxRetryCount,
 				queues.QueueTypeActiveTimer,

@@ -25,6 +25,7 @@
 package queues
 
 import (
+	"math/rand"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
@@ -67,7 +68,8 @@ func (s *priorityAssignerSuite) SetupTest() {
 		cluster.TestCurrentClusterName,
 		s.mockNamespaceRegistry,
 		PriorityAssignerOptions{
-			HighPriorityRPS:       dynamicconfig.GetIntPropertyFilteredByNamespace(3),
+			HighPriorityHostRPS:   dynamicconfig.GetIntPropertyFilteredByNamespace(20),
+			HighPriorityShardRPS:  dynamicconfig.GetIntPropertyFilteredByNamespace(5),
 			CriticalRetryAttempts: dynamicconfig.GetIntPropertyFn(100),
 		},
 		metrics.NoopMetricsHandler,
@@ -128,27 +130,71 @@ func (s *priorityAssignerSuite) TestAssign_SelectedTaskTypes() {
 	s.NoError(err)
 }
 
-func (s *priorityAssignerSuite) TestAssign_Throttled() {
+func (s *priorityAssignerSuite) TestAssign_ThrottledByHostRPS() {
 	s.mockNamespaceRegistry.EXPECT().GetNamespaceByID(tests.NamespaceID).Return(tests.GlobalNamespaceEntry, nil).AnyTimes()
 
-	rps := s.priorityAssigner.options.HighPriorityRPS("")
-	mockExecutable := NewMockExecutable(s.controller)
-	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
-	mockExecutable.EXPECT().GetNamespaceID().Return(tests.NamespaceID.String()).AnyTimes()
-	mockExecutable.EXPECT().GetType().Return(enumsspb.TASK_TYPE_UNSPECIFIED).AnyTimes()
-	mockExecutable.EXPECT().QueueType().Return(QueueTypeActiveTransfer).AnyTimes()
+	hostRPS := s.priorityAssigner.options.HighPriorityHostRPS(tests.Namespace.String())
+	shardRPS := s.priorityAssigner.options.HighPriorityShardRPS(tests.Namespace.String())
+	s.True(shardRPS*2 < hostRPS)
 
-	mockExecutable.EXPECT().SetPriority(tasks.PriorityHigh).Times(1)
-	err := s.priorityAssigner.Assign(mockExecutable)
-	s.NoError(err)
+	namespaceID := tests.NamespaceID.String()
+	for i := 0; i != shardRPS*2; i++ {
+		mockExecutable := s.newMockExecutable(namespaceID, rand.Int31())
+		mockExecutable.EXPECT().SetPriority(tasks.PriorityHigh).Times(1)
+		err := s.priorityAssigner.Assign(mockExecutable)
+		s.NoError(err)
+	}
 
-	for i := 0; i != rps*3; i++ {
+	for i := 0; i != hostRPS*2; i++ {
+		mockExecutable := s.newMockExecutable(namespaceID, rand.Int31())
 		mockExecutable.EXPECT().SetPriority(gomock.Any()).Times(1)
 		err := s.priorityAssigner.Assign(mockExecutable)
 		s.NoError(err)
 	}
 
+	mockExecutable := s.newMockExecutable(namespaceID, rand.Int31())
 	mockExecutable.EXPECT().SetPriority(tasks.PriorityMedium).Times(1)
+	err := s.priorityAssigner.Assign(mockExecutable)
+	s.NoError(err)
+}
+
+func (s *priorityAssignerSuite) TestAssign_ThrottledByShardRPS() {
+	s.mockNamespaceRegistry.EXPECT().GetNamespaceByID(tests.NamespaceID).Return(tests.GlobalNamespaceEntry, nil).AnyTimes()
+
+	hostRPS := s.priorityAssigner.options.HighPriorityHostRPS(tests.Namespace.String())
+	shardRPS := s.priorityAssigner.options.HighPriorityShardRPS(tests.Namespace.String())
+	s.True(shardRPS*2+2 < hostRPS)
+
+	namespaceID := tests.NamespaceID.String()
+	shardID := rand.Int31()
+	for i := 0; i != shardRPS*2; i++ {
+		mockExecutable := s.newMockExecutable(namespaceID, shardID)
+		mockExecutable.EXPECT().SetPriority(gomock.Any()).Times(1)
+		err := s.priorityAssigner.Assign(mockExecutable)
+		s.NoError(err)
+	}
+
+	mockExecutable := s.newMockExecutable(namespaceID, shardID)
+	mockExecutable.EXPECT().SetPriority(tasks.PriorityMedium).Times(1)
+	err := s.priorityAssigner.Assign(mockExecutable)
+	s.NoError(err)
+
+	mockExecutable = s.newMockExecutable(namespaceID, shardID+1)
+	mockExecutable.EXPECT().SetPriority(tasks.PriorityHigh).Times(1)
 	err = s.priorityAssigner.Assign(mockExecutable)
 	s.NoError(err)
+}
+
+func (s *priorityAssignerSuite) newMockExecutable(
+	namespaceID string,
+	shardID int32,
+) *MockExecutable {
+	mockExecutable := NewMockExecutable(s.controller)
+	mockExecutable.EXPECT().Attempt().Return(10).AnyTimes()
+	mockExecutable.EXPECT().GetShardID().Return(shardID).AnyTimes()
+	mockExecutable.EXPECT().GetNamespaceID().Return(namespaceID).AnyTimes()
+	mockExecutable.EXPECT().GetType().Return(enumsspb.TASK_TYPE_UNSPECIFIED).AnyTimes()
+	mockExecutable.EXPECT().QueueType().Return(QueueTypeActiveTransfer).AnyTimes()
+
+	return mockExecutable
 }

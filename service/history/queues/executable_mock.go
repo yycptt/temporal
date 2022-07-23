@@ -187,6 +187,20 @@ func (mr *MockExecutableMockRecorder) GetRunID() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRunID", reflect.TypeOf((*MockExecutable)(nil).GetRunID))
 }
 
+// GetShardID mocks base method.
+func (m *MockExecutable) GetShardID() int32 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShardID")
+	ret0, _ := ret[0].(int32)
+	return ret0
+}
+
+// GetShardID indicates an expected call of GetShardID.
+func (mr *MockExecutableMockRecorder) GetShardID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShardID", reflect.TypeOf((*MockExecutable)(nil).GetShardID))
+}
+
 // GetTask mocks base method.
 func (m *MockExecutable) GetTask() tasks0.Task {
 	m.ctrl.T.Helper()

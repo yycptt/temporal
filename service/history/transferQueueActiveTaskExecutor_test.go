@@ -2483,5 +2483,5 @@ func (s *transferQueueActiveTaskExecutorSuite) createPersistenceMutableState(
 func (s *transferQueueActiveTaskExecutorSuite) newTaskExecutable(
 	task tasks.Task,
 ) queues.Executable {
-	return queues.NewExecutable(task, nil, s.transferQueueActiveTaskExecutor, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeActiveTransfer, nil)
+	return queues.NewExecutable(task, s.mockShard, nil, s.transferQueueActiveTaskExecutor, nil, nil, nil, nil, queues.QueueTypeActiveTransfer, nil)
 }

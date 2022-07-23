@@ -36,13 +36,16 @@ import (
 
 	"go.temporal.io/api/serviceerror"
 
+	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
+	"go.temporal.io/server/common/persistence"
 	ctasks "go.temporal.io/server/common/tasks"
 	"go.temporal.io/server/service/history/consts"
+	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/tests"
 )
@@ -55,6 +58,7 @@ type (
 		*require.Assertions
 
 		controller      *gomock.Controller
+		mockShard       *shard.ContextTest
 		mockExecutor    *MockExecutor
 		mockScheduler   *MockScheduler
 		mockRescheduler *MockRescheduler
@@ -71,12 +75,23 @@ func TestExecutableSuite(t *testing.T) {
 func (s *executableSuite) SetupTest() {
 	s.Assertions = require.New(s.T())
 
+	s.timeSource = clock.NewEventTimeSource()
+
 	s.controller = gomock.NewController(s.T())
+	s.mockShard = shard.NewTestContextWithTimeSource(
+		s.controller,
+		&persistence.ShardInfoWithFailover{
+			ShardInfo: &persistencespb.ShardInfo{
+				ShardId: 1,
+				RangeId: 1,
+			},
+		},
+		tests.NewDynamicConfig(),
+		s.timeSource,
+	)
 	s.mockExecutor = NewMockExecutor(s.controller)
 	s.mockScheduler = NewMockScheduler(s.controller)
 	s.mockRescheduler = NewMockRescheduler(s.controller)
-
-	s.timeSource = clock.NewEventTimeSource()
 }
 
 func (s *executableSuite) TearDownSuite() {
@@ -234,11 +249,11 @@ func (s *executableSuite) newTestExecutable(
 			tasks.CategoryTransfer,
 			s.timeSource.Now(),
 		),
+		s.mockShard,
 		filter,
 		s.mockExecutor,
 		s.mockScheduler,
 		s.mockRescheduler,
-		s.timeSource,
 		log.NewTestLogger(),
 		dynamicconfig.GetIntPropertyFn(100),
 		QueueTypeActiveTransfer,

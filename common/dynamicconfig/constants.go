@@ -315,8 +315,10 @@ const (
 	// StandbyTaskMissingEventsDiscardDelay is the amount of time standby cluster's will wait (if events are missing)
 	// before discarding the task
 	StandbyTaskMissingEventsDiscardDelay = "history.standbyTaskMissingEventsDiscardDelay"
-	// TimerTaskHighPriorityRPS is the per namespace rps limit for processing timer tasks as high priority
-	TimerTaskHighPriorityRPS = "history.timerTaskHighPriorityRPS"
+	// TimerTaskHighPriorityHostRPS is the per namespace host rps limit for processing timer tasks as high priority
+	TimerTaskHighPriorityHostRPS = "history.timerTaskHighPriorityHostRPS"
+	// TimerTaskHighPriorityShardRPS is the per namespace shard rps limit for processing timer tasks as high priority
+	TimerTaskHighPriorityShardRPS = "history.timerTaskHighPriorityShardRPS"
 	// TimerTaskBatchSize is batch size for timer processor to process tasks
 	TimerTaskBatchSize = "history.timerTaskBatchSize"
 	// TimerTaskWorkerCount is number of task workers for timer processor
@@ -362,8 +364,10 @@ const (
 	TimerProcessorHistoryArchivalSizeLimit = "history.timerProcessorHistoryArchivalSizeLimit"
 	// TimerProcessorArchivalTimeLimit is the upper time limit for inline history archival
 	TimerProcessorArchivalTimeLimit = "history.timerProcessorArchivalTimeLimit"
-	// TransferTaskHighPriorityRPS is the per namespace rps limit for processing timer tasks as high priority
-	TransferTaskHighPriorityRPS = "history.transferTaskHighPriorityRPS"
+	// TransferTaskHighPriorityHostRPS is the per namespace rps limit for processing transfer tasks as high priority
+	TransferTaskHighPriorityHostRPS = "history.transferTaskHighPriorityHostRPS"
+	// TransferTaskHighPriorityShardRPS is the per namespace shard rps limit for processing transfer tasks as high priority
+	TransferTaskHighPriorityShardRPS = "history.transferTaskHighPriorityShardRPS"
 	// TransferTaskBatchSize is batch size for transferQueueProcessor
 	TransferTaskBatchSize = "history.transferTaskBatchSize"
 	// TransferProcessorFailoverMaxPollRPS is max poll rate per second for transferQueueProcessor
@@ -408,8 +412,10 @@ const (
 	// TransferProcessorVisibilityArchivalTimeLimit is the upper time limit for archiving visibility records
 	TransferProcessorVisibilityArchivalTimeLimit = "history.transferProcessorVisibilityArchivalTimeLimit"
 
-	// VisibilityTaskHighPriorityRPS is the per namespace rps limit for processing timer tasks as high priority
-	VisibilityTaskHighPriorityRPS = "history.visibilityTaskHighPriorityRPS"
+	// VisibilityTaskHighPriorityHostRPS is the per namespace rps limit for processing visibility tasks as high priority
+	VisibilityTaskHighPriorityHostRPS = "history.visibilityTaskHighPriorityHostRPS"
+	// VisibilityTaskHighPriorityShardRPS is the per namespace shard rps limit for processing visibility tasks as high priority
+	VisibilityTaskHighPriorityShardRPS = "history.visibilityTaskHighPriorityShardRPS"
 	// VisibilityTaskBatchSize is batch size for visibilityQueueProcessor
 	VisibilityTaskBatchSize = "history.visibilityTaskBatchSize"
 	// VisibilityProcessorFailoverMaxPollRPS is max poll rate per second for visibilityQueueProcessor

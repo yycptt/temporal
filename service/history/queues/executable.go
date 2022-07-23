@@ -55,6 +55,7 @@ type (
 		Attempt() int
 		Logger() log.Logger
 		GetTask() tasks.Task
+		GetShardID() int32
 
 		QueueType() QueueType
 	}
@@ -95,6 +96,7 @@ type (
 		lowestPriority ctasks.Priority // priority for emitting metrics across multiple attempts
 		attempt        int
 
+		shard       shard.Context
 		executor    Executor
 		scheduler   Scheduler
 		rescheduler Rescheduler
@@ -114,11 +116,11 @@ type (
 
 func NewExecutable(
 	task tasks.Task,
+	shard shard.Context,
 	filter TaskFilter,
 	executor Executor,
 	scheduler Scheduler,
 	rescheduler Rescheduler,
-	timeSource clock.TimeSource,
 	logger log.Logger,
 	criticalRetryAttempt dynamicconfig.IntPropertyFn,
 	queueType QueueType,
@@ -128,11 +130,12 @@ func NewExecutable(
 		Task:        task,
 		state:       ctasks.TaskStatePending,
 		attempt:     1,
+		shard:       shard,
 		executor:    executor,
 		scheduler:   scheduler,
 		rescheduler: rescheduler,
-		timeSource:  timeSource,
-		loadTime:    util.MaxTime(timeSource.Now(), task.GetKey().FireTime),
+		timeSource:  shard.GetTimeSource(),
+		loadTime:    util.MaxTime(shard.GetTimeSource().Now(), task.GetKey().FireTime),
 		logger: log.NewLazyLogger(
 			logger,
 			func() []tag.Tag {
@@ -360,6 +363,10 @@ func (e *executableImpl) Logger() log.Logger {
 
 func (e *executableImpl) GetTask() tasks.Task {
 	return e.Task
+}
+
+func (e *executableImpl) GetShardID() int32 {
+	return e.shard.GetShardID()
 }
 
 func (e *executableImpl) QueueType() QueueType {

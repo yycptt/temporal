@@ -163,11 +163,11 @@ func newTransferQueueStandbyProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				transferTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				shard.GetConfig().TransferTaskMaxRetryCount,
 				queues.QueueTypeStandbyTransfer,

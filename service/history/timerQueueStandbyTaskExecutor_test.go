@@ -1534,5 +1534,5 @@ func (s *timerQueueStandbyTaskExecutorSuite) createPersistenceMutableState(
 func (s *timerQueueStandbyTaskExecutorSuite) newTaskExecutable(
 	task tasks.Task,
 ) queues.Executable {
-	return queues.NewExecutable(task, nil, s.timerQueueStandbyTaskExecutor, nil, nil, s.mockShard.GetTimeSource(), nil, nil, queues.QueueTypeStandbyTimer, nil)
+	return queues.NewExecutable(task, s.mockShard, nil, s.timerQueueStandbyTaskExecutor, nil, nil, nil, nil, queues.QueueTypeStandbyTimer, nil)
 }

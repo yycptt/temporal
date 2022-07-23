@@ -81,7 +81,8 @@ type Config struct {
 	StandbyTaskMissingEventsDiscardDelay dynamicconfig.DurationPropertyFn
 
 	// TimerQueueProcessor settings
-	TimerTaskHighPriorityRPS                         dynamicconfig.IntPropertyFnWithNamespaceFilter
+	TimerTaskHighPriorityHostRPS                     dynamicconfig.IntPropertyFnWithNamespaceFilter
+	TimerTaskHighPriorityShardRPS                    dynamicconfig.IntPropertyFnWithNamespaceFilter
 	TimerTaskBatchSize                               dynamicconfig.IntPropertyFn
 	TimerTaskWorkerCount                             dynamicconfig.IntPropertyFn
 	TimerTaskMaxRetryCount                           dynamicconfig.IntPropertyFn
@@ -106,7 +107,8 @@ type Config struct {
 	TimerProcessorArchivalTimeLimit                  dynamicconfig.DurationPropertyFn
 
 	// TransferQueueProcessor settings
-	TransferTaskHighPriorityRPS                         dynamicconfig.IntPropertyFnWithNamespaceFilter
+	TransferTaskHighPriorityHostRPS                     dynamicconfig.IntPropertyFnWithNamespaceFilter
+	TransferTaskHighPriorityShardRPS                    dynamicconfig.IntPropertyFnWithNamespaceFilter
 	TransferTaskBatchSize                               dynamicconfig.IntPropertyFn
 	TransferTaskWorkerCount                             dynamicconfig.IntPropertyFn
 	TransferTaskMaxRetryCount                           dynamicconfig.IntPropertyFn
@@ -230,7 +232,8 @@ type Config struct {
 
 	// ===== Visibility related =====
 	// VisibilityQueueProcessor settings
-	VisibilityTaskHighPriorityRPS                         dynamicconfig.IntPropertyFnWithNamespaceFilter
+	VisibilityTaskHighPriorityHostRPS                     dynamicconfig.IntPropertyFnWithNamespaceFilter
+	VisibilityTaskHighPriorityShardRPS                    dynamicconfig.IntPropertyFnWithNamespaceFilter
 	VisibilityTaskBatchSize                               dynamicconfig.IntPropertyFn
 	VisibilityTaskWorkerCount                             dynamicconfig.IntPropertyFn
 	VisibilityTaskMaxRetryCount                           dynamicconfig.IntPropertyFn
@@ -305,7 +308,8 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		StandbyTaskMissingEventsResendDelay:  dc.GetDurationProperty(dynamicconfig.StandbyTaskMissingEventsResendDelay, 10*time.Minute),
 		StandbyTaskMissingEventsDiscardDelay: dc.GetDurationProperty(dynamicconfig.StandbyTaskMissingEventsDiscardDelay, 15*time.Minute),
 
-		TimerTaskHighPriorityRPS:                         dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TimerTaskHighPriorityRPS, 500),
+		TimerTaskHighPriorityHostRPS:                     dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TimerTaskHighPriorityHostRPS, 500),
+		TimerTaskHighPriorityShardRPS:                    dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TimerTaskHighPriorityShardRPS, 50),
 		TimerTaskBatchSize:                               dc.GetIntProperty(dynamicconfig.TimerTaskBatchSize, 100),
 		TimerTaskWorkerCount:                             dc.GetIntProperty(dynamicconfig.TimerTaskWorkerCount, 10),
 		TimerTaskMaxRetryCount:                           dc.GetIntProperty(dynamicconfig.TimerTaskMaxRetryCount, 20),
@@ -329,7 +333,8 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		TimerProcessorHistoryArchivalSizeLimit:           dc.GetIntProperty(dynamicconfig.TimerProcessorHistoryArchivalSizeLimit, 500*1024),
 		TimerProcessorArchivalTimeLimit:                  dc.GetDurationProperty(dynamicconfig.TimerProcessorArchivalTimeLimit, 1*time.Second),
 
-		TransferTaskHighPriorityRPS:                         dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TransferTaskHighPriorityRPS, 500),
+		TransferTaskHighPriorityHostRPS:                     dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TransferTaskHighPriorityHostRPS, 500),
+		TransferTaskHighPriorityShardRPS:                    dc.GetIntPropertyFilteredByNamespace(dynamicconfig.TransferTaskHighPriorityShardRPS, 50),
 		TransferTaskBatchSize:                               dc.GetIntProperty(dynamicconfig.TransferTaskBatchSize, 100),
 		TransferTaskWorkerCount:                             dc.GetIntProperty(dynamicconfig.TransferTaskWorkerCount, 10),
 		TransferTaskMaxRetryCount:                           dc.GetIntProperty(dynamicconfig.TransferTaskMaxRetryCount, 20),
@@ -425,7 +430,8 @@ func NewConfig(dc *dynamicconfig.Collection, numberOfShards int32, isAdvancedVis
 		SkipReapplicationByNamespaceID: dc.GetBoolPropertyFnWithNamespaceIDFilter(dynamicconfig.SkipReapplicationByNamespaceID, false),
 
 		// ===== Visibility related =====
-		VisibilityTaskHighPriorityRPS:                         dc.GetIntPropertyFilteredByNamespace(dynamicconfig.VisibilityTaskHighPriorityRPS, 500),
+		VisibilityTaskHighPriorityHostRPS:                     dc.GetIntPropertyFilteredByNamespace(dynamicconfig.VisibilityTaskHighPriorityHostRPS, 500),
+		VisibilityTaskHighPriorityShardRPS:                    dc.GetIntPropertyFilteredByNamespace(dynamicconfig.VisibilityTaskHighPriorityShardRPS, 50),
 		VisibilityTaskBatchSize:                               dc.GetIntProperty(dynamicconfig.VisibilityTaskBatchSize, 100),
 		VisibilityProcessorFailoverMaxPollRPS:                 dc.GetIntProperty(dynamicconfig.VisibilityProcessorFailoverMaxPollRPS, 1),
 		VisibilityProcessorMaxPollRPS:                         dc.GetIntProperty(dynamicconfig.VisibilityProcessorMaxPollRPS, 20),

@@ -168,7 +168,8 @@ func NewTransferQueueFactory(
 				params.ClusterMetadata.GetCurrentClusterName(),
 				params.NamespaceRegistry,
 				queues.PriorityAssignerOptions{
-					HighPriorityRPS:       params.Config.TransferTaskHighPriorityRPS,
+					HighPriorityHostRPS:   params.Config.TransferTaskHighPriorityHostRPS,
+					HighPriorityShardRPS:  params.Config.TransferTaskHighPriorityShardRPS,
 					CriticalRetryAttempts: params.Config.TransferTaskMaxRetryCount,
 				},
 				params.MetricsHandler,
@@ -227,7 +228,8 @@ func NewTimerQueueFactory(
 				params.ClusterMetadata.GetCurrentClusterName(),
 				params.NamespaceRegistry,
 				queues.PriorityAssignerOptions{
-					HighPriorityRPS:       params.Config.TimerTaskHighPriorityRPS,
+					HighPriorityHostRPS:   params.Config.TimerTaskHighPriorityHostRPS,
+					HighPriorityShardRPS:  params.Config.TimerTaskHighPriorityShardRPS,
 					CriticalRetryAttempts: params.Config.TimerTaskMaxRetryCount,
 				},
 				params.MetricsHandler,
@@ -284,7 +286,8 @@ func NewVisibilityQueueFactory(
 				params.ClusterMetadata.GetCurrentClusterName(),
 				params.NamespaceRegistry,
 				queues.PriorityAssignerOptions{
-					HighPriorityRPS:       params.Config.VisibilityTaskHighPriorityRPS,
+					HighPriorityHostRPS:   params.Config.VisibilityTaskHighPriorityHostRPS,
+					HighPriorityShardRPS:  params.Config.VisibilityTaskHighPriorityShardRPS,
 					CriticalRetryAttempts: params.Config.VisibilityTaskMaxRetryCount,
 				},
 				params.MetricsHandler,

@@ -196,11 +196,11 @@ func newTransferQueueActiveProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				transferTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				config.TransferTaskMaxRetryCount,
 				queueType,
@@ -332,11 +332,11 @@ func newTransferQueueFailoverProcessor(
 		func(t tasks.Task) queues.Executable {
 			return queues.NewExecutable(
 				t,
+				shard,
 				transferTaskFilter,
 				taskExecutor,
 				scheduler,
 				rescheduler,
-				shard.GetTimeSource(),
 				logger,
 				shard.GetConfig().TransferTaskMaxRetryCount,
 				queues.QueueTypeActiveTransfer,
