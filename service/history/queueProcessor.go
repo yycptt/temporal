@@ -283,11 +283,10 @@ func (p *queueProcessorBase) throttle(duration time.Duration) {
 
 	if p.backoffTimer == nil {
 		p.backoffTimer = time.AfterFunc(duration, func() {
-			p.notifyNewTask() // re-enqueue the event
-
 			p.backoffTimerLock.Lock()
 			defer p.backoffTimerLock.Unlock()
 
+			p.notifyNewTask() // re-enqueue the event
 			p.backoffTimer = nil
 		})
 	}
