@@ -71,8 +71,9 @@ type (
 		scheduler    queues.Scheduler
 		rescheduler  queues.Rescheduler
 
-		lastPollTime time.Time
-		backoffTimer *time.Timer
+		lastPollTime     time.Time
+		backoffTimerLock sync.Mutex
+		backoffTimer     *time.Timer
 
 		notifyCh   chan struct{}
 		status     int32
@@ -269,11 +270,7 @@ func (p *queueProcessorBase) verifyReschedulerSize() bool {
 	}
 
 	passed := p.rescheduler.Len() < maxLength
-	if passed && p.backoffTimer != nil {
-		p.backoffTimer.Stop()
-		p.backoffTimer = nil
-	}
-	if !passed && p.backoffTimer == nil {
+	if !passed {
 		p.throttle(p.options.PollBackoffInterval())
 	}
 
@@ -281,9 +278,17 @@ func (p *queueProcessorBase) verifyReschedulerSize() bool {
 }
 
 func (p *queueProcessorBase) throttle(duration time.Duration) {
+	p.backoffTimerLock.Lock()
+	defer p.backoffTimerLock.Unlock()
+
 	if p.backoffTimer == nil {
 		p.backoffTimer = time.AfterFunc(duration, func() {
 			p.notifyNewTask() // re-enqueue the event
+
+			p.backoffTimerLock.Lock()
+			defer p.backoffTimerLock.Unlock()
+
+			p.backoffTimer = nil
 		})
 	}
 }
