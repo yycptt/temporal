@@ -98,6 +98,17 @@ func NewScheduledQueue(
 			// during processing. To compensate for that, add 1ms back when scheduling the task in reader.go.
 			for _, task := range resp.Tasks {
 				task.SetVisibilityTime(task.GetVisibilityTime().Truncate(scheduledTaskPrecision))
+				if retryTimerTask, ok := task.(*tasks.ActivityRetryTimerTask); ok {
+					logger.Info("Loaded activity retry timer",
+						tag.WorkflowNamespaceID(task.GetNamespaceID()),
+						tag.WorkflowID(task.GetWorkflowID()),
+						tag.WorkflowRunID(task.GetRunID()),
+						tag.WorkflowScheduledEventID(retryTimerTask.EventID),
+						tag.Attempt(retryTimerTask.Attempt),
+						tag.TaskVisibilityTimestamp(task.GetVisibilityTime()),
+						tag.TaskID(task.GetTaskID()),
+					)
+				}
 			}
 
 			for len(resp.Tasks) > 0 && !r.ContainsKey(resp.Tasks[0].GetKey()) {

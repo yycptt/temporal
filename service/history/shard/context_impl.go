@@ -1343,6 +1343,31 @@ func (s *ContextImpl) allocateTaskIDsLocked(
 				visibilityTs := task.GetVisibilityTime()
 				s.contextTaggedLogger.Debug("Assigning new timer",
 					tag.Timestamp(visibilityTs), tag.TaskID(task.GetTaskID()), tag.MaxQueryLevel(readCursorTS))
+				if retryTimerTask, ok := task.(*tasks.ActivityRetryTimerTask); ok {
+					s.contextTaggedLogger.Info("Generating activity retry timer",
+						tag.WorkflowNamespaceID(namespaceEntry.ID().String()),
+						tag.WorkflowID(workflowID),
+						tag.WorkflowRunID(task.GetRunID()),
+						tag.WorkflowScheduledEventID(retryTimerTask.EventID),
+						tag.Attempt(retryTimerTask.Attempt),
+						tag.Timestamp(visibilityTs),
+						tag.TaskID(task.GetTaskID()),
+						tag.CursorTimestamp(readCursorTS),
+					)
+				}
+				if workflowTaskTimeoutTask, ok := task.(*tasks.WorkflowTaskTimeoutTask); ok &&
+					workflowTaskTimeoutTask.TimeoutType == enums.TIMEOUT_TYPE_SCHEDULE_TO_START {
+					s.contextTaggedLogger.Info("Generating workflow task timeout timer",
+						tag.WorkflowNamespaceID(namespaceEntry.ID().String()),
+						tag.WorkflowID(workflowID),
+						tag.WorkflowRunID(task.GetRunID()),
+						tag.WorkflowScheduledEventID(workflowTaskTimeoutTask.EventID),
+						tag.Attempt(workflowTaskTimeoutTask.ScheduleAttempt),
+						tag.Timestamp(visibilityTs),
+						tag.TaskID(task.GetTaskID()),
+						tag.CursorTimestamp(readCursorTS),
+					)
+				}
 			}
 		}
 	}

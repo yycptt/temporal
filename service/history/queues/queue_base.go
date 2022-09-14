@@ -310,6 +310,9 @@ func (p *queueBase) processNewRange() {
 		p.monitor,
 		newReadScope,
 	)
+	if p.category.ID() == tasks.CategoryIDTimer {
+		p.logger.Info("Merging new slice with range", tag.Value(newSlice.Scope()))
+	}
 
 	reader, ok := p.readerGroup.ReaderByID(DefaultReaderId)
 	if !ok {
@@ -381,6 +384,10 @@ func (p *queueBase) rangeCompleteTasks(
 	if p.category.Type() == tasks.CategoryTypeScheduled {
 		oldExclusiveDeletionHighWatermark.TaskID = 0
 		newExclusiveDeletionHighWatermark.TaskID = 0
+		p.logger.Info("Range completing tasks",
+			tag.MinQueryLevel(oldExclusiveDeletionHighWatermark.FireTime),
+			tag.MaxQueryLevel(newExclusiveDeletionHighWatermark.FireTime),
+		)
 	}
 
 	ctx, cancel := newQueueIOContext()
