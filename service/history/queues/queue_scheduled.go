@@ -75,6 +75,11 @@ func NewScheduledQueue(
 			ctx, cancel := newQueueIOContext()
 			defer cancel()
 
+			logger.Info("Loading timer tasks",
+				tag.MinQueryLevel(r.InclusiveMin.FireTime),
+				tag.MaxQueryLevel(r.ExclusiveMax.FireTime.Add(scheduledTaskPrecision)),
+			)
+
 			request := &persistence.GetHistoryTasksRequest{
 				ShardID:             shard.GetShardID(),
 				TaskCategory:        category,
