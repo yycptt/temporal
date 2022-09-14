@@ -390,6 +390,16 @@ func (t *timerQueueActiveTaskExecutor) executeActivityRetryTimerTask(
 	ctx context.Context,
 	task *tasks.ActivityRetryTimerTask,
 ) (retError error) {
+
+	t.logger.Info("Executing activity retry timer task",
+		tag.WorkflowID(task.GetWorkflowID()),
+		tag.WorkflowRunID(task.GetRunID()),
+		tag.WorkflowNamespaceID(task.GetNamespaceID()),
+		tag.WorkflowScheduledEventID(task.EventID),
+		tag.FailoverVersion(task.Version),
+		tag.ScheduleAttempt(task.Attempt),
+	)
+
 	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
 	defer cancel()
 

@@ -3740,6 +3740,14 @@ func (e *MutableStateImpl) RetryActivity(
 	ai.RetryLastWorkerIdentity = ai.StartedIdentity
 	ai.RetryLastFailure = failure
 
+	e.logger.Info("Generating activity retry timer task",
+		tag.WorkflowID(e.executionInfo.WorkflowId),
+		tag.WorkflowRunID(e.executionState.RunId),
+		tag.WorkflowNamespaceID(e.executionInfo.NamespaceId),
+		tag.WorkflowScheduledEventID(ai.ScheduledEventId),
+		tag.ScheduleAttempt(ai.Attempt),
+	)
+
 	if err := e.taskGenerator.GenerateActivityRetryTasks(
 		ai.ScheduledEventId,
 	); err != nil {
