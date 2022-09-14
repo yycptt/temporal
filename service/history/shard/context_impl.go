@@ -127,6 +127,7 @@ type (
 		maxTaskSequenceNumber              int64
 		immediateTaskExclusiveMaxReadLevel int64
 		scheduledTaskMaxReadLevelMap       map[string]time.Time // cluster -> scheduledTaskMaxReadLevel
+		// minInflightScheduleTaskTimestamp   time.Time
 
 		// exist only in memory
 		remoteClusterInfos map[string]*remoteClusterInfo
@@ -215,7 +216,7 @@ func (s *ContextImpl) AssertOwnership(
 		ShardID: s.shardID,
 		RangeID: rangeID,
 	})
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, 0); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, 0, time.Time{}); err != nil {
 		return err
 	}
 	return nil
@@ -301,12 +302,21 @@ func (s *ContextImpl) updateScheduledTaskMaxReadLevel(cluster string) tasks.Key 
 		s.scheduledTaskMaxReadLevelMap[cluster] = tasks.DefaultFireTime
 	}
 
+	if s.errorByState() != nil {
+		return tasks.NewKey(s.scheduledTaskMaxReadLevelMap[cluster], 0)
+	}
+
 	currentTime := s.timeSource.Now()
 	if cluster != "" && cluster != s.GetClusterMetadata().GetCurrentClusterName() {
 		currentTime = s.getOrUpdateRemoteClusterInfoLocked(cluster).CurrentTime
 	}
 
 	newMaxReadLevel := currentTime.Add(s.config.TimerProcessorMaxTimeShift()).Truncate(time.Millisecond)
+
+	// if !s.minInflightScheduleTaskTimestamp.IsZero() {
+	// 	newMaxReadLevel = util.MinTime(newMaxReadLevel, s.minInflightScheduleTaskTimestamp)
+	// }
+
 	s.scheduledTaskMaxReadLevelMap[cluster] = util.MaxTime(s.scheduledTaskMaxReadLevelMap[cluster], newMaxReadLevel)
 	return tasks.NewKey(s.scheduledTaskMaxReadLevelMap[cluster], 0)
 }
@@ -675,11 +685,13 @@ func (s *ContextImpl) CreateWorkflowExecution(
 	}
 
 	transferExclusiveMaxReadLevel := int64(0)
+	var minInflightScheduleTaskTimestamp time.Time
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.NewWorkflowSnapshot.Tasks,
 		&transferExclusiveMaxReadLevel,
+		// &minInflightScheduleTaskTimestamp,
 	); err != nil {
 		return nil, err
 	}
@@ -687,7 +699,7 @@ func (s *ContextImpl) CreateWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.CreateWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel, minInflightScheduleTaskTimestamp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -719,11 +731,13 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 	}
 
 	transferExclusiveMaxReadLevel := int64(0)
+	var minInflightScheduleTaskTimestamp time.Time
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.UpdateWorkflowMutation.Tasks,
 		&transferExclusiveMaxReadLevel,
+		// &minInflightScheduleTaskTimestamp,
 	); err != nil {
 		return nil, err
 	}
@@ -734,6 +748,7 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 			workflowID,
 			request.NewWorkflowSnapshot.Tasks,
 			&transferExclusiveMaxReadLevel,
+			// &minInflightScheduleTaskTimestamp,
 		); err != nil {
 			return nil, err
 		}
@@ -743,7 +758,7 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.UpdateWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel, minInflightScheduleTaskTimestamp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -790,12 +805,14 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 	}
 
 	transferExclusiveMaxReadLevel := int64(0)
+	var minInflightScheduleTaskTimestamp time.Time
 	if request.CurrentWorkflowMutation != nil {
 		if err := s.allocateTaskIDsLocked(
 			namespaceEntry,
 			workflowID,
 			request.CurrentWorkflowMutation.Tasks,
 			&transferExclusiveMaxReadLevel,
+			// &minInflightScheduleTaskTimestamp,
 		); err != nil {
 			return nil, err
 		}
@@ -805,6 +822,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 		workflowID,
 		request.ResetWorkflowSnapshot.Tasks,
 		&transferExclusiveMaxReadLevel,
+		// &minInflightScheduleTaskTimestamp,
 	); err != nil {
 		return nil, err
 	}
@@ -814,6 +832,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 			workflowID,
 			request.NewWorkflowSnapshot.Tasks,
 			&transferExclusiveMaxReadLevel,
+			// &minInflightScheduleTaskTimestamp,
 		); err != nil {
 			return nil, err
 		}
@@ -822,7 +841,7 @@ func (s *ContextImpl) ConflictResolveWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.ConflictResolveWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel, minInflightScheduleTaskTimestamp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -854,11 +873,13 @@ func (s *ContextImpl) SetWorkflowExecution(
 	}
 
 	transferExclusiveMaxReadLevel := int64(0)
+	var minInflightScheduleTaskTimestamp time.Time
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		workflowID,
 		request.SetWorkflowSnapshot.Tasks,
 		&transferExclusiveMaxReadLevel,
+		// &minInflightScheduleTaskTimestamp,
 	); err != nil {
 		return nil, err
 	}
@@ -866,7 +887,7 @@ func (s *ContextImpl) SetWorkflowExecution(
 	currentRangeID := s.getRangeIDLocked()
 	request.RangeID = currentRangeID
 	resp, err := s.executionManager.SetWorkflowExecution(ctx, request)
-	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel); err != nil {
+	if err = s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel, minInflightScheduleTaskTimestamp); err != nil {
 		return nil, err
 	}
 	return resp, nil
@@ -908,18 +929,20 @@ func (s *ContextImpl) addTasksLocked(
 	namespaceEntry *namespace.Namespace,
 ) error {
 	transferExclusiveMaxReadLevel := int64(0)
+	var minInflightScheduleTaskTimestamp time.Time
 	if err := s.allocateTaskIDsLocked(
 		namespaceEntry,
 		request.WorkflowID,
 		request.Tasks,
 		&transferExclusiveMaxReadLevel,
+		// &minInflightScheduleTaskTimestamp,
 	); err != nil {
 		return err
 	}
 
 	request.RangeID = s.getRangeIDLocked()
 	err := s.executionManager.AddHistoryTasks(ctx, request)
-	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel)
+	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, transferExclusiveMaxReadLevel, minInflightScheduleTaskTimestamp)
 }
 
 func (s *ContextImpl) AppendHistoryEvents(
@@ -1185,6 +1208,7 @@ func (s *ContextImpl) renewRangeLocked(isStealing bool) error {
 	s.taskSequenceNumber = updatedShardInfo.GetRangeId() << s.config.RangeSizeBits
 	s.maxTaskSequenceNumber = (updatedShardInfo.GetRangeId() + 1) << s.config.RangeSizeBits
 	s.immediateTaskExclusiveMaxReadLevel = s.taskSequenceNumber
+	// s.minInflightScheduleTaskTimestamp = time.Time{} // need to trigger a task loading
 	s.shardInfo = updatedShardInfo
 
 	return nil
@@ -1305,6 +1329,7 @@ func (s *ContextImpl) allocateTaskIDsLocked(
 	workflowID string,
 	newTasks map[tasks.Category][]tasks.Task,
 	transferExclusiveMaxReadLevel *int64,
+	// minInflightScheduleTaskTimestamp *time.Time,
 ) error {
 	currentCluster := s.GetClusterMetadata().GetCurrentClusterName()
 	for category, tasksByCategory := range newTasks {
@@ -1343,6 +1368,13 @@ func (s *ContextImpl) allocateTaskIDsLocked(
 				visibilityTs := task.GetVisibilityTime()
 				s.contextTaggedLogger.Debug("Assigning new timer",
 					tag.Timestamp(visibilityTs), tag.TaskID(task.GetTaskID()), tag.MaxQueryLevel(readCursorTS))
+
+				// if minInflightScheduleTaskTimestamp == nil {
+				// 	*minInflightScheduleTaskTimestamp = visibilityTs
+				// } else {
+				// 	*minInflightScheduleTaskTimestamp = util.MinTime(*minInflightScheduleTaskTimestamp, visibilityTs)
+				// }
+
 				if retryTimerTask, ok := task.(*tasks.ActivityRetryTimerTask); ok {
 					s.contextTaggedLogger.Info("Generating activity retry timer",
 						tag.WorkflowNamespaceID(namespaceEntry.ID().String()),
@@ -1420,10 +1452,10 @@ func (s *ContextImpl) handleReadError(err error) error {
 
 func (s *ContextImpl) handleWriteErrorLocked(err error) error {
 	// We can use 0 here since updateMaxReadLevelLocked ensures that the read level never goes backwards.
-	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, 0)
+	return s.handleWriteErrorAndUpdateMaxReadLevelLocked(err, 0, time.Time{})
 }
 
-func (s *ContextImpl) handleWriteErrorAndUpdateMaxReadLevelLocked(err error, newMaxReadLevel int64) error {
+func (s *ContextImpl) handleWriteErrorAndUpdateMaxReadLevelLocked(err error, newMaxReadLevel int64, minInflightScheduleTaskTimestamp time.Time) error {
 	switch err.(type) {
 	case nil:
 		// Persistence success: update max read level
@@ -1451,6 +1483,11 @@ func (s *ContextImpl) handleWriteErrorAndUpdateMaxReadLevelLocked(err error, new
 		// reliably check the outcome by performing a read. If we fail, we'll shut down the shard.
 		// Note that reacquiring the shard will cause the max read level to be updated
 		// to the new range (i.e. past newMaxReadLevel).
+
+		// if !minInflightScheduleTaskTimestamp.IsZero() {
+		// 	s.minInflightScheduleTaskTimestamp = util.MinTime(s.minInflightScheduleTaskTimestamp, minInflightScheduleTaskTimestamp)
+		// }
+
 		s.transition(contextRequestLost{})
 		return err
 	}
@@ -1635,6 +1672,24 @@ func (s *ContextImpl) transition(request contextRequest) error {
 				s.contextTaggedLogger.Warn("transition to acquired but no engine set")
 				return errInvalidTransition
 			}
+
+			engine, err := s.engineFuture.Get(s.lifecycleCtx)
+			if err != nil {
+				s.contextTaggedLogger.Warn("transition to acquired but unable to get engine", tag.Error(err))
+				return errInvalidTransition
+			}
+			now := s.timeSource.Now()
+			fakeTasks := make(map[tasks.Category][]tasks.Task)
+			for _, category := range tasks.GetCategories() {
+				fakeTasks[category] = []tasks.Task{tasks.NewFakeTask(definition.WorkflowKey{}, category, now)}
+			}
+			for clusterName, info := range s.clusterMetadata.GetAllClusterInfo() {
+				if !info.Enabled {
+					continue
+				}
+				engine.NotifyNewTasks(clusterName, fakeTasks)
+			}
+
 			return nil
 		case contextRequestLost:
 			return nil // nothing to do, already acquiring
