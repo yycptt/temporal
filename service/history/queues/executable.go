@@ -28,6 +28,7 @@ package queues
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -97,15 +98,13 @@ type (
 		tasks.Task
 
 		sync.Mutex
-		state          ctasks.State
-		priority       ctasks.Priority // priority for the current attempt
-		lowestPriority ctasks.Priority // priority for emitting metrics across multiple attempts
-		attempt        int
+		state    ctasks.State
+		priority ctasks.Priority
+		attempt  int
 
 		executor          Executor
 		scheduler         Scheduler
 		rescheduler       Rescheduler
-		priorityAssigner  PriorityAssigner
 		timeSource        clock.TimeSource
 		namespaceRegistry namespace.Registry
 
@@ -145,7 +144,6 @@ func NewExecutable(
 		executor:          executor,
 		scheduler:         scheduler,
 		rescheduler:       rescheduler,
-		priorityAssigner:  priorityAssigner,
 		timeSource:        timeSource,
 		namespaceRegistry: namespaceRegistry,
 		readerID:          readerID,
@@ -160,7 +158,7 @@ func NewExecutable(
 		taggedMetricsHandler: metricsHandler,
 		criticalRetryAttempt: criticalRetryAttempt,
 	}
-	executable.updatePriority()
+	executable.priority = priorityAssigner.Assign(executable)
 	return executable
 }
 
@@ -177,7 +175,6 @@ func (e *executableImpl) Execute() error {
 	startTime := e.timeSource.Now()
 
 	metricsTags, isActive, err := e.executor.Execute(ctx, e)
-	e.taggedMetricsHandler = e.metricsHandler.WithTags(metricsTags...)
 
 	if isActive != e.lastActiveness {
 		// namespace did a failover, reset task attempt
@@ -187,45 +184,36 @@ func (e *executableImpl) Execute() error {
 	}
 	e.lastActiveness = isActive
 
-	e.userLatency = 0
-	if duration, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency.GetMetricName()); ok {
-		e.userLatency = time.Duration(duration)
-	}
-
-	e.taggedMetricsHandler.Timer(metrics.TaskProcessingLatency.GetMetricName()).Record(time.Since(startTime))
-	e.taggedMetricsHandler.Timer(metrics.TaskProcessingUserLatency.GetMetricName()).Record(e.userLatency)
-
+	e.taggedMetricsHandler = e.metricsHandler.WithTags(metricsTags...)
 	priorityTaggedProvider := e.taggedMetricsHandler.WithTags(metrics.TaskPriorityTag(e.priority.String()))
 	priorityTaggedProvider.Counter(metrics.TaskRequests.GetMetricName()).Record(1)
 	priorityTaggedProvider.Timer(metrics.TaskScheduleLatency.GetMetricName()).Record(startTime.Sub(e.scheduledTime))
+
+	if err != consts.ErrTaskAsyncCompletion {
+		e.userLatency = 0
+		if duration, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency.GetMetricName()); ok {
+			e.userLatency = time.Duration(duration)
+		}
+
+		e.taggedMetricsHandler.Timer(metrics.TaskProcessingLatency.GetMetricName()).Record(time.Since(startTime))
+		e.taggedMetricsHandler.Timer(metrics.TaskProcessingUserLatency.GetMetricName()).Record(e.userLatency)
+	}
 
 	return err
 }
 
 func (e *executableImpl) HandleErr(err error) (retErr error) {
-	defer func() {
-		if retErr != nil {
-			e.Lock()
-			defer e.Unlock()
+	if errors.Is(err, consts.ErrTaskAsyncCompletion) {
+		return err
+	}
 
-			e.attempt++
-			if e.attempt > e.criticalRetryAttempt() {
-				e.taggedMetricsHandler.Histogram(metrics.TaskAttempt.GetMetricName(), metrics.TaskAttempt.GetMetricUnit()).Record(int64(e.attempt))
-				e.logger.Error("Critical error processing task, retrying.", tag.Error(err), tag.OperationCritical)
-			}
-		}
-	}()
+	if !common.IsResourceExhausted(err) {
+		e.resourceExhaustedCount = 0
+	}
 
 	if err == nil {
 		return nil
 	}
-
-	if common.IsResourceExhausted(err) {
-		e.resourceExhaustedCount++
-		e.taggedMetricsHandler.Counter(metrics.TaskThrottledCounter.GetMetricName()).Record(1)
-		return err
-	}
-	e.resourceExhaustedCount = 0
 
 	if _, isNotFound := err.(*serviceerror.NotFound); isNotFound {
 		return nil
@@ -234,6 +222,24 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 	// This means that namespace is deleted, and it is safe to drop the task (=ignore the error).
 	if _, isNotFound := err.(*serviceerror.NamespaceNotFound); isNotFound {
 		return nil
+	}
+
+	if err == consts.ErrTaskDiscarded {
+		e.taggedMetricsHandler.Counter(metrics.TaskDiscarded.GetMetricName()).Record(1)
+		return nil
+	}
+
+	if err == consts.ErrTaskVersionMismatch {
+		e.taggedMetricsHandler.Counter(metrics.TaskVersionMisMatch.GetMetricName()).Record(1)
+		return nil
+	}
+
+	e.increaseAttempt(err)
+
+	if common.IsResourceExhausted(err) {
+		e.resourceExhaustedCount++
+		e.taggedMetricsHandler.Counter(metrics.TaskThrottledCounter.GetMetricName()).Record(1)
+		return err
 	}
 
 	if err == consts.ErrDependencyTaskNotCompleted {
@@ -251,20 +257,9 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 		return err
 	}
 
-	if err == consts.ErrTaskDiscarded {
-		e.taggedMetricsHandler.Counter(metrics.TaskDiscarded.GetMetricName()).Record(1)
-		return nil
-	}
-
-	if err == consts.ErrTaskVersionMismatch {
-		e.taggedMetricsHandler.Counter(metrics.TaskVersionMisMatch.GetMetricName()).Record(1)
-		return nil
-	}
-
 	if err.Error() == consts.ErrNamespaceHandover.Error() {
 		e.taggedMetricsHandler.Counter(metrics.TaskNamespaceHandoverCounter.GetMetricName()).Record(1)
-		err = consts.ErrNamespaceHandover
-		return err
+		return consts.ErrNamespaceHandover
 	}
 
 	if _, ok := err.(*serviceerror.NamespaceNotActive); ok {
@@ -274,33 +269,27 @@ func (e *executableImpl) HandleErr(err error) (retErr error) {
 		return err
 	}
 
+	// unknown errors
 	e.taggedMetricsHandler.Counter(metrics.TaskFailures.GetMetricName()).Record(1)
-
 	e.logger.Error("Fail to process task", tag.Error(err), tag.LifeCycleProcessingFailed)
 	return err
 }
 
 func (e *executableImpl) IsRetryableError(err error) bool {
-	// this determines if the executable should be retried when hold the worker goroutine
-
-	if e.State() == ctasks.TaskStateCancelled {
-		return false
-	}
-
-	if shard.IsShardOwnershipLostError(err) {
-		return false
-	}
+	// return true if the executable should be retried when hold the worker goroutine
 
 	// don't retry immediately for resource exhausted which may incur more load
 	// context deadline exceed may also suggested downstream is overloaded, so don't retry immediately
-	if common.IsResourceExhausted(err) || common.IsContextDeadlineExceededErr(err) {
-		return false
-	}
 
 	// ErrTaskRetry means mutable state is not ready for standby task processing
 	// there's no point for retrying the task immediately which will hold the worker corouinte
-	// TODO: change ErrTaskRetry to a better name
-	return err != consts.ErrTaskRetry &&
+
+	return e.State() != ctasks.TaskStateCancelled &&
+		!shard.IsShardOwnershipLostError(err) &&
+		!common.IsResourceExhausted(err) &&
+		!common.IsContextDeadlineExceededErr(err) &&
+		err != consts.ErrTaskAsyncCompletion &&
+		err != consts.ErrTaskRetry &&
 		err != consts.ErrWorkflowBusy &&
 		err != consts.ErrDependencyTaskNotCompleted &&
 		err != consts.ErrNamespaceHandover
@@ -337,7 +326,7 @@ func (e *executableImpl) Ack() {
 	)
 	e.taggedMetricsHandler.Histogram(metrics.TaskAttempt.GetMetricName(), metrics.TaskAttempt.GetMetricUnit()).Record(int64(e.attempt))
 
-	priorityTaggedProvider := e.taggedMetricsHandler.WithTags(metrics.TaskPriorityTag(e.lowestPriority.String()))
+	priorityTaggedProvider := e.taggedMetricsHandler.WithTags(metrics.TaskPriorityTag(e.priority.String()))
 	priorityTaggedProvider.Timer(metrics.TaskLatency.GetMetricName()).Record(time.Since(e.loadTime))
 
 	readerIDTaggedProvider := priorityTaggedProvider.WithTags(metrics.QueueReaderIDTag(e.readerID))
@@ -345,11 +334,10 @@ func (e *executableImpl) Ack() {
 }
 
 func (e *executableImpl) Nack(err error) {
-	if e.State() == ctasks.TaskStateCancelled {
+	if e.State() == ctasks.TaskStateCancelled ||
+		err == consts.ErrTaskAsyncCompletion {
 		return
 	}
-
-	e.updatePriority()
 
 	submitted := false
 	if e.shouldResubmitOnNack(e.Attempt(), err) {
@@ -369,8 +357,6 @@ func (e *executableImpl) Reschedule() {
 	if e.State() == ctasks.TaskStateCancelled {
 		return
 	}
-
-	e.updatePriority()
 
 	e.rescheduler.Add(e, e.rescheduleTime(nil, e.Attempt()))
 }
@@ -408,6 +394,17 @@ func (e *executableImpl) SetScheduledTime(t time.Time) {
 	e.scheduledTime = t
 }
 
+func (e *executableImpl) increaseAttempt(err error) {
+	e.Lock()
+	defer e.Unlock()
+
+	e.attempt++
+	if e.attempt > e.criticalRetryAttempt() {
+		e.taggedMetricsHandler.Histogram(metrics.TaskAttempt.GetMetricName(), metrics.TaskAttempt.GetMetricUnit()).Record(int64(e.attempt))
+		e.logger.Error("Critical error processing task, retrying.", tag.Error(err), tag.OperationCritical)
+	}
+}
+
 func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 	// this is an optimization for skipping rescheduler and retry the task sooner.
 	// this is useful for errors like workflow busy, which doesn't have to wait for
@@ -427,7 +424,8 @@ func (e *executableImpl) shouldResubmitOnNack(attempt int, err error) bool {
 
 	return err != consts.ErrTaskRetry &&
 		err != consts.ErrDependencyTaskNotCompleted &&
-		err != consts.ErrNamespaceHandover
+		err != consts.ErrNamespaceHandover &&
+		err != consts.ErrTaskAsyncCompletion
 }
 
 func (e *executableImpl) rescheduleTime(
@@ -457,16 +455,4 @@ func (e *executableImpl) rescheduleTime(
 	}
 
 	return e.timeSource.Now().Add(backoff)
-}
-
-func (e *executableImpl) updatePriority() {
-	// do NOT invoke Assign while holding the lock
-	newPriority := e.priorityAssigner.Assign(e)
-
-	e.Lock()
-	defer e.Unlock()
-	e.priority = newPriority
-	if e.priority > e.lowestPriority {
-		e.lowestPriority = e.priority
-	}
 }
