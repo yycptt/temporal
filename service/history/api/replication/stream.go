@@ -179,7 +179,7 @@ func sendCatchUp(
 		tasks.CategoryReplication,
 		sourceClusterShardID.ClusterName,
 	)
-	catchupEndExclusiveWatermark := shardContext.GetImmediateQueueExclusiveHighReadWatermark()
+	catchupEndExclusiveWatermark := shardContext.GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication)
 	if err := sendTasks(
 		ctx,
 		server,
@@ -206,7 +206,7 @@ func sendLive(
 	for {
 		select {
 		case <-newTaskNotificationChan:
-			endExclusiveWatermark := shardContext.GetImmediateQueueExclusiveHighReadWatermark().TaskID
+			endExclusiveWatermark := shardContext.GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).TaskID
 			if err := sendTasks(
 				ctx,
 				server,

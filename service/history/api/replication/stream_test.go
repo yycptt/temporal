@@ -127,11 +127,11 @@ func (s *streamSuite) TestSendCatchUp() {
 		tasks.CategoryReplication,
 		s.sourceClusterShardID.ClusterName,
 	).Return(tasks.NewImmediateKey(beginInclusiveWatermark))
-	s.shardContext.EXPECT().GetImmediateQueueExclusiveHighReadWatermark().Return(
+	s.shardContext.EXPECT().GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).Return(
 		tasks.NewImmediateKey(endExclusiveWatermark),
 	)
 
-	iter := collection.NewPagingIterator[tasks.Task](
+	iter := collection.NewPagingIterator(
 		func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			return []tasks.Task{}, nil, nil
 		},
@@ -166,14 +166,14 @@ func (s *streamSuite) TestSendLive() {
 	watermark2 := watermark1 + 1 + rand.Int63n(100)
 
 	gomock.InOrder(
-		s.shardContext.EXPECT().GetImmediateQueueExclusiveHighReadWatermark().Return(
+		s.shardContext.EXPECT().GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).Return(
 			tasks.NewImmediateKey(watermark1),
 		),
-		s.shardContext.EXPECT().GetImmediateQueueExclusiveHighReadWatermark().Return(
+		s.shardContext.EXPECT().GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).Return(
 			tasks.NewImmediateKey(watermark2),
 		),
 	)
-	iter := collection.NewPagingIterator[tasks.Task](
+	iter := collection.NewPagingIterator(
 		func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			return []tasks.Task{}, nil, nil
 		},
@@ -241,7 +241,7 @@ func (s *streamSuite) TestSendTasks_WithoutTasks() {
 	beginInclusiveWatermark := rand.Int63()
 	endExclusiveWatermark := beginInclusiveWatermark + 100
 
-	iter := collection.NewPagingIterator[tasks.Task](
+	iter := collection.NewPagingIterator(
 		func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			return []tasks.Task{}, nil, nil
 		},
@@ -285,7 +285,7 @@ func (s *streamSuite) TestSendTasks_WithTasks() {
 		VisibilityTime: timestamp.TimePtr(time.Unix(0, rand.Int63())),
 	}
 
-	iter := collection.NewPagingIterator[tasks.Task](
+	iter := collection.NewPagingIterator(
 		func(paginationToken []byte) ([]tasks.Task, []byte, error) {
 			return []tasks.Task{item0, item1, item2}, nil, nil
 		},

@@ -270,7 +270,7 @@ func (r *taskProcessorManagerImpl) cleanupReplicationTasks() error {
 
 		var ackLevel int64
 		if clusterName == currentCluster {
-			ackLevel = r.shard.GetImmediateQueueExclusiveHighReadWatermark().TaskID
+			ackLevel = r.shard.GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).TaskID
 		} else {
 			ackLevel = r.shard.GetQueueClusterAckLevel(tasks.CategoryReplication, clusterName).TaskID
 		}
@@ -289,7 +289,7 @@ func (r *taskProcessorManagerImpl) cleanupReplicationTasks() error {
 		metrics.OperationTag(metrics.ReplicationTaskCleanupScope),
 	)
 	r.metricsHandler.Histogram(metrics.ReplicationTasksLag.GetMetricName(), metrics.ReplicationTasksLag.GetMetricUnit()).Record(
-		r.shard.GetImmediateQueueExclusiveHighReadWatermark().Prev().TaskID-*minAckedTaskID,
+		r.shard.GetQueueExclusiveHighReadWatermark(tasks.CategoryReplication).Prev().TaskID-*minAckedTaskID,
 		metrics.OperationTag(metrics.ReplicationTaskFetcherScope),
 	)
 

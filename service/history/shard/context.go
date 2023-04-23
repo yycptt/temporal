@@ -75,8 +75,9 @@ type (
 		GenerateTaskID() (int64, error)
 		GenerateTaskIDs(number int) ([]int64, error)
 
-		GetImmediateQueueExclusiveHighReadWatermark() tasks.Key
-		UpdateScheduledQueueExclusiveHighReadWatermark() (tasks.Key, error)
+		// GetImmediateQueueExclusiveHighReadWatermark() tasks.Key
+		// UpdateScheduledQueueExclusiveHighReadWatermark() (tasks.Key, error)
+		GetQueueExclusiveHighReadWatermark(category tasks.Category) tasks.Key
 		GetQueueAckLevel(category tasks.Category) tasks.Key
 		UpdateQueueAckLevel(category tasks.Category, ackLevel tasks.Key) error
 		GetQueueClusterAckLevel(category tasks.Category, cluster string) tasks.Key
@@ -89,7 +90,7 @@ type (
 
 		UpdateRemoteClusterInfo(cluster string, ackTaskID int64, ackTimestamp time.Time)
 
-		GetMaxTaskIDForCurrentRangeID() int64
+		// GetMaxTaskIDForCurrentRangeID() int64
 
 		SetCurrentTime(cluster string, currentTime time.Time)
 		GetCurrentTime(cluster string) time.Time
