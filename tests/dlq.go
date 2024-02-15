@@ -202,7 +202,7 @@ func (s *DLQSuite) TestReadArtificialDLQTasks() {
 	targetCluster := "active"
 	queueKey := persistence.QueueKey{
 		QueueType:     persistence.QueueTypeHistoryDLQ,
-		Category:      category,
+		CategoryID:    category.ID(),
 		SourceCluster: sourceCluster,
 		TargetCluster: targetCluster,
 	}
@@ -409,7 +409,7 @@ func (s *DLQSuite) TestListQueues() {
 
 	queueKey1 := persistence.QueueKey{
 		QueueType:     persistence.QueueTypeHistoryDLQ,
-		Category:      category,
+		CategoryID:    category.ID(),
 		SourceCluster: sourceCluster + "_1",
 		TargetCluster: targetCluster,
 	}
@@ -420,7 +420,7 @@ func (s *DLQSuite) TestListQueues() {
 
 	queueKey2 := persistence.QueueKey{
 		QueueType:     persistence.QueueTypeHistoryDLQ,
-		Category:      category,
+		CategoryID:    category.ID(),
 		SourceCluster: sourceCluster + "_2",
 		TargetCluster: targetCluster,
 	}

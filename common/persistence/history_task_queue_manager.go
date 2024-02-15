@@ -99,7 +99,7 @@ func (m *HistoryTaskQueueManagerImpl) EnqueueTask(
 	}
 	queueKey := QueueKey{
 		QueueType:     request.QueueType,
-		Category:      taskCategory,
+		CategoryID:    taskCategory.ID(),
 		SourceCluster: request.SourceCluster,
 		TargetCluster: request.TargetCluster,
 	}
@@ -175,7 +175,7 @@ func (m *HistoryTaskQueueManagerImpl) ReadTasks(ctx context.Context, request *Re
 			return nil, serialization.NewDeserializationError(enums.ENCODING_TYPE_PROTO3, ErrHistoryTaskBlobIsNil)
 		}
 
-		task, err := m.serializer.DeserializeTask(request.QueueKey.Category, blob)
+		task, err := m.serializer.DeserializeTask(request.QueueKey.CategoryID, blob)
 		if err != nil {
 			return nil, fmt.Errorf("%v: %w", ErrMsgDeserializeHistoryTask, err)
 		}
@@ -252,5 +252,5 @@ func combineUnique(strs ...string) string {
 
 func (k QueueKey) GetQueueName() string {
 	hash := combineUnique(k.SourceCluster, k.TargetCluster)[:clusterNamesHashSuffixLength]
-	return fmt.Sprintf("%d_%s_%s_%s", k.Category.ID(), k.SourceCluster, k.TargetCluster, hash)
+	return fmt.Sprintf("%d_%s_%s_%s", k.CategoryID, k.SourceCluster, k.TargetCluster, hash)
 }

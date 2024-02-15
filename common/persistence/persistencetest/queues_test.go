@@ -39,7 +39,7 @@ func TestGetQueueKey_Default(t *testing.T) {
 
 	queueKey := persistencetest.GetQueueKey(t)
 	assert.Equal(t, persistence.QueueTypeHistoryNormal, queueKey.QueueType)
-	assert.Equal(t, tasks.CategoryTransfer, queueKey.Category)
+	assert.Equal(t, tasks.CategoryIDTransfer, queueKey.CategoryID)
 	assert.Equal(t, "test-source-cluster-TestGetQueueKey_Default", queueKey.SourceCluster)
 	assert.Equal(t, "test-target-cluster-TestGetQueueKey_Default", queueKey.TargetCluster)
 }
@@ -52,7 +52,7 @@ func TestGetQueueKey_WithOptions(t *testing.T) {
 		persistencetest.WithCategory(tasks.CategoryTimer),
 	)
 	assert.Equal(t, persistence.QueueTypeHistoryDLQ, queueKey.QueueType)
-	assert.Equal(t, tasks.CategoryTimer, queueKey.Category)
+	assert.Equal(t, tasks.CategoryIDTimer, queueKey.CategoryID)
 	assert.Equal(t, "test-source-cluster-TestGetQueueKey_WithOptions", queueKey.SourceCluster)
 	assert.Equal(t, "test-target-cluster-TestGetQueueKey_WithOptions", queueKey.TargetCluster)
 }

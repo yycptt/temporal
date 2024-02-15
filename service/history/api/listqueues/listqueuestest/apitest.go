@@ -53,7 +53,7 @@ func TestInvoke(t *testing.T, manager persistence.HistoryTaskQueueManager) {
 		for i := 0; i < 3; i++ {
 			queueKey := persistence.QueueKey{
 				QueueType:     queueType,
-				Category:      inTask.GetCategory(),
+				CategoryID:    inTask.GetCategory().ID(),
 				SourceCluster: sourceCluster + strconv.Itoa(i),
 				TargetCluster: targetCluster + strconv.Itoa(i),
 			}

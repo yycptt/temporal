@@ -69,10 +69,10 @@ func (s *TaskSerializer) SerializeTask(
 }
 
 func (s *TaskSerializer) DeserializeTask(
-	category tasks.Category,
+	categoryID int,
 	blob *commonpb.DataBlob,
 ) (tasks.Task, error) {
-	switch category.ID() {
+	switch categoryID {
 	case tasks.CategoryIDTransfer:
 		return s.deserializeTransferTasks(blob)
 	case tasks.CategoryIDTimer:
@@ -84,7 +84,7 @@ func (s *TaskSerializer) DeserializeTask(
 	case tasks.CategoryIDArchival:
 		return s.deserializeArchivalTasks(blob)
 	default:
-		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown task category: %v", category))
+		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown task categoryID: %v", categoryID))
 	}
 }
 

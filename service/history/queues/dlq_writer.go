@@ -81,7 +81,7 @@ func NewDLQWriter(w QueueWriter, m cluster.Metadata, h metrics.Handler, l log.Sn
 func (q *DLQWriter) WriteTaskToDLQ(ctx context.Context, sourceCluster, targetCluster string, task tasks.Task) error {
 	queueKey := persistence.QueueKey{
 		QueueType:     persistence.QueueTypeHistoryDLQ,
-		Category:      task.GetCategory(),
+		CategoryID:    task.GetCategory().ID(),
 		SourceCluster: sourceCluster,
 		TargetCluster: targetCluster,
 	}

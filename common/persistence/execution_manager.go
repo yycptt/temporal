@@ -860,7 +860,7 @@ func (m *executionManagerImpl) GetHistoryTasks(
 
 	historyTasks := make([]tasks.Task, 0, len(resp.Tasks))
 	for _, internalTask := range resp.Tasks {
-		task, err := m.serializer.DeserializeTask(request.TaskCategory, internalTask.Blob)
+		task, err := m.serializer.DeserializeTask(request.TaskCategory.ID(), internalTask.Blob)
 		if err != nil {
 			return nil, err
 		}
@@ -921,7 +921,7 @@ func (m *executionManagerImpl) GetReplicationTasksFromDLQ(
 	dlqTasks := make([]tasks.Task, 0, len(resp.Tasks))
 	for i := range resp.Tasks {
 		internalTask := resp.Tasks[i]
-		task, err := m.serializer.DeserializeTask(category, internalTask.Blob)
+		task, err := m.serializer.DeserializeTask(category.ID(), internalTask.Blob)
 		if err != nil {
 			return nil, err
 		}

@@ -49,7 +49,6 @@ import (
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/primitives"
 	"go.temporal.io/server/common/util"
-	"go.temporal.io/server/service/history/api"
 	"go.temporal.io/server/service/worker/dlq"
 
 	"github.com/pborman/uuid"
@@ -1856,7 +1855,7 @@ func (adh *AdminHandler) PurgeDLQTasks(
 		WorkflowType: dlq.WorkflowTypeDelete,
 		DeleteParams: dlq.DeleteParams{
 			Key: dlq.Key{
-				TaskCategoryID: key.Category.ID(),
+				TaskCategoryID: key.CategoryID,
 				SourceCluster:  key.SourceCluster,
 				TargetCluster:  key.TargetCluster,
 			},
@@ -1891,7 +1890,7 @@ func (adh *AdminHandler) MergeDLQTasks(ctx context.Context, request *adminservic
 		WorkflowType: dlq.WorkflowTypeMerge,
 		MergeParams: dlq.MergeParams{
 			Key: dlq.Key{
-				TaskCategoryID: key.Category.ID(),
+				TaskCategoryID: key.CategoryID,
 				SourceCluster:  key.SourceCluster,
 				TargetCluster:  key.TargetCluster,
 			},
@@ -2041,10 +2040,6 @@ func (adh *AdminHandler) getDLQWorkflowID(key *persistence.QueueKey) string {
 }
 
 func (adh *AdminHandler) parseDLQKey(key *commonspb.HistoryDLQKey) (*persistence.QueueKey, error) {
-	category, err := api.GetTaskCategory(int(key.TaskCategory), adh.taskCategoryRegistry)
-	if err != nil {
-		return nil, err
-	}
 	sourceCluster := key.SourceCluster
 	if len(sourceCluster) == 0 {
 		return nil, errSourceClusterNotSet
@@ -2055,7 +2050,7 @@ func (adh *AdminHandler) parseDLQKey(key *commonspb.HistoryDLQKey) (*persistence
 	}
 	return &persistence.QueueKey{
 		QueueType:     persistence.QueueTypeHistoryDLQ,
-		Category:      category,
+		CategoryID:    int(key.TaskCategory),
 		SourceCluster: sourceCluster,
 		TargetCluster: key.TargetCluster,
 	}, nil

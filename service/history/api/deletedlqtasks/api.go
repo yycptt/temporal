@@ -53,7 +53,7 @@ func Invoke(
 	resp, err := historyTaskQueueManager.DeleteTasks(ctx, &persistence.DeleteTasksRequest{
 		QueueKey: persistence.QueueKey{
 			QueueType:     persistence.QueueTypeHistoryDLQ,
-			Category:      category,
+			CategoryID:    category.ID(),
 			SourceCluster: req.DlqKey.SourceCluster,
 			TargetCluster: req.DlqKey.TargetCluster,
 		},

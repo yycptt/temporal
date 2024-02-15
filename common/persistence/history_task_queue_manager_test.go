@@ -44,7 +44,7 @@ import (
 // queue keys to queue names.
 func TestQueueKey_Determinism(t *testing.T) {
 	name := persistence.QueueKey{
-		Category:      tasks.CategoryTransfer,
+		CategoryID:    tasks.CategoryIDTransfer,
 		SourceCluster: "a",
 		TargetCluster: "b",
 	}.GetQueueName()
@@ -85,12 +85,12 @@ func TestQueueKey_Conflicts(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			k1 := persistence.QueueKey{
-				Category:      tasks.CategoryTransfer,
+				CategoryID:    tasks.CategoryIDTransfer,
 				SourceCluster: tc.source1,
 				TargetCluster: tc.target1,
 			}.GetQueueName()
 			k2 := persistence.QueueKey{
-				Category:      tasks.CategoryTransfer,
+				CategoryID:    tasks.CategoryIDTransfer,
 				SourceCluster: tc.source2,
 				TargetCluster: tc.target2,
 			}.GetQueueName()
@@ -156,7 +156,7 @@ func TestHistoryTaskQueueManager_ReadTasks_ErrDeserializeRawHistoryTask(t *testi
 	m := persistence.NewHistoryTaskQueueManager(corruptQueue{})
 	_, err := m.ReadTasks(context.Background(), &persistence.ReadTasksRequest{
 		QueueKey: persistence.QueueKey{
-			Category: tasks.CategoryTransfer,
+			CategoryID: tasks.CategoryIDTransfer,
 		},
 		PageSize: 1,
 	})
@@ -172,7 +172,7 @@ func TestHistoryTaskQueueManager_ReadTasks_NonPositivePageSize(t *testing.T) {
 	for _, pageSize := range []int{0, -1} {
 		_, err := m.ReadTasks(context.Background(), &persistence.ReadTasksRequest{
 			QueueKey: persistence.QueueKey{
-				Category: tasks.Category{},
+				CategoryID: tasks.Category{}.ID(),
 			},
 			PageSize: pageSize,
 		})

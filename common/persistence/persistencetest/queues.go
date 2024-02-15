@@ -67,7 +67,7 @@ func GetQueueKey(t *testing.T, opts ...func(p *getQueueKeyParams)) persistence.Q
 	// unique across tests. That way, we can run many queue tests without any risk of queue name collisions.
 	return persistence.QueueKey{
 		QueueType:     params.QueueType,
-		Category:      params.Category,
+		CategoryID:    params.Category.ID(),
 		SourceCluster: "test-source-cluster-" + t.Name(),
 		TargetCluster: "test-target-cluster-" + t.Name(),
 	}

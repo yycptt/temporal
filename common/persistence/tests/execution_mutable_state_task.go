@@ -741,13 +741,17 @@ func (s *testSerializer) SerializeTask(
 }
 
 func (s *testSerializer) DeserializeTask(
-	category tasks.Category,
+	categoryID int,
 	blob *commonpb.DataBlob,
 ) (tasks.Task, error) {
-	categoryID := category.ID()
-	if categoryID != fakeImmediateTaskCategory.ID() &&
-		categoryID != fakeScheduledTaskCategory.ID() {
-		return s.Serializer.DeserializeTask(category, blob)
+	var category tasks.Category
+	switch categoryID {
+	case fakeImmediateTaskCategory.ID():
+		category = fakeImmediateTaskCategory
+	case fakeScheduledTaskCategory.ID():
+		category = fakeScheduledTaskCategory
+	default:
+		return s.Serializer.DeserializeTask(categoryID, blob)
 	}
 
 	taskInfo := &persistencespb.TransferTaskInfo{}

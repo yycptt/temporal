@@ -63,7 +63,7 @@ func TestInvoke(t *testing.T, manager persistence.HistoryTaskQueueManager) {
 		}
 		_, err = deletedlqtasks.Invoke(ctx, manager, &historyservice.DeleteDLQTasksRequest{
 			DlqKey: &commonspb.HistoryDLQKey{
-				TaskCategory:  int32(queueKey.Category.ID()),
+				TaskCategory:  int32(queueKey.CategoryID),
 				SourceCluster: queueKey.SourceCluster,
 				TargetCluster: queueKey.TargetCluster,
 			},
@@ -86,7 +86,7 @@ func TestInvoke(t *testing.T, manager persistence.HistoryTaskQueueManager) {
 		queueKey := persistencetest.GetQueueKey(t, persistencetest.WithQueueType(persistence.QueueTypeHistoryDLQ))
 		_, err := deletedlqtasks.Invoke(ctx, manager, &historyservice.DeleteDLQTasksRequest{
 			DlqKey: &commonspb.HistoryDLQKey{
-				TaskCategory:  int32(queueKey.Category.ID()),
+				TaskCategory:  int32(queueKey.CategoryID),
 				SourceCluster: queueKey.SourceCluster,
 				TargetCluster: queueKey.TargetCluster,
 			},

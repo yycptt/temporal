@@ -68,7 +68,7 @@ type (
 )
 
 func (d faultyDeserializer) DeserializeTask(
-	tasks.Category,
+	int,
 	*commonpb.DataBlob,
 ) (tasks.Task, error) {
 	return nil, d.err

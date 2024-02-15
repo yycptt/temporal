@@ -56,7 +56,7 @@ func Invoke(
 	response, err := historyTaskQueueManager.ReadRawTasks(ctx, &persistence.ReadTasksRequest{
 		QueueKey: persistence.QueueKey{
 			QueueType:     persistence.QueueTypeHistoryDLQ,
-			Category:      category,
+			CategoryID:    category.ID(),
 			SourceCluster: req.DlqKey.SourceCluster,
 			TargetCluster: req.DlqKey.TargetCluster,
 		},

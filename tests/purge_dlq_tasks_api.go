@@ -165,7 +165,7 @@ func (s *PurgeDLQTasksSuite) TestPurgeDLQTasks() {
 
 			queueKey := persistence.QueueKey{
 				QueueType:     persistence.QueueTypeHistoryDLQ,
-				Category:      defaultParams.category,
+				CategoryID:    defaultParams.category.ID(),
 				SourceCluster: defaultParams.sourceCluster,
 				TargetCluster: defaultParams.targetCluster,
 			}

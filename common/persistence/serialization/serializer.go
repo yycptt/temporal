@@ -110,7 +110,7 @@ type (
 		ParseReplicationTask(replicationTask *persistencespb.ReplicationTaskInfo) (tasks.Task, error)
 
 		SerializeTask(task tasks.Task) (*commonpb.DataBlob, error)
-		DeserializeTask(category tasks.Category, blob *commonpb.DataBlob) (tasks.Task, error)
+		DeserializeTask(categoryID int, blob *commonpb.DataBlob) (tasks.Task, error)
 	}
 
 	// SerializationError is an error type for serialization

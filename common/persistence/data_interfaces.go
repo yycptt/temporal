@@ -1215,7 +1215,7 @@ type (
 	// QueueKey identifies a history task queue. It is converted to a queue name using the GetQueueName method.
 	QueueKey struct {
 		QueueType     QueueV2Type
-		Category      tasks.Category
+		CategoryID    int
 		SourceCluster string
 		// TargetCluster is only used for cross-cluster replication tasks.
 		TargetCluster string

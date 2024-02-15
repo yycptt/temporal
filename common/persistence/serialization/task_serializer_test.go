@@ -369,7 +369,7 @@ func (s *taskSerializerSuite) assertEqualTasks(
 ) {
 	blob, err := s.taskSerializer.SerializeTask(task)
 	s.NoError(err)
-	deserializedTask, err := s.taskSerializer.DeserializeTask(task.GetCategory(), blob)
+	deserializedTask, err := s.taskSerializer.DeserializeTask(task.GetCategory().ID(), blob)
 	s.NoError(err)
 	s.Equal(task, deserializedTask)
 }
