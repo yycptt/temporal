@@ -221,6 +221,12 @@ func (e *stateMachineEnvironment) loadAndValidateMutableState(
 
 // validateStateMachineRef compares the ref and associated state machine's version and transition count to detect staleness.
 func (e *stateMachineEnvironment) validateStateMachineRef(ms workflow.MutableState, ref hsm.Ref) error {
+
+	if ref.StateMachineRef.MutableStateTransitionCount == 0 {
+		// transtion history was disabled when the ref is generated, fallback to the old validation logic
+		return e.validateStateMachineRefByVersion(ms, ref)
+	}
+
 	err := workflow.TransitionHistoryStalenessCheck(
 		ms.GetExecutionInfo().GetTransitionHistory(),
 		ref.StateMachineRef.MutableStateNamespaceFailoverVersion,
@@ -229,6 +235,7 @@ func (e *stateMachineEnvironment) validateStateMachineRef(ms workflow.MutableSta
 	if err != nil {
 		return err
 	}
+
 	node, err := ms.HSM().Child(ref.StateMachinePath())
 	if err != nil {
 		if errors.Is(err, hsm.ErrStateMachineNotFound) {
@@ -241,6 +248,44 @@ func (e *stateMachineEnvironment) validateStateMachineRef(ms workflow.MutableSta
 	if ref.StateMachineRef.MachineTransitionCount != 0 && node.TransitionCount() != ref.StateMachineRef.MachineTransitionCount {
 		return fmt.Errorf("%w: state machine transitions != task transitions", consts.ErrStaleReference)
 	}
+	return nil
+}
+
+func (e *stateMachineEnvironment) validateStateMachineRefByVersion(
+	ms workflow.MutableState,
+	ref hsm.Ref,
+) error {
+	node, err := ms.HSM().Child(ref.StateMachinePath())
+	if err != nil {
+		if errors.Is(err, hsm.ErrStateMachineNotFound) {
+			// for task processing logic, we will never run into this case because
+			// 1. queue processor already validated taskID against shard clock and mutable state won't be stale
+			// 2. we never delete HSM node once created today
+
+			// for nexus completion API call, since we never delete HSM node,
+			// if we run into this, it must due to stale mutable state.
+
+			// ideally the implementation here should be reload once and if still not found, return ErrStaleReference
+			return fmt.Errorf("%w: %w", consts.ErrStaleState, err)
+		}
+		return fmt.Errorf("%w: %w", serviceerror.NewInternal("node lookup failed"), err)
+	}
+
+	// this check if the node we loaded is the one the task is intended for
+	// without HSM node deletion, HSM path + initial failover version can uniquely identify a HSM node
+	if node.InitialNamespaceFailoverVersion() != ref.StateMachineRef.InitialNamespaceFailoverVersion {
+		return fmt.Errorf("%w: initial namespace failover version mismatch", consts.ErrStaleReference)
+	}
+
+	if ref.StateMachineRef.MachineTransitionCount != 0 {
+		if node.CurrentNamespaceFailoverVersion() != ref.StateMachineRef.MutableStateNamespaceFailoverVersion {
+			return fmt.Errorf("%w: current namespace failover version mismatch", consts.ErrStaleReference)
+		}
+		if node.TransitionCount() != ref.StateMachineRef.MachineTransitionCount {
+			return fmt.Errorf("%w: state machine transitions != task transitions", consts.ErrStaleReference)
+		}
+	}
+
 	return nil
 }
 

@@ -51,6 +51,7 @@ import (
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/common/persistence/versionhistory"
 	serviceerrors "go.temporal.io/server/common/serviceerror"
+	"go.temporal.io/server/service/history/hsm"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/workflow"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
@@ -166,7 +167,17 @@ func (r *WorkflowStateReplicatorImpl) SyncWorkflowState(
 				common.EmptyVersion,
 			)
 		}
-		return nil
+		engine, err := r.shardContext.GetEngine(ctx)
+		if err != nil {
+			return err
+		}
+		return engine.SyncHSM(ctx, &hsm.SyncRequest{
+			WorkflowKey: wfCtx.GetWorkflowKey(),
+			StateMachineNode: &persistencespb.StateMachineNode{
+				Children: executionInfo.SubStateMachinesByType,
+			},
+			EventVersionHistory: incomingVersionHistory,
+		})
 	default:
 		return err
 	}

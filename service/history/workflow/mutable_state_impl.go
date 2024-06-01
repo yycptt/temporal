@@ -688,7 +688,7 @@ func (ms *MutableStateImpl) UpdateCurrentVersion(
 	forceUpdate bool,
 ) error {
 
-	if ms.config.EnableNexus() &&
+	if ms.config.EnableTransitionHistory() &&
 		len(ms.executionInfo.TransitionHistory) != 0 {
 
 		// this make sure current version >= last write version
@@ -769,7 +769,7 @@ func (ms *MutableStateImpl) GetCloseVersion() (int64, error) {
 }
 
 func (ms *MutableStateImpl) GetLastWriteVersion() (int64, error) {
-	if ms.config.EnableNexus() &&
+	if ms.config.EnableTransitionHistory() &&
 		len(ms.executionInfo.TransitionHistory) != 0 {
 
 		lastVersionedTransition := ms.executionInfo.TransitionHistory[len(ms.executionInfo.TransitionHistory)-1]
@@ -5247,7 +5247,7 @@ func (ms *MutableStateImpl) closeTransactionUpdateTransitionHistory(
 		return nil
 	}
 
-	if !ms.config.EnableNexus() {
+	if !ms.config.EnableTransitionHistory() {
 		return nil
 	}
 
@@ -5306,6 +5306,11 @@ func (ms *MutableStateImpl) closeTransactionPrepareReplicationTasks(
 	ms.InsertTasks[tasks.CategoryReplication] = append(
 		ms.InsertTasks[tasks.CategoryReplication],
 		ms.syncActivityToReplicationTask(transactionPolicy)...,
+	)
+
+	ms.InsertTasks[tasks.CategoryReplication] = append(
+		ms.InsertTasks[tasks.CategoryReplication],
+		ms.dirtyHSMToReplicationTask(transactionPolicy, workflowEventsSeq)...,
 	)
 
 	if transactionPolicy == TransactionPolicyPassive &&
@@ -5447,6 +5452,29 @@ func (ms *MutableStateImpl) syncActivityToReplicationTask(
 			)
 		}
 		return nil
+	case TransactionPolicyPassive:
+		return emptyTasks
+	default:
+		panic(fmt.Sprintf("unknown transaction policy: %v", transactionPolicy))
+	}
+}
+
+func (ms *MutableStateImpl) dirtyHSMToReplicationTask(
+	transactionPolicy TransactionPolicy,
+	workflowEventsSeq []*persistence.WorkflowEvents,
+) []tasks.Task {
+	switch transactionPolicy {
+	case TransactionPolicyActive:
+		// HSM().Dirty() implies Nexus is enabled.
+		if ms.HSM().Dirty() && len(workflowEventsSeq) == 0 && ms.generateReplicationTask() {
+			return []tasks.Task{
+				&tasks.SyncHSMTask{
+					WorkflowKey: ms.GetWorkflowKey(),
+					// TaskID and VisibilityTimestamp are set by shard
+				},
+			}
+		}
+		return emptyTasks
 	case TransactionPolicyPassive:
 		return emptyTasks
 	default:

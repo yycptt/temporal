@@ -294,15 +294,15 @@ func (r *TaskGeneratorImpl) getRetention() (time.Duration, error) {
 func (r *TaskGeneratorImpl) GenerateDirtySubStateMachineTasks(
 	stateMachineRegistry *hsm.Registry,
 ) error {
-	tree := r.mutableState.HSM()
-	// Early return here to avoid accessing the transition history. It may be disabled via dynamic config.
-	outputs := tree.Outputs()
-	if len(outputs) == 0 {
-		return nil
+
+	var versionedTransition *persistencespb.VersionedTransition
+	if len(r.mutableState.GetExecutionInfo().TransitionHistory) > 0 {
+		transitionHistory := r.mutableState.GetExecutionInfo().TransitionHistory
+		versionedTransition = transitionHistory[len(transitionHistory)-1]
 	}
-	transitionHistory := r.mutableState.GetExecutionInfo().TransitionHistory
-	versionedTransition := transitionHistory[len(transitionHistory)-1]
-	for _, pao := range outputs {
+
+	tree := r.mutableState.HSM()
+	for _, pao := range tree.Outputs() {
 		node, err := tree.Child(pao.Path)
 		if err != nil {
 			return err
@@ -755,6 +755,11 @@ func (r *TaskGeneratorImpl) GenerateMigrationTasks() ([]tasks.Task, int64, error
 		r.mutableState.GetPendingActivityInfos(),
 		activityIDs,
 	)...)
+	if r.config.EnableNexus() {
+		replicationTasks = append(replicationTasks, &tasks.SyncHSMTask{
+			WorkflowKey: workflowKey,
+		})
+	}
 	return replicationTasks, executionInfo.StateTransitionCount, nil
 
 }
@@ -821,14 +826,19 @@ func generateSubStateMachineTask(
 	if !task.Concurrent() {
 		transitionCount = node.TransitionCount()
 	}
+	mutableStateTransitionCount := int64(0)
+	if versionedTransition != nil {
+		mutableStateTransitionCount = versionedTransition.MaxTransitionCount
+	}
 	smt := tasks.StateMachineTask{
 		WorkflowKey: mutableState.GetWorkflowKey(),
 		Info: &persistencespb.StateMachineTaskInfo{
 			Ref: &persistencespb.StateMachineRef{
 				Path:                                 ppath,
-				MutableStateNamespaceFailoverVersion: versionedTransition.NamespaceFailoverVersion,
-				MutableStateTransitionCount:          versionedTransition.MaxTransitionCount,
+				MutableStateNamespaceFailoverVersion: node.CurrentNamespaceFailoverVersion(),
+				MutableStateTransitionCount:          mutableStateTransitionCount,
 				MachineTransitionCount:               transitionCount,
+				InitialNamespaceFailoverVersion:      node.InitialNamespaceFailoverVersion(),
 			},
 			Type: task.Type().ID,
 			Data: data,

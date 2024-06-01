@@ -55,6 +55,10 @@ func (b *backend) LoadHistoryEvent(ctx context.Context, token []byte) (*historyp
 	panic("unimplemented - not used in test")
 }
 
+func (b *backend) GetCurrentVersion() int64 {
+	panic("TODO: implement me")
+}
+
 func init() {
 	for _, def := range defs {
 		if err := reg.RegisterMachine(def); err != nil {

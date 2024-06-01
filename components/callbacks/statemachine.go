@@ -139,6 +139,11 @@ func (stateMachineDefinition) Serialize(state any) ([]byte, error) {
 	return nil, fmt.Errorf("invalid callback provided: %v", state) // nolint:goerr113
 }
 
+func (stateMachineDefinition) Compare(state1, state2 any) (int, error) {
+	// TODO
+	return 0, nil
+}
+
 func RegisterStateMachine(r *hsm.Registry) error {
 	return r.RegisterMachine(stateMachineDefinition{})
 }

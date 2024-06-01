@@ -138,19 +138,19 @@ func (r *ActivityStateReplicatorImpl) SyncActivityState(
 		},
 		mutableState,
 		&historyservice.ActivitySyncInfo{
-			Version:            request.Version,
-			ScheduledEventId:   request.ScheduledEventId,
-			ScheduledTime:      request.ScheduledTime,
-			StartedEventId:     request.StartedEventId,
-			StartedTime:        request.StartedTime,
-			LastHeartbeatTime:  request.LastHeartbeatTime,
-			Details:            request.Details,
-			Attempt:            request.Attempt,
-			LastFailure:        request.LastFailure,
-			LastWorkerIdentity: request.LastWorkerIdentity,
-			LastStartedBuildId: request.LastStartedBuildId,
+			Version:                    request.Version,
+			ScheduledEventId:           request.ScheduledEventId,
+			ScheduledTime:              request.ScheduledTime,
+			StartedEventId:             request.StartedEventId,
+			StartedTime:                request.StartedTime,
+			LastHeartbeatTime:          request.LastHeartbeatTime,
+			Details:                    request.Details,
+			Attempt:                    request.Attempt,
+			LastFailure:                request.LastFailure,
+			LastWorkerIdentity:         request.LastWorkerIdentity,
+			LastStartedBuildId:         request.LastStartedBuildId,
 			LastStartedRedirectCounter: request.LastStartedRedirectCounter,
-			VersionHistory:     request.VersionHistory,
+			VersionHistory:             request.VersionHistory,
 		},
 	)
 	if err != nil {
@@ -219,6 +219,9 @@ func (r *ActivityStateReplicatorImpl) SyncActivitiesState(
 			// or the target workflow is long gone
 			// the safe solution to this is to throw away the sync activity task
 			// or otherwise, worker attempt will exceed limit and put this message to DLQ
+
+			// TODO: this should return serviceerrors.NewRetryReplication to trigger a resend
+			// resend logic will handle not found case and drop the task.
 			return nil
 		}
 		return err

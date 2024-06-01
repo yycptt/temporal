@@ -196,6 +196,9 @@ func (p *ackMgrImpl) GetTask(
 	taskInfo *replicationspb.ReplicationTaskInfo,
 ) (*replicationspb.ReplicationTask, error) {
 
+	// TODO: can we deprecate this method?
+	// It's only used by the old replication DLQ logic.
+
 	switch taskInfo.TaskType {
 	case enumsspb.TASK_TYPE_REPLICATION_SYNC_ACTIVITY:
 		return p.ConvertTask(ctx, &tasks.SyncActivityTask{
@@ -233,6 +236,16 @@ func (p *ackMgrImpl) GetTask(
 			TaskID:              taskInfo.TaskId,
 			Version:             taskInfo.Version,
 			Priority:            taskInfo.GetPriority(),
+		})
+	case enumsspb.TASK_TYPE_REPLICATION_SYNC_HSM:
+		return p.ConvertTask(ctx, &tasks.SyncHSMTask{
+			WorkflowKey: definition.NewWorkflowKey(
+				taskInfo.GetNamespaceId(),
+				taskInfo.GetWorkflowId(),
+				taskInfo.GetRunId(),
+			),
+			VisibilityTimestamp: time.Unix(0, 0), // TODO add the missing attribute to proto definition
+			TaskID:              taskInfo.TaskId,
 		})
 	default:
 		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown replication task type: %v", taskInfo.TaskType))
@@ -432,6 +445,13 @@ func (p *ackMgrImpl) ConvertTask(
 			p.eventBlobCache,
 			p.executionMgr,
 			p.logger,
+		)
+	case *tasks.SyncHSMTask:
+		return convertSyncHSMReplicationTask(
+			ctx,
+			p.shardContext,
+			task,
+			p.workflowCache,
 		)
 	default:
 		return nil, errUnknownReplicationTask

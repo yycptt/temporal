@@ -93,6 +93,10 @@ func (stateMachineDefinition) Type() hsm.MachineType {
 	return StateMachineType
 }
 
+func (stateMachineDefinition) Compare(any, any) (int, error) {
+	return 0, serviceerror.NewUnimplemented("workflow mutable state persistence is not supported in the HSM framework")
+}
+
 func RegisterStateMachine(reg *hsm.Registry) error {
 	return reg.RegisterMachine(stateMachineDefinition{})
 }

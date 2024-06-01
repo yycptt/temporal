@@ -151,23 +151,23 @@ func convertActivityStateReplicationTask(
 				SourceTaskId: taskInfo.TaskID,
 				Attributes: &replicationspb.ReplicationTask_SyncActivityTaskAttributes{
 					SyncActivityTaskAttributes: &replicationspb.SyncActivityTaskAttributes{
-						NamespaceId:        taskInfo.NamespaceID,
-						WorkflowId:         taskInfo.WorkflowID,
-						RunId:              taskInfo.RunID,
-						Version:            activityInfo.Version,
-						ScheduledEventId:   activityInfo.ScheduledEventId,
-						ScheduledTime:      activityInfo.ScheduledTime,
-						StartedEventId:     activityInfo.StartedEventId,
-						StartedTime:        startedTime,
-						LastHeartbeatTime:  activityInfo.LastHeartbeatUpdateTime,
-						Details:            activityInfo.LastHeartbeatDetails,
-						Attempt:            activityInfo.Attempt,
-						LastFailure:        activityInfo.RetryLastFailure,
-						LastWorkerIdentity: activityInfo.RetryLastWorkerIdentity,
-						LastStartedBuildId: lastStartedBuildId,
+						NamespaceId:                taskInfo.NamespaceID,
+						WorkflowId:                 taskInfo.WorkflowID,
+						RunId:                      taskInfo.RunID,
+						Version:                    activityInfo.Version,
+						ScheduledEventId:           activityInfo.ScheduledEventId,
+						ScheduledTime:              activityInfo.ScheduledTime,
+						StartedEventId:             activityInfo.StartedEventId,
+						StartedTime:                startedTime,
+						LastHeartbeatTime:          activityInfo.LastHeartbeatUpdateTime,
+						Details:                    activityInfo.LastHeartbeatDetails,
+						Attempt:                    activityInfo.Attempt,
+						LastFailure:                activityInfo.RetryLastFailure,
+						LastWorkerIdentity:         activityInfo.RetryLastWorkerIdentity,
+						LastStartedBuildId:         lastStartedBuildId,
 						LastStartedRedirectCounter: activityInfo.GetUseWorkflowBuildIdInfo().GetLastRedirectCounter(),
-						BaseExecutionInfo:  persistence.CopyBaseWorkflowInfo(mutableState.GetBaseWorkflowInfo()),
-						VersionHistory:     versionhistory.CopyVersionHistory(currentVersionHistory),
+						BaseExecutionInfo:          persistence.CopyBaseWorkflowInfo(mutableState.GetBaseWorkflowInfo()),
+						VersionHistory:             versionhistory.CopyVersionHistory(currentVersionHistory),
 					},
 				},
 				VisibilityTime: timestamppb.New(taskInfo.VisibilityTimestamp),
@@ -199,6 +199,45 @@ func convertWorkflowStateReplicationTask(
 				Attributes: &replicationspb.ReplicationTask_SyncWorkflowStateTaskAttributes{
 					SyncWorkflowStateTaskAttributes: &replicationspb.SyncWorkflowStateTaskAttributes{
 						WorkflowState: mutableState.CloneToProto(),
+					},
+				},
+				VisibilityTime: timestamppb.New(taskInfo.VisibilityTimestamp),
+			}, nil
+		},
+	)
+}
+
+func convertSyncHSMReplicationTask(
+	ctx context.Context,
+	shardContext shard.Context,
+	taskInfo *tasks.SyncHSMTask,
+	workflowCache wcache.Cache,
+) (*replicationspb.ReplicationTask, error) {
+	return generateStateReplicationTask(
+		ctx,
+		shardContext,
+		definition.NewWorkflowKey(taskInfo.NamespaceID, taskInfo.WorkflowID, taskInfo.RunID),
+		workflowCache,
+		func(mutableState workflow.MutableState) (*replicationspb.ReplicationTask, error) {
+			// HSM can be updated after workflow is completed
+			// so no check on workflow state here.
+
+			versionHistories := mutableState.GetExecutionInfo().GetVersionHistories()
+			currentVersionHistory, err := versionhistory.GetCurrentVersionHistory(versionHistories)
+			if err != nil {
+				return nil, err
+			}
+
+			return &replicationspb.ReplicationTask{
+				TaskType:     enumsspb.REPLICATION_TASK_TYPE_SYNC_HSM_TASK,
+				SourceTaskId: taskInfo.TaskID,
+				Attributes: &replicationspb.ReplicationTask_SyncHsmAttributes{
+					SyncHsmAttributes: &replicationspb.SyncHSMAttributes{
+						NamespaceId:      taskInfo.NamespaceID,
+						WorkflowId:       taskInfo.WorkflowID,
+						RunId:            taskInfo.RunID,
+						VersionHistory:   currentVersionHistory,
+						StateMachineNode: mutableState.HSM().PersistenceRepr(),
 					},
 				},
 				VisibilityTime: timestamppb.New(taskInfo.VisibilityTimestamp),

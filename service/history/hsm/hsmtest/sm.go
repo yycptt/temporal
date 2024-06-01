@@ -107,3 +107,7 @@ func (d Definition) Type() hsm.MachineType {
 		Name: d.name,
 	}
 }
+
+func (d Definition) Compare(s1, s2 any) (int, error) {
+	panic("not implemented")
+}

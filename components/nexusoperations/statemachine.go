@@ -205,6 +205,11 @@ func (operationMachineDefinition) Serialize(state any) ([]byte, error) {
 	return nil, fmt.Errorf("invalid operation provided: %v", state) // nolint:goerr113
 }
 
+func (operationMachineDefinition) Compare(state1, state2 any) (int, error) {
+	// TODO
+	return 0, nil
+}
+
 func RegisterStateMachines(r *hsm.Registry) error {
 	if err := r.RegisterMachine(operationMachineDefinition{}); err != nil {
 		return err
@@ -439,6 +444,11 @@ func (cancelationMachineDefinition) Serialize(state any) ([]byte, error) {
 
 func (cancelationMachineDefinition) Type() hsm.MachineType {
 	return CancelationMachineType
+}
+
+func (cancelationMachineDefinition) Compare(state1, state2 any) (int, error) {
+	// TODO
+	return 0, nil
 }
 
 // Cancelation state machine for canceling an operation.

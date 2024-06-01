@@ -116,6 +116,7 @@ func (e *taskExecutorImpl) Execute(
 		err = e.handleHistoryReplicationTask(ctx, replicationTask, forceApply)
 	case enumsspb.REPLICATION_TASK_TYPE_SYNC_WORKFLOW_STATE_TASK:
 		err = e.handleSyncWorkflowStateTask(ctx, replicationTask, forceApply)
+	// old code path, not handling sync HSM task right now
 	default:
 		e.logger.Error("Unknown task type.")
 		err = ErrUnknownReplicationTask
@@ -145,22 +146,22 @@ func (e *taskExecutorImpl) handleActivityTask(
 	}()
 
 	request := &historyservice.SyncActivityRequest{
-		NamespaceId:        attr.NamespaceId,
-		WorkflowId:         attr.WorkflowId,
-		RunId:              attr.RunId,
-		Version:            attr.Version,
-		ScheduledEventId:   attr.ScheduledEventId,
-		ScheduledTime:      attr.ScheduledTime,
-		StartedEventId:     attr.StartedEventId,
-		StartedTime:        attr.StartedTime,
-		LastHeartbeatTime:  attr.LastHeartbeatTime,
-		Details:            attr.Details,
-		Attempt:            attr.Attempt,
-		LastFailure:        attr.LastFailure,
-		LastWorkerIdentity: attr.LastWorkerIdentity,
-		LastStartedBuildId: attr.LastStartedBuildId,
+		NamespaceId:                attr.NamespaceId,
+		WorkflowId:                 attr.WorkflowId,
+		RunId:                      attr.RunId,
+		Version:                    attr.Version,
+		ScheduledEventId:           attr.ScheduledEventId,
+		ScheduledTime:              attr.ScheduledTime,
+		StartedEventId:             attr.StartedEventId,
+		StartedTime:                attr.StartedTime,
+		LastHeartbeatTime:          attr.LastHeartbeatTime,
+		Details:                    attr.Details,
+		Attempt:                    attr.Attempt,
+		LastFailure:                attr.LastFailure,
+		LastWorkerIdentity:         attr.LastWorkerIdentity,
+		LastStartedBuildId:         attr.LastStartedBuildId,
 		LastStartedRedirectCounter: attr.LastStartedRedirectCounter,
-		VersionHistory:     attr.GetVersionHistory(),
+		VersionHistory:             attr.GetVersionHistory(),
 	}
 	ctx, cancel := e.newTaskContext(ctx, attr.NamespaceId)
 	defer cancel()

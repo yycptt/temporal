@@ -34,6 +34,9 @@ message StateMachineNode {
     // Seralized data of the underlying state machine.
     bytes data = 2;
     map<int32, StateMachineMap> children = 3;
+
+    int64 initial_namespace_failover_version = 4;
+    int64 current_namespace_failover_version = 5;
 }
 
 // Map of state machine ID to StateMachineNode.
@@ -56,6 +59,7 @@ message StateMachineRef {
     repeated StateMachineKey path = 1;
     // Namespace failover version on the corresponding mutable state object, used for staleness detection when global
     // namespaces are enabled.
+    // this is also the current namespace failover version when this ref is generated.
     int64 mutable_state_namespace_failover_version = 2;
     // Number of transitions on the corresponding mutable state object. Used to verify that a task is not referencing a
     // stale state or, in some situations, that the task itself is not stale.
@@ -64,6 +68,8 @@ message StateMachineRef {
     // If non-zero, the state machine is assumed to support only non-concurrent tasks, and this number should match the
     // number of state transitions on the corresponding state machine object.
     int64 machine_transition_count = 4;
+
+    int64 initial_namespace_failover_version = 5;
 }
 
 message StateMachineTaskInfo {

@@ -915,6 +915,20 @@ func (mr *MockEngineMockRecorder) SyncActivity(ctx, request interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncActivity", reflect.TypeOf((*MockEngine)(nil).SyncActivity), ctx, request)
 }
 
+// SyncHSM mocks base method.
+func (m *MockEngine) SyncHSM(ctx context.Context, request *hsm.SyncRequest) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncHSM", ctx, request)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SyncHSM indicates an expected call of SyncHSM.
+func (mr *MockEngineMockRecorder) SyncHSM(ctx, request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncHSM", reflect.TypeOf((*MockEngine)(nil).SyncHSM), ctx, request)
+}
+
 // SyncShardStatus mocks base method.
 func (m *MockEngine) SyncShardStatus(ctx context.Context, request *historyservice.SyncShardStatusRequest) error {
 	m.ctrl.T.Helper()

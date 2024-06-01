@@ -142,3 +142,7 @@ func (n *nodeBackend) LoadHistoryEvent(ctx context.Context, token []byte) (*hist
 	}
 	return event, nil
 }
+
+func (n *nodeBackend) GetCurrentVersion() int64 {
+	panic("TODO: implement me")
+}
