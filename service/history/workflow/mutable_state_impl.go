@@ -168,7 +168,8 @@ type (
 		// Buffered events are added to this value when calling GetApproximatePersistedSize.
 		approximateSize int
 		// Total number of tomestones tracked in mutable state
-		totalTombstones int
+		totalTombstones         int
+		versionedTransitionInDB *persistencespb.VersionedTransition
 		// Buffer events from DB
 		bufferEventsInDB []*historypb.HistoryEvent
 		// Indicates the workflow state in DB, can be used to calculate
@@ -446,6 +447,9 @@ func NewMutableStateFromDB(
 	mutableState.nextEventIDInDB = dbRecord.NextEventId
 	mutableState.dbRecordVersion = dbRecordVersion
 	mutableState.checksum = dbRecord.Checksum
+	if len(mutableState.executionInfo.TransitionHistory) != 0 {
+		mutableState.versionedTransitionInDB = mutableState.executionInfo.TransitionHistory[len(mutableState.executionInfo.TransitionHistory)-1]
+	}
 
 	if len(dbRecord.Checksum.GetValue()) > 0 {
 		switch {
@@ -5045,7 +5049,30 @@ func (ms *MutableStateImpl) UpdateWorkflowStateStatus(
 }
 
 func (ms *MutableStateImpl) IsDirty() bool {
-	return ms.hBuilder.IsDirty() || len(ms.InsertTasks) > 0 || (ms.stateMachineNode != nil && ms.stateMachineNode.Dirty())
+	return len(ms.InsertTasks) > 0 || ms.isStateDirty()
+}
+
+func (ms *MutableStateImpl) isStateDirty() bool {
+	// TODO: we need to track more workflow state changes
+	// e.g. changes to executionInfo.CancelRequested
+	return ms.hBuilder.IsDirty() ||
+		len(ms.updateActivityInfos) > 0 ||
+		len(ms.deleteActivityInfos) > 0 ||
+		len(ms.updateTimerInfos) > 0 ||
+		len(ms.deleteTimerInfos) > 0 ||
+		len(ms.updateChildExecutionInfos) > 0 ||
+		len(ms.deleteChildExecutionInfos) > 0 ||
+		len(ms.updateRequestCancelInfos) > 0 ||
+		len(ms.deleteRequestCancelInfos) > 0 ||
+		len(ms.updateSignalInfos) > 0 ||
+		len(ms.deleteSignalInfos) > 0 ||
+		len(ms.updateSignalRequestedIDs) > 0 ||
+		len(ms.deleteSignalRequestedIDs) > 0 ||
+		len(ms.updateInfoUpdated) > 0 ||
+		ms.visibilityUpdated ||
+		ms.executionStateUpdated ||
+		ms.workflowTaskUpdated ||
+		(ms.stateMachineNode != nil && ms.stateMachineNode.Dirty())
 }
 
 func (ms *MutableStateImpl) StartTransaction(
@@ -5236,6 +5263,8 @@ func (ms *MutableStateImpl) closeTransaction(
 		return closeTransactionResult{}, err
 	}
 
+	ms.closeTransactionHandleUnknownVersionedTransition()
+
 	ms.closeTransactionTrackLastUpdateVersionedTransition(
 		transactionPolicy,
 	)
@@ -5340,6 +5369,7 @@ func (ms *MutableStateImpl) closeTransactionUpdateTransitionHistory(
 	workflowEventsSeq []*persistence.WorkflowEvents,
 	newBufferEvents []*historypb.HistoryEvent,
 ) error {
+
 	if len(workflowEventsSeq) > 0 {
 		lastEvents := workflowEventsSeq[len(workflowEventsSeq)-1].Events
 		lastEvent := lastEvents[len(lastEvents)-1]
@@ -5513,6 +5543,72 @@ func (ms *MutableStateImpl) capTombstoneCount() {
 	}
 }
 
+func (ms *MutableStateImpl) closeTransactionHandleUnknownVersionedTransition() {
+	if len(ms.executionInfo.TransitionHistory) != 0 {
+		if CompareVersionedTransition(
+			ms.versionedTransitionInDB,
+			ms.executionInfo.TransitionHistory[len(ms.executionInfo.TransitionHistory)-1],
+		) != 0 {
+			// versioned transition updated in the transaction
+			return
+		}
+	}
+
+	// already in unknown state or
+	// in an old state that didn't get updated
+
+	if !ms.isStateDirty() {
+		// no state change in the transaction
+		return
+	}
+
+	// State changed but transition history not updated.
+	// We are in unknown versioned transition state, clear the transition history.
+
+	ms.executionInfo.TransitionHistory = nil
+	ms.executionInfo.SubStateMachineTombstoneBatches = nil
+
+	for _, activityInfo := range ms.updateActivityInfos {
+		activityInfo.LastUpdateVersionedTransition = nil
+	}
+	for _, timerInfo := range ms.updateTimerInfos {
+		timerInfo.LastUpdateVersionedTransition = nil
+	}
+	for _, childInfo := range ms.updateChildExecutionInfos {
+		childInfo.LastUpdateVersionedTransition = nil
+	}
+	for _, requestCancelInfo := range ms.updateRequestCancelInfos {
+		requestCancelInfo.LastUpdateVersionedTransition = nil
+	}
+	for _, signalInfo := range ms.updateSignalInfos {
+		signalInfo.LastUpdateVersionedTransition = nil
+	}
+	for updateID := range ms.updateInfoUpdated {
+		ms.executionInfo.UpdateInfos[updateID].LastUpdateVersionedTransition = nil
+	}
+	if len(ms.updateSignalRequestedIDs) > 0 || len(ms.deleteSignalRequestedIDs) > 0 {
+		ms.executionInfo.SignalRequestIdsLastUpdateVersionedTransition = nil
+	}
+	if ms.visibilityUpdated {
+		ms.executionInfo.VisibilityLastUpdateVersionedTransition = nil
+	}
+	if ms.executionStateUpdated {
+		ms.executionState.LastUpdateVersionedTransition = nil
+	}
+	if ms.workflowTaskUpdated {
+		ms.executionInfo.WorkflowTaskLastUpdateVersionedTransition = nil
+	}
+	if ms.stateMachineNode != nil {
+		// the error must be nil here since the fn passed into Walk() always returns nil
+		_ = ms.stateMachineNode.Walk(func(node *hsm.Node) error {
+			persistenceRepr := node.InternalRepr()
+			persistenceRepr.LastUpdateVersionedTransition.TransitionCount = 0
+			persistenceRepr.InitialVersionedTransition.TransitionCount = 0
+			return nil
+		})
+	}
+}
+
 func (ms *MutableStateImpl) closeTransactionPrepareTasks(
 	transactionPolicy TransactionPolicy,
 	eventBatches [][]*historypb.HistoryEvent,
@@ -5604,6 +5700,9 @@ func (ms *MutableStateImpl) cleanupTransaction() error {
 
 	ms.stateInDB = ms.executionState.State
 	ms.nextEventIDInDB = ms.GetNextEventID()
+	if len(ms.executionInfo.TransitionHistory) != 0 {
+		ms.versionedTransitionInDB = ms.executionInfo.TransitionHistory[len(ms.executionInfo.TransitionHistory)-1]
+	}
 	// ms.dbRecordVersion remains the same
 
 	ms.hBuilder = historybuilder.New(
