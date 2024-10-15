@@ -57,6 +57,7 @@ import (
 	"go.temporal.io/server/common/sdk"
 	serviceerrors "go.temporal.io/server/common/serviceerror"
 	"go.temporal.io/server/common/worker_versioning"
+	"go.temporal.io/server/service/history/asm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/ndc"
@@ -80,6 +81,7 @@ type (
 
 func newTransferQueueActiveTaskExecutor(
 	shard shard.Context,
+	asmRegistry asm.Registry,
 	workflowCache wcache.Cache,
 	sdkClientFactory sdk.ClientFactory,
 	logger log.Logger,
@@ -92,6 +94,7 @@ func newTransferQueueActiveTaskExecutor(
 	return &transferQueueActiveTaskExecutor{
 		transferQueueTaskExecutorBase: newTransferQueueTaskExecutorBase(
 			shard,
+			asmRegistry,
 			workflowCache,
 			logger,
 			metricProvider,
@@ -159,6 +162,8 @@ func (t *transferQueueActiveTaskExecutor) Execute(
 		err = t.processResetWorkflow(ctx, task)
 	case *tasks.DeleteExecutionTask:
 		err = t.processDeleteExecutionTask(ctx, task)
+	case *tasks.StateMachineTask:
+		err = t.processStateMachineTask(ctx, task)
 	default:
 		err = errUnknownTransferTask
 	}
@@ -174,6 +179,37 @@ func (t *transferQueueActiveTaskExecutor) processDeleteExecutionTask(ctx context
 	task *tasks.DeleteExecutionTask) error {
 	return t.transferQueueTaskExecutorBase.processDeleteExecutionTask(ctx, task,
 		t.config.TransferProcessorEnsureCloseBeforeDelete())
+}
+
+func (t *transferQueueActiveTaskExecutor) processStateMachineTask(
+	ctx context.Context,
+	task *tasks.StateMachineTask,
+) (retError error) {
+
+	// Validate taskID vs shard clock
+
+	rootASMType := task.ASMTaskInfo.GetRootAsmType()
+	asmDef, ok := t.asmRegistry.Get(rootASMType)
+	if !ok {
+		return asm.ErrASMTypeNotRegistered
+	}
+
+	asmKey := asm.Key(taskWorkflowKey(task))
+	consistenceToken, err := asm.ToConsistenceToken(task.ASMTaskInfo.VersionedTransition)
+	if err != nil {
+		return err
+	}
+
+	asmTask, err := asmDef.Serializer().DeserializeTask(&commonpb.DataBlob{
+		// TODO: store the encoding as well.
+		EncodingType: enumspb.ENCODING_TYPE_UNSPECIFIED,
+		Data:         task.ASMTaskInfo.Data,
+	})
+	if err != nil {
+		return err
+	}
+
+	return asmDef.TaskExecutor().Execute(ctx, asmKey, consistenceToken, asmTask)
 }
 
 func (t *transferQueueActiveTaskExecutor) processActivityTask(

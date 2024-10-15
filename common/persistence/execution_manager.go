@@ -448,6 +448,14 @@ func (m *executionManagerImpl) SetWorkflowExecution(
 	return &SetWorkflowExecutionResponse{}, nil
 }
 
+func (m *executionManagerImpl) UpsertASM(
+	ctx context.Context,
+	request *UpsertASMRequest,
+) (*UpsertASMResponse, error) {
+	// TODO chasm: implement this
+	return nil, serviceerror.NewUnimplemented("UpsertASM is not implemented")
+}
+
 func (m *executionManagerImpl) serializeWorkflowEventBatches(
 	ctx context.Context,
 	shardID int32,
@@ -642,6 +650,14 @@ func (m *executionManagerImpl) SerializeWorkflowMutation( // unexport
 		result.UpsertSignalInfos[key] = blob
 	}
 
+	for key, info := range input.UpsertASMInfos {
+		blob, err := m.serializer.ASMToBlob(info, enumspb.ENCODING_TYPE_PROTO3)
+		if err != nil {
+			return nil, err
+		}
+		result.UpsertChildASMs[key] = blob
+	}
+
 	if len(input.NewBufferedEvents) > 0 {
 		result.NewBufferedEvents, err = m.serializer.SerializeEvents(input.NewBufferedEvents, enumspb.ENCODING_TYPE_PROTO3)
 		if err != nil {
@@ -680,6 +696,7 @@ func (m *executionManagerImpl) SerializeWorkflowSnapshot( // unexport
 		ChildExecutionInfos: make(map[int64]*commonpb.DataBlob, len(input.ChildExecutionInfos)),
 		RequestCancelInfos:  make(map[int64]*commonpb.DataBlob, len(input.RequestCancelInfos)),
 		SignalInfos:         make(map[int64]*commonpb.DataBlob, len(input.SignalInfos)),
+		ChildASMs:           make(map[string]*commonpb.DataBlob, len(input.ASMInfos)),
 
 		ExecutionInfo:      input.ExecutionInfo,
 		ExecutionState:     input.ExecutionState,
@@ -739,6 +756,13 @@ func (m *executionManagerImpl) SerializeWorkflowSnapshot( // unexport
 			return nil, err
 		}
 		result.SignalInfos[key] = blob
+	}
+	for key, info := range input.ASMInfos {
+		blob, err := m.serializer.ASMToBlob(info, enumspb.ENCODING_TYPE_PROTO3)
+		if err != nil {
+			return nil, err
+		}
+		result.ChildASMs[key] = blob
 	}
 	for key := range input.SignalRequestedIDs {
 		result.SignalRequestedIDs[key] = struct{}{}
@@ -1010,6 +1034,7 @@ func (m *executionManagerImpl) toWorkflowMutableState(internState *InternalWorkf
 		ChildExecutionInfos: make(map[int64]*persistencespb.ChildExecutionInfo),
 		RequestCancelInfos:  make(map[int64]*persistencespb.RequestCancelInfo),
 		SignalInfos:         make(map[int64]*persistencespb.SignalInfo),
+		ChildAsmInfos:       make(map[string]*persistencespb.ASMInstance),
 		SignalRequestedIds:  internState.SignalRequestedIDs,
 		NextEventId:         internState.NextEventID,
 		BufferedEvents:      make([]*historypb.HistoryEvent, len(internState.BufferedEvents)),
@@ -1048,6 +1073,13 @@ func (m *executionManagerImpl) toWorkflowMutableState(internState *InternalWorkf
 			return nil, err
 		}
 		state.SignalInfos[key] = info
+	}
+	for key, blob := range internState.ChildASMs {
+		info, err := m.serializer.ASMFromBlob(blob)
+		if err != nil {
+			return nil, err
+		}
+		state.ChildAsmInfos[key] = info
 	}
 	var err error
 	state.ExecutionInfo, err = m.serializer.WorkflowExecutionInfoFromBlob(internState.ExecutionInfo)

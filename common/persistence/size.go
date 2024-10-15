@@ -65,6 +65,8 @@ func statusOfInternalWorkflow(
 	signalRequestIDCount := len(internalState.SignalRequestedIDs)
 	signalRequestIDSize := sizeOfStringSlice(internalState.SignalRequestedIDs)
 
+	// TODO chasm: add size for childASMs
+
 	bufferedEventsCount := len(internalState.BufferedEvents)
 	bufferedEventsSize := sizeOfBlobSlice(internalState.BufferedEvents)
 

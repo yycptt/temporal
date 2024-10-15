@@ -408,6 +408,7 @@ type (
 		ChildExecutionInfos map[int64]*commonpb.DataBlob  // ChildExecutionInfo
 		RequestCancelInfos  map[int64]*commonpb.DataBlob  // RequestCancelInfo
 		SignalInfos         map[int64]*commonpb.DataBlob  // SignalInfo
+		ChildASMs           map[string]*commonpb.DataBlob // ChildASM
 		SignalRequestedIDs  []string
 		ExecutionInfo       *commonpb.DataBlob // WorkflowExecutionInfo
 		ExecutionState      *commonpb.DataBlob // WorkflowExecutionState
@@ -459,6 +460,8 @@ type (
 		DeleteRequestCancelInfos  map[int64]struct{}
 		UpsertSignalInfos         map[int64]*commonpb.DataBlob
 		DeleteSignalInfos         map[int64]struct{}
+		UpsertChildASMs           map[string]*commonpb.DataBlob
+		DeleteChildASMs           map[string]struct{}
 		UpsertSignalRequestedIDs  map[string]struct{}
 		DeleteSignalRequestedIDs  map[string]struct{}
 		NewBufferedEvents         *commonpb.DataBlob
@@ -492,6 +495,7 @@ type (
 		ChildExecutionInfos map[int64]*commonpb.DataBlob
 		RequestCancelInfos  map[int64]*commonpb.DataBlob
 		SignalInfos         map[int64]*commonpb.DataBlob
+		ChildASMs           map[string]*commonpb.DataBlob
 		SignalRequestedIDs  map[string]struct{}
 
 		Tasks map[tasks.Category][]InternalHistoryTask

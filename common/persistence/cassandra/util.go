@@ -124,6 +124,18 @@ func applyWorkflowMutationBatch(
 		return err
 	}
 
+	if err := updateChildASMs(
+		batch,
+		workflowMutation.UpsertChildASMs,
+		workflowMutation.DeleteChildASMs,
+		shardID,
+		namespaceID,
+		workflowID,
+		runID,
+	); err != nil {
+		return err
+	}
+
 	updateSignalsRequested(
 		batch,
 		workflowMutation.UpsertSignalRequestedIDs,
@@ -237,6 +249,17 @@ func applyWorkflowSnapshotBatchAsReset(
 		return err
 	}
 
+	if err := resetChildASMs(
+		batch,
+		workflowSnapshot.ChildASMs,
+		shardID,
+		namespaceID,
+		workflowID,
+		runID,
+	); err != nil {
+		return err
+	}
+
 	resetSignalRequested(
 		batch,
 		workflowSnapshot.SignalRequestedIDs,
@@ -330,6 +353,18 @@ func applyWorkflowSnapshotBatchAsNew(
 	if err := updateSignalInfos(
 		batch,
 		workflowSnapshot.SignalInfos,
+		nil,
+		shardID,
+		namespaceID,
+		workflowID,
+		runID,
+	); err != nil {
+		return err
+	}
+
+	if err := updateChildASMs(
+		batch,
+		workflowSnapshot.ChildASMs,
 		nil,
 		shardID,
 		namespaceID,
@@ -942,6 +977,72 @@ func resetSignalInfos(
 	return nil
 }
 
+func updateChildASMs(
+	batch *gocql.Batch,
+	childASMs map[string]*commonpb.DataBlob,
+	deleteKeys map[string]struct{},
+	shardID int32,
+	namespaceID string,
+	workflowID string,
+	runID string,
+) error {
+
+	for key, blob := range childASMs {
+		batch.Query(templateUpdateChildASMQuery,
+			key,
+			blob.Data,
+			blob.EncodingType.String(),
+			shardID,
+			rowTypeExecution,
+			namespaceID,
+			workflowID,
+			runID,
+			defaultVisibilityTimestamp,
+			rowTypeExecutionTaskID)
+	}
+
+	for deleteKey := range deleteKeys {
+		batch.Query(templateDeleteChildASMQuery,
+			deleteKey,
+			shardID,
+			rowTypeExecution,
+			namespaceID,
+			workflowID,
+			runID,
+			defaultVisibilityTimestamp,
+			rowTypeExecutionTaskID)
+	}
+	return nil
+}
+
+func resetChildASMs(
+	batch *gocql.Batch,
+	childASMs map[string]*commonpb.DataBlob,
+	shardID int32,
+	namespaceID string,
+	workflowID string,
+	runID string,
+) error {
+	cMap, cMapEncoding, err := resetChildASMMap(childASMs)
+
+	if err != nil {
+		return err
+	}
+
+	batch.Query(templateResetChildASMQuery,
+		cMap,
+		cMapEncoding.String(),
+		shardID,
+		rowTypeExecution,
+		namespaceID,
+		workflowID,
+		runID,
+		defaultVisibilityTimestamp,
+		rowTypeExecutionTaskID)
+
+	return nil
+}
+
 func updateSignalsRequested(
 	batch *gocql.Batch,
 	signalReqIDs map[string]struct{},
@@ -1099,6 +1200,20 @@ func resetSignalInfoMap(
 	for initiatedID, blob := range signalInfos {
 		encoding = blob.EncodingType
 		sMap[initiatedID] = blob.Data
+	}
+
+	return sMap, encoding, nil
+}
+
+func resetChildASMMap(
+	childASMs map[string]*commonpb.DataBlob,
+) (map[string][]byte, enumspb.EncodingType, error) {
+
+	sMap := make(map[string][]byte)
+	var encoding enumspb.EncodingType
+	for key, blob := range childASMs {
+		encoding = blob.EncodingType
+		sMap[key] = blob.Data
 	}
 
 	return sMap, encoding, nil

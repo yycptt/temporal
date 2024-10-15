@@ -43,6 +43,7 @@ import (
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/xdc"
+	"go.temporal.io/server/service/history/asm"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/ndc"
 	"go.temporal.io/server/service/history/queues"
@@ -75,6 +76,7 @@ type (
 
 func newTransferQueueStandbyTaskExecutor(
 	shard shard.Context,
+	asmRegistry asm.Registry,
 	workflowCache wcache.Cache,
 	nDCHistoryResender xdc.NDCHistoryResender,
 	resendHandler eventhandler.ResendHandler,
@@ -88,6 +90,7 @@ func newTransferQueueStandbyTaskExecutor(
 	return &transferQueueStandbyTaskExecutor{
 		transferQueueTaskExecutorBase: newTransferQueueTaskExecutorBase(
 			shard,
+			asmRegistry,
 			workflowCache,
 			logger,
 			metricProvider,

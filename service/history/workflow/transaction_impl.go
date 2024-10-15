@@ -26,6 +26,7 @@ package workflow
 
 import (
 	"context"
+	"time"
 
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
@@ -460,7 +461,7 @@ func conflictResolveWorkflowExecution(
 	return resp, nil
 }
 
-func getWorkflowExecution(
+func GetWorkflowExecutionFromPersistence(
 	ctx context.Context,
 	shard shard.Context,
 	request *persistence.GetWorkflowExecutionRequest,
@@ -485,15 +486,39 @@ func getWorkflowExecution(
 		}
 	}
 
-	if namespaceEntry, err := shard.GetNamespaceRegistry().GetNamespaceByID(
+	namespaceEntry, err := shard.GetNamespaceRegistry().GetNamespaceByID(
 		namespace.ID(resp.State.ExecutionInfo.NamespaceId),
-	); err == nil {
-		emitGetMetrics(
-			shard,
-			namespaceEntry,
-			&resp.MutableStateStats,
-		)
+	)
+	if err != nil {
+		// namespace could be delete, we still need to process tasks sometime
+		return resp, nil
 	}
+
+	closeTime := resp.State.ExecutionInfo.GetCloseTime()
+	if closeTime == nil {
+		// workflow still running, or too old that doesn't persist close time upon closing
+		return resp, nil
+	}
+
+	retention := namespaceEntry.Retention()
+	buffer := time.Hour * 24
+	if shard.GetTimeSource().Now().After(closeTime.AsTime().Add(retention).Add(buffer)) {
+		// resurrected workflow
+		shard.GetLogger().Error(
+			"Found resurrected workflow execution.",
+			tag.WorkflowNamespaceID(request.NamespaceID),
+			tag.WorkflowID(request.WorkflowID),
+			tag.WorkflowRunID(request.RunID),
+			tag.StoreOperationGetWorkflowExecution,
+		)
+		return nil, serviceerror.NewNotFound("workflow not found")
+	}
+
+	emitGetMetrics(
+		shard,
+		namespaceEntry,
+		&resp.MutableStateStats,
+	)
 	return resp, nil
 }
 

@@ -211,6 +211,7 @@ func (s *transferQueueStandbyTaskExecutorSuite) SetupTest() {
 
 	s.transferQueueStandbyTaskExecutor = newTransferQueueStandbyTaskExecutor(
 		s.mockShard,
+		nil, // TODO chasm: pass in asm registry
 		s.workflowCache,
 		s.mockNDCHistoryResender,
 		s.resendHandler,

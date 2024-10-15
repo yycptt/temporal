@@ -313,6 +313,47 @@ type (
 	SetWorkflowExecutionResponse struct {
 	}
 
+	ASMMutation struct {
+		ExecutionInfo  *persistencespb.WorkflowExecutionInfo // root is here
+		ExecutionState *persistencespb.WorkflowExecutionState
+		Tasks          map[tasks.Category][]tasks.Task
+		EventBatches   []*WorkflowEvents
+
+		UpsertASMInfos map[string]*persistencespb.ASMInstanceInfo
+		DeleteASMInfos map[string]struct{}
+
+		DBRecordVersion int64
+		Checksum        *persistencespb.Checksum
+	}
+
+	ASMSnapshot struct {
+		ExecutionInfo  *persistencespb.WorkflowExecutionInfo // root is here
+		ExecutionState *persistencespb.WorkflowExecutionState
+		Tasks          map[tasks.Category][]tasks.Task
+		EventBatches   []*WorkflowEvents
+
+		ASMInfos map[string]*persistencespb.ASMInstanceInfo
+
+		DBRecordVersion int64
+		Checksum        *persistencespb.Checksum
+	}
+
+	CurrentASM struct {
+		NewRunID      string
+		ExistingRunID string
+	}
+
+	UpsertASMRequest struct {
+		ShardID int32
+		RangeID int64
+
+		Mutations  []ASMMutation
+		Snapshots  []ASMSnapshot
+		CurrentASM *CurrentASM
+	}
+
+	UpsertASMResponse struct{}
+
 	// ListConcreteExecutionsRequest is request to ListConcreteExecutions
 	ListConcreteExecutionsRequest struct {
 		ShardID   int32
@@ -354,6 +395,8 @@ type (
 		DeleteRequestCancelInfos  map[int64]struct{}
 		UpsertSignalInfos         map[int64]*persistencespb.SignalInfo
 		DeleteSignalInfos         map[int64]struct{}
+		UpsertASMInfos            map[string]*persistencespb.ASMInstanceInfo
+		DeleteASMInfos            map[string]struct{}
 		UpsertSignalRequestedIDs  map[string]struct{}
 		DeleteSignalRequestedIDs  map[string]struct{}
 		NewBufferedEvents         []*historypb.HistoryEvent
@@ -379,6 +422,7 @@ type (
 		ChildExecutionInfos map[int64]*persistencespb.ChildExecutionInfo
 		RequestCancelInfos  map[int64]*persistencespb.RequestCancelInfo
 		SignalInfos         map[int64]*persistencespb.SignalInfo
+		ASMInfos            map[string]*persistencespb.ASMInstanceInfo
 		SignalRequestedIDs  map[string]struct{}
 
 		Tasks map[tasks.Category][]tasks.Task
@@ -1080,6 +1124,8 @@ type (
 		GetCurrentExecution(ctx context.Context, request *GetCurrentExecutionRequest) (*GetCurrentExecutionResponse, error)
 		GetWorkflowExecution(ctx context.Context, request *GetWorkflowExecutionRequest) (*GetWorkflowExecutionResponse, error)
 		SetWorkflowExecution(ctx context.Context, request *SetWorkflowExecutionRequest) (*SetWorkflowExecutionResponse, error)
+
+		UpsertASM(ctx context.Context, request *UpsertASMRequest) (*UpsertASMResponse, error)
 
 		// Scan operations
 

@@ -30,15 +30,22 @@ import (
 	"go.temporal.io/server/common/definition"
 )
 
+var _ Task = &StateMachineTask{}
+
 // StateMachineTask is a base for all tasks emitted by hierarchical state machines.
 type StateMachineTask struct {
 	definition.WorkflowKey
 	VisibilityTimestamp time.Time
 	TaskID              int64
 	Info                *persistence.StateMachineTaskInfo
+	ASMTaskInfo         *persistence.ASMTaskInfo
 }
 
 var _ HasStateMachineTaskType = &StateMachineTask{}
+
+func (t *StateMachineTask) GetKey() Key {
+	return NewImmediateKey(t.TaskID)
+}
 
 func (t *StateMachineTask) GetTaskID() int64 {
 	return t.TaskID
@@ -57,7 +64,18 @@ func (t *StateMachineTask) SetVisibilityTime(timestamp time.Time) {
 }
 
 func (t *StateMachineTask) StateMachineTaskType() string {
-	return t.Info.Type
+	if t.Info != nil {
+		return t.Info.Type
+	}
+	return "ASMTaskType"
+}
+
+func (*StateMachineTask) GetCategory() Category {
+	return CategoryTransfer
+}
+
+func (*StateMachineTask) GetType() enums.TaskType {
+	return enums.TASK_TYPE_STATE_MACHINE_TRANSFER
 }
 
 // StateMachineOutboundTask is a task on the outbound queue.
@@ -92,6 +110,7 @@ type StateMachineTimerTask struct {
 	VisibilityTimestamp time.Time
 	TaskID              int64
 	Version             int64
+	ASMTaskInfo         *persistence.ASMTaskInfo
 }
 
 func (*StateMachineTimerTask) GetCategory() Category {

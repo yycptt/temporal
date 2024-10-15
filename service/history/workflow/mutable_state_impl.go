@@ -721,6 +721,10 @@ func (ms *MutableStateImpl) SetHistoryBuilder(hBuilder *historybuilder.HistoryBu
 	ms.hBuilder = hBuilder
 }
 
+func (ms *MutableStateImpl) HistoryBuilder() *historybuilder.HistoryBuilder {
+	return ms.hBuilder
+}
+
 func (ms *MutableStateImpl) SetBaseWorkflow(
 	baseRunID string,
 	baseRunLowestCommonAncestorEventID int64,

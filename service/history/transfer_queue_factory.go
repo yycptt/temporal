@@ -134,6 +134,7 @@ func (f *transferQueueFactory) CreateQueue(
 
 	activeExecutor := newTransferQueueActiveTaskExecutor(
 		shardContext,
+		f.ASMRegistry,
 		workflowCache,
 		f.SdkClientFactory,
 		logger,
@@ -167,6 +168,7 @@ func (f *transferQueueFactory) CreateQueue(
 
 	standbyExecutor := newTransferQueueStandbyTaskExecutor(
 		shardContext,
+		f.ASMRegistry,
 		workflowCache,
 		xdc.NewNDCHistoryResender(
 			f.NamespaceRegistry,

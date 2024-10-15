@@ -642,6 +642,21 @@ func (mr *MockExecutionManagerMockRecorder) UpdateWorkflowExecution(ctx, request
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateWorkflowExecution", reflect.TypeOf((*MockExecutionManager)(nil).UpdateWorkflowExecution), ctx, request)
 }
 
+// UpsertASM mocks base method.
+func (m *MockExecutionManager) UpsertASM(ctx context.Context, request *UpsertASMRequest) (*UpsertASMResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertASM", ctx, request)
+	ret0, _ := ret[0].(*UpsertASMResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpsertASM indicates an expected call of UpsertASM.
+func (mr *MockExecutionManagerMockRecorder) UpsertASM(ctx, request any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertASM", reflect.TypeOf((*MockExecutionManager)(nil).UpsertASM), ctx, request)
+}
+
 // MockTaskManager is a mock of TaskManager interface.
 type MockTaskManager struct {
 	ctrl     *gomock.Controller

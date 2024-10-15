@@ -113,6 +113,8 @@ func (s *TaskSerializer) serializeTransferTask(
 		transferTask = s.transferResetTaskToProto(task)
 	case *tasks.DeleteExecutionTask:
 		transferTask = s.transferDeleteExecutionTaskToProto(task)
+	case *tasks.StateMachineTask:
+		transferTask = s.transferStateMachineTaskToProto(task)
 	default:
 		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown transfer task type: %v", task))
 	}
@@ -146,6 +148,8 @@ func (s *TaskSerializer) deserializeTransferTasks(
 		task = s.transferResetTaskFromProto(transferTask)
 	case enumsspb.TASK_TYPE_TRANSFER_DELETE_EXECUTION:
 		task = s.transferDeleteExecutionTaskFromProto(transferTask)
+	case enumsspb.TASK_TYPE_STATE_MACHINE_TRANSFER:
+		task = s.transferStateMachineTaskFromProto(transferTask)
 	default:
 		return nil, serviceerror.NewInternal(fmt.Sprintf("Unknown transfer task type: %v", transferTask.TaskType))
 	}
@@ -648,6 +652,35 @@ func (s *TaskSerializer) transferDeleteExecutionTaskFromProto(
 	}
 }
 
+func (s *TaskSerializer) transferStateMachineTaskToProto(
+	stateMachineTask *tasks.StateMachineTask,
+) *persistencespb.TransferTaskInfo {
+	return &persistencespb.TransferTaskInfo{
+		NamespaceId:    stateMachineTask.WorkflowKey.NamespaceID,
+		WorkflowId:     stateMachineTask.WorkflowKey.WorkflowID,
+		RunId:          stateMachineTask.WorkflowKey.RunID,
+		TaskType:       stateMachineTask.GetType(),
+		TaskId:         stateMachineTask.TaskID,
+		VisibilityTime: timestamppb.New(stateMachineTask.VisibilityTimestamp),
+		AsmTaskInfo:    stateMachineTask.ASMTaskInfo,
+	}
+}
+
+func (s *TaskSerializer) transferStateMachineTaskFromProto(
+	stateMachineTask *persistencespb.TransferTaskInfo,
+) *tasks.StateMachineTask {
+	return &tasks.StateMachineTask{
+		WorkflowKey: definition.NewWorkflowKey(
+			stateMachineTask.NamespaceId,
+			stateMachineTask.WorkflowId,
+			stateMachineTask.RunId,
+		),
+		VisibilityTimestamp: stateMachineTask.VisibilityTime.AsTime(),
+		TaskID:              stateMachineTask.TaskId,
+		ASMTaskInfo:         stateMachineTask.AsmTaskInfo,
+	}
+}
+
 func (s *TaskSerializer) timerWorkflowTaskToProto(
 	workflowTimer *tasks.WorkflowTaskTimeoutTask,
 ) *persistencespb.TimerTaskInfo {
@@ -914,6 +947,7 @@ func (s *TaskSerializer) stateMachineTimerTaskToProto(task *tasks.StateMachineTi
 		VisibilityTime: timestamppb.New(task.VisibilityTimestamp),
 		Version:        task.Version,
 		TaskType:       task.GetType(),
+		AsmTaskInfo:    task.ASMTaskInfo,
 	}
 }
 
@@ -945,6 +979,7 @@ func (s *TaskSerializer) stateMachineTimerTaskFromProto(info *persistencespb.Tim
 		VisibilityTimestamp: info.VisibilityTime.AsTime(),
 		TaskID:              info.TaskId,
 		Version:             info.Version,
+		ASMTaskInfo:         info.AsmTaskInfo,
 	}
 }
 
@@ -1315,6 +1350,7 @@ func (s *TaskSerializer) serializeOutboundTask(task tasks.Task) (*commonpb.DataB
 			RunId:            task.RunID,
 			TaskId:           task.TaskID,
 			StateMachineInfo: task.Info,
+			AsmTaskInfo:      task.ASMTaskInfo,
 			TaskType:         task.GetType(),
 			Destination:      task.Destination,
 			VisibilityTime:   timestamppb.New(task.VisibilityTimestamp),
@@ -1343,6 +1379,7 @@ func (s *TaskSerializer) deserializeOutboundTask(blob *commonpb.DataBlob) (tasks
 			VisibilityTimestamp: info.VisibilityTime.AsTime(),
 			TaskID:              info.TaskId,
 			Info:                info.StateMachineInfo,
+			ASMTaskInfo:         info.AsmTaskInfo,
 		},
 		Destination: info.Destination,
 	}, nil

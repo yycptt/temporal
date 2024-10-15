@@ -79,6 +79,7 @@ var (
 		"WorkflowExecutionTimeout":           29,
 		"ReplicationSyncHsm":                 30,
 		"ReplicationSyncVersionedTransition": 31,
+		"StateMachineTransfer":               32,
 	}
 )
 

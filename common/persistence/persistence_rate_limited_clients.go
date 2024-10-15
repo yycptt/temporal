@@ -333,6 +333,14 @@ func (p *executionRateLimitedPersistenceClient) SetWorkflowExecution(
 	return response, err
 }
 
+func (p *executionRateLimitedPersistenceClient) UpsertASM(
+	ctx context.Context,
+	request *UpsertASMRequest,
+) (*UpsertASMResponse, error) {
+	// TODO chasm: implement this
+	return p.persistence.UpsertASM(ctx, request)
+}
+
 func (p *executionRateLimitedPersistenceClient) UpdateWorkflowExecution(
 	ctx context.Context,
 	request *UpdateWorkflowExecutionRequest,
