@@ -8,35 +8,33 @@ import (
 	"go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/chasm/components/activity"
-	"go.temporal.io/server/service/history/consts"
 )
 
 type (
 	WorkflowImpl struct {
 		WorkflowInfo persistence.WorkflowExecutionInfo
-
-		Activities chasm.ComponentMap[*activity.ActivityImpl]
 	}
 )
 
 func NewWorkflow(
-	chasmContext chasm.Context,
+	ctx chasm.MutableContext,
 	request *NewWorkflowRequest,
 ) (*NewWorkflowResponse, error) {
 	workflow := &WorkflowImpl{
 		WorkflowInfo: persistence.WorkflowExecutionInfo{}, // populate some fields
 	}
 
-	if err := chasmContext.AddTask(
+	if err := chasm.AddTask(
+		ctx,
 		workflow,
 		chasm.TaskAttributes{
-			ScheduledTime: chasmContext.Now(workflow).Add(time.Hour),
+			ScheduledTime: chasm.Now(ctx, workflow).Add(time.Hour),
 		},
 		WorkflowTimeoutTask{},
 	); err != nil {
 		return nil, err
 	}
-	if err := chasmContext.AddTask(
+	if err := ctx.AddTask(
 		workflow,
 		chasm.TaskAttributes{},
 		DispatchWorkflowTask{},
@@ -52,23 +50,28 @@ func (w *WorkflowImpl) RunningState() chasm.ComponentState {
 }
 
 func (w *WorkflowImpl) RespondWorkflowTaskCompleted(
-	chasmContext chasm.Context,
+	ctx chasm.MutableContext,
 	request *RespondWorkflowTaskCompletedRequest,
 ) (*RespondWorkflowTaskCompletedResponse, error) {
 	for _, command := range request.ActivityCommands {
-		a, err := activity.NewScheduledActivity(
-			chasmContext,
+
+		a, _, err := activity.NewScheduledActivity(
+			ctx,
 			&activity.NewActivityRequest{},
 		)
 		if err != nil {
 			return nil, err
 		}
 
-		w.Activities[command.ActivityID] = chasm.NewComponentField(
-			chasmContext,
-			a,
-			chasm.NewComponentOptions{},
-		)
+		// we need to provide a name (string) here when creating the child
+		// also need to make sure the name is unique either within the parent
+		// or at least within the same component type.
+		// If we have a chasm.ComponentMap, then the name is implicitly scoped to that field
+		// name, which is guaranteed to be unique.
+		if err := chasm.NewChildComponent(ctx, w, a, command.ActivityID); err != nil {
+			return nil, err
+		}
+
 	}
 	return &RespondWorkflowTaskCompletedResponse{}, nil
 }
@@ -79,138 +82,24 @@ func (w *WorkflowImpl) RespondWorkflowTaskCompleted(
 // defined on activity component and SDK worker can just invoke that api since it has the ref.
 // But any byID activity can only be defined on Instances (top level).
 func (w *WorkflowImpl) CompletedActivityByID(
-	chasmContext chasm.MutableContext,
+	ctx chasm.MutableContext,
 	request *CompleteActivityByIDRequest,
-) error {
+) (*CompleteActivityByIDResponse, error) {
 
-	a, err := w.Activities.Get(chasmContext, request.ActivityID)
+	a, err := chasm.GetChild[*activity.ActivityImpl](ctx, w, request.ActivityID)
 	if err != nil {
-		return errors.New("activity not found")
-	}
-	activityImpl, err := a.Get(chasmContext)
-	if err != nil {
-		return err
+		return nil, errors.New("activity not found")
 	}
 
-	_, err = activityImpl.RecordCompleted(chasmContext, &activity.RecordCompletedRequest{})
+	_, err = a.RecordCompleted(ctx, &activity.RecordCompletedRequest{})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// continue to schedule workflow task
 
-	return nil
+	return &CompleteActivityByIDResponse{}, nil
 }
-
-// separate two concerns
-
-// needs to be registered in the registry
-func (w *WorkflowImpl) CustomChildOpertionRule(
-	chasmContext chasm.Context,
-	childComponent *activity.ActivityImpl,
-) bool {
-	// this is the default rule
-	return chasm.ShouldContinueOperation(w, chasmContext, childComponent)
-}
-
-// needs to be registered in the registry
-func (w *WorkflowImpl) ActivityCompletionStateListener()
-
-// needs to be registered in the registry
-// Only need to intercept the sub-component type cared about
-// Framework will provide default behavior based on the parent component's
-// running state & child component's lifecycle option.
-func (w *WorkflowImpl) InterceptActivity(
-	chasmContext chasm.MutableContext,
-	childActivity *activity.ActivityImpl,
-	next func() error,
-) (retErr error) {
-	// it will be much easier if we can listen on an event...
-	// imagine what the code will look like if we want to check for multiple things.
-	// activity started/completed/failed/timedout/paused.
-	// huge switch case in this method.
-
-	resp, err := childActivity.Describe(
-		chasmContext,
-		&activity.DescribeActivityRequest{},
-	)
-	if err != nil {
-		return err
-	}
-	closedBeforeProcessing := resp.CompletedTime.IsZero()
-	defer func() {
-		// post interceptor
-		//
-		resp, err := childActivity.Describe(
-			chasmContext,
-			&activity.DescribeActivityRequest{},
-		)
-		if err != nil {
-			retErr = err
-			return
-		}
-		closedAfterProcessing := resp.CompletedTime.IsZero()
-
-		if !closedBeforeProcessing && closedAfterProcessing {
-			// schedule new workflowTask
-		}
-	}()
-
-	// if you just want to default behavior for pre-operation interceptor
-	//
-	// if chasm.ShouldContinueOperation(chasmContext, w, childComponent) {
-	// 	return next()
-	// }
-	// return consts.ErrWorkflowCompleted
-
-	runningState := w.RunningState()
-	if runningState == chasm.ComponentStateRunning {
-		return next()
-	}
-
-	// closed
-	if chasmContext.Intent() == chasm.OperationIntentObserve {
-		return next()
-	}
-	if chasmContext.Intent() == chasm.OperationIntentNotification {
-		// we should check reset case here as well
-		return next()
-	}
-
-	// closed but activity is abandoned
-	// allow progress operations to proceed
-	if chasmContext.LifeCycleOption(childActivity) == chasm.LifecycleOptionAbandon {
-		return next()
-	}
-
-	return consts.ErrWorkflowCompleted
-}
-
-// This won't work because it introduces a new way of updating component,
-// which can't be intercetped by the interceptor.
-// type WorkflowActivityInterceptor struct {
-// 	w *WorkflowImpl
-
-// 	activity.Activity
-// }
-
-// func NewWorkflowActivityInterceptor(
-// 	ctx chasm.Context,
-// 	w *WorkflowImpl,
-// 	activity activity.Activity,
-// ) (activity.Activity, error) {
-// 	return &WorkflowActivityInterceptor{
-// 		w:        w,
-// 		Activity: activity,
-// 	}, nil
-// }
-
-// func (i *WorkflowActivityInterceptor) RecordStarted(
-// 	chasmContext chasm.MutableContext,
-// 	req *activity.RecordStartedRequest,
-// ) (*activity.RecordStartedResponse, error) {
-// 	return i.Activity.RecordStarted(chasmContext, req)
-// }
 
 type WorkflowTimeoutTask struct{}
 type DispatchWorkflowTask struct{}
@@ -243,9 +132,9 @@ func (h *WorkflowHandler) CompleteActivityByID(
 	ctx context.Context,
 	request *CompleteActivityByIDRequest,
 ) (*CompleteActivityByIDResponse, error) {
-	_, err := chasm.UpdateComponent(
+	resp, _, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[*WorkflowImpl]{
+		chasm.UpdateComponentRequest[*WorkflowImpl, *CompleteActivityByIDRequest, *CompleteActivityByIDResponse]{
 			// TODO: take in a struct def, not a registred name
 			// But point here is that tell the framework your struct definition,
 			// so it can determine which sub components needs to be eagerly loaded.
@@ -253,13 +142,23 @@ func (h *WorkflowHandler) CompleteActivityByID(
 			// Also note that if you don't have a ref,
 			// you can only interact with to the top level component.
 			Ref: chasm.NewComponentRef(request.WorkflowKey, "Workflow"),
+			// for partial load, we need to provide the field name as a string
 			EagerLoadPaths: []chasm.ComponentPath{
 				{"Activities", request.ActivityID},
 			},
-			UpdateFn: func(ctx chasm.Context, w *WorkflowImpl) error {
-				return w.CompletedActivityByID(ctx, request)
-			},
+			UpdateFn: (*WorkflowImpl).CompletedActivityByID,
 		},
 	)
-	return &CompleteActivityByIDResponse{}, err
+
+	// partial load:
+	// the only benefit of using reflection is that we can automatically figure out
+	// all sub-components that needs to be eagerly loaded.
+	// However, if it a sub-component that always needs to be loaded, why separate component?
+
+	// without reflection, we need to define this list at probably component registration time
+
+	// allow you specify a path in string format
+	// depending on the scope of component name, without reflection, we
+
+	return resp, err
 }

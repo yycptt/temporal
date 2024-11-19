@@ -22,29 +22,8 @@ type (
 		// figure out which fields are dirty, and send a proto.Message with only those dirty fields
 		// set to persistence.
 		State persistencepb.ActivityInfo // proto.Message
-
-		// One nice thing about this approach is that it defines the structure of the component tree
-		// statically. This solve's our partial load problem as now we can look at this structure
-		// definition and figure what paths to load.
-		// - If the field is a chasm.ComponentMap, then caller needs to specify a path
-		// - If the componentField is an interface, then check **all** registered components
-		// that implements that interface.
-		//
-		// Use field tags to control the default loading behavior
-		// Can also support field name tag, so the fields can be renamed
-		Input  *chasm.DataField[*common.Payload] `chasm:"lazy"`
-		Output *chasm.DataField[*common.Payload] `chasm:"lazy"`
 	}
 )
-
-// This is only needed if this component struct is also registered for an interface
-// func NewActivity(
-// 	_ chasm.Context,
-// ) *ActivityImpl {
-// 	return &ActivityImpl{
-// 		State: persistencepb.ActivityInfo{},
-// 	}
-// }
 
 func NewScheduledActivity(
 	chasmContext chasm.MutableContext,
@@ -52,9 +31,7 @@ func NewScheduledActivity(
 ) (*ActivityImpl, *NewActivityResponse, error) {
 	// after return framework will use reflection to analyze
 	// and understand the structure of the component tree
-	activity := &ActivityImpl{
-		// State: persistencepb.ActivityInfo{},
-	}
+	activity := &ActivityImpl{}
 	_, err := activity.Schedule(chasmContext, &ScheduleRequest{
 		Input: params.Input,
 	})
@@ -70,27 +47,34 @@ func (i *ActivityImpl) RunningState() chasm.ComponentState {
 }
 
 func (i *ActivityImpl) Schedule(
-	chasmContext chasm.MutableContext,
+	ctx chasm.MutableContext,
 	req *ScheduleRequest,
 ) (*ScheduleResponse, error) {
 	// also validate current state etc.
 
-	i.State.ScheduledTime = timestamppb.New(chasmContext.Now(i))
-	i.Input = chasm.NewDataField(chasmContext, &common.Payload{
-		Data: req.Input,
-	})
+	i.State.ScheduledTime = timestamppb.New(chasm.Now(ctx, i))
 
-	if err := chasmContext.AddTask(
+	// we need to provide a name (string) here, since there could be
+	// multiple fields with the same type. In this case, "input" & "output"
+	// in reflection case this will be the field name, which is bind to a type
+	if err := chasm.NewChildData(ctx, i, "input", &common.Payload{
+		Data: req.Input,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := ctx.AddTask(
 		i,
 		chasm.TaskAttributes{}, // immediate task
 		DispatchTask{},
 	); err != nil {
 		return nil, err
 	}
-	if err := chasmContext.AddTask(
+	if err := chasm.AddTask(
+		ctx,
 		i,
 		chasm.TaskAttributes{
-			ScheduledTime: chasmContext.Now(i).Add(10 * time.Second),
+			ScheduledTime: chasm.Now(ctx, i).Add(10 * time.Second),
 		},
 		TimeoutTask{
 			TimeoutType: TimeoutTypeScheduleToStart,
@@ -103,23 +87,28 @@ func (i *ActivityImpl) Schedule(
 }
 
 func (i *ActivityImpl) RecordStarted(
-	chasmContext chasm.MutableContext,
+	ctx chasm.MutableContext,
 	req *RecordStartedRequest,
 ) (*RecordStartedResponse, error) {
 
 	// only this field will be updated
-	i.State.StartedTime = timestamppb.New(chasmContext.Now(i))
+	i.State.StartedTime = timestamppb.New(chasm.Now(ctx, i))
 	// update other states
 
-	payload, err := i.Input.Get(chasmContext)
+	// when retrieving child data, we need to provide again the field name as a string
+	// and also the type information
+	// alternatively we can change this to
+	// var payload *common.Payload
+	// err := chasm.GetChild(ctx, i, &payload) and populate the variable passed in
+	payload, err := chasm.GetChild[*common.Payload](ctx, i, "input")
 	if err != nil {
 		return nil, err
 	}
 
-	if err := chasmContext.AddTask(
+	if err := ctx.AddTask(
 		i,
 		chasm.TaskAttributes{
-			ScheduledTime: chasmContext.Now(i).Add(10 * time.Second),
+			ScheduledTime: chasm.Now(ctx, i).Add(10 * time.Second),
 		},
 		TimeoutTask{
 			TimeoutType: TimeoutTypeStartToClose,
@@ -134,14 +123,18 @@ func (i *ActivityImpl) RecordStarted(
 }
 
 func (i *ActivityImpl) RecordCompleted(
-	chasmContext chasm.MutableContext,
+	ctx chasm.MutableContext,
 	req *RecordCompletedRequest,
 ) (*RecordCompletedResponse, error) {
 	// say we have a completedTime field
 	// i.State.CompletedTime = timestamppb.New(chasmContext.Now())
-	i.Output = chasm.NewDataField(chasmContext, &common.Payload{
+
+	// Same here, we need to provide the field name as a string.
+	if err := chasm.NewChildData(ctx, i, "output", &common.Payload{
 		Data: req.Output,
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	return &RecordCompletedResponse{}, nil
 }

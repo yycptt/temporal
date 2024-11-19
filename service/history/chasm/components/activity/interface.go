@@ -22,29 +22,21 @@ type ScheduleResponse struct{}
 
 type RecordStartedRequest struct {
 	RefToken []byte
-
-	chasm.OperationProgressBase
 }
 
 type RecordStartedResponse struct {
 	RefToken []byte
 	Input    []byte
-
-	chasm.OperationProgressBase
 }
 
 type RecordCompletedRequest struct {
 	RefToken []byte
 	Output   []byte
-
-	chasm.OperationProgressBase
 }
 
 type RecordCompletedResponse struct{}
 
-type DescribeActivityRequest struct {
-	chasm.OperationObserveBase
-}
+type DescribeActivityRequest struct{}
 
 type DescribeActivityResponse struct {
 	IsAbandonded  bool

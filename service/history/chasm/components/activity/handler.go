@@ -3,6 +3,7 @@ package activity
 import (
 	"context"
 
+	"go.temporal.io/api/common/v1"
 	"go.temporal.io/server/service/history/chasm"
 )
 
@@ -90,8 +91,6 @@ func (h *ActivityHandler) RecordCompleted(
 
 type GetActivityResultRequest struct {
 	RefToken []byte
-
-	chasm.OperationObserveBase
 }
 
 type GetActivityResultResponse struct {
@@ -116,7 +115,7 @@ func (h *ActivityHandler) GetActivityResult(
 				return ai.RunningState() == chasm.ComponentStateCompleted
 			},
 			OperationFn: func(ai *ActivityImpl, ctx chasm.MutableContext, garr *GetActivityResultRequest) (*GetActivityResultResponse, error) {
-				outputPayload, err := ai.Output.Get(ctx)
+				outputPayload, err := chasm.GetChild[*common.Payload](ctx, ai, "output")
 				resp.Output = outputPayload.Data
 				return resp, err
 			},

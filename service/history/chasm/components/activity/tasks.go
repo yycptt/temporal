@@ -10,9 +10,7 @@ import (
 
 // This should be in fx logic
 
-type DispatchTask struct {
-	chasm.OperationProgressBase
-}
+type DispatchTask struct{}
 
 type DispatchTaskHandler struct {
 	matchingClient matchingservice.MatchingServiceClient
@@ -62,6 +60,4 @@ type TimeoutTask struct {
 	// similar to component state,
 	// use a proto message if possible
 	TimeoutType int
-
-	chasm.OperationProgressBase
 }

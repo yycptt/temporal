@@ -50,6 +50,25 @@ const (
 
 // TODO: same for IDConflictPolicy
 
+type DynamicInstanceOptions struct {
+	StorageOption     InstanceStorageOption
+	ReplicationOption InstanceReplicationOption
+}
+
+type InstanceStorageOption int
+
+const (
+	IntanceStorageOptionInMemory InstanceStorageOption = iota
+	InstanceStorageOptionPersistent
+)
+
+type InstanceReplicationOption int
+
+const (
+	InstanceReplicationOptionSingleCluster InstanceReplicationOption = iota
+	InstanceReplicationOptionMultiCluster
+)
+
 type NewInstanceRequest[C Component, I any, O any] struct {
 	Key                    InstanceKey
 	IDReusePolicy          BusinessIDReusePolicy

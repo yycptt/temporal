@@ -17,16 +17,12 @@ func (l Library) Name() string {
 func (l Library) Components() []chasm.RegistrableComponent {
 	return []chasm.RegistrableComponent{
 		chasm.NewRegistrableComponent[*ActivityImpl](
-			chasm.RegistrableComponentOptions{
-				Name: "",
-				StaticInstanceOptions: chasm.StaticInstanceOptions{
-					ShardingOption: chasm.InstanceShardingOption{
-						Sharding: func(key chasm.InstanceKey) string {
-							return key.NamespaceID + key.BusinessID
-						},
-					},
+			"",
+			chasm.NewComponentShardingOption(
+				func(key chasm.InstanceKey) string {
+					return key.NamespaceID + key.BusinessID
 				},
-			},
+			),
 		),
 	}
 }

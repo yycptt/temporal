@@ -32,44 +32,92 @@ type Context interface {
 
 	// NOTE: component created in the current transaction won't have a ref
 
-	Ref(Component) (ComponentRef, bool)
-	LifeCycleOption(Component) LifecycleOption
-	Now(Component) time.Time
-	Intent() OperationIntent
+	ref(Component) (ComponentRef, bool)
+	lifeCycleOption(Component) LifecycleOption
+	now(Component) time.Time
+
+	listChild(Component, reflect.Type) ([]string, error)
+	getChild(Component, string) (any, error)
 
 	getContext() context.Context
+}
+
+func GetChild[T any](
+	ctx Context,
+	parent Component,
+	childName string,
+) (T, error) {
+	child, err := ctx.getChild(parent, childName)
+	return child.(T), err
+}
+
+func ListChild[T any](
+	ctx Context,
+	parent Component,
+) ([]string, error) {
+	return ctx.listChild(parent, reflect.TypeFor[T]())
+}
+
+type childOptions struct {
+	name            string
+	LifecycleOption LifecycleOption
+}
+
+type ChildOptions func(*childOptions)
+
+func NewChildLifecycleOption(option LifecycleOption) ChildOptions {
+	return func(o *childOptions) {
+		o.LifecycleOption = option
+	}
+}
+
+type ComponentData interface {
+	proto.Message
 }
 
 type MutableContext interface {
 	Context
 
+	newChildComponent(parent Component, name string, child Component, opts ...ChildOptions) error
+	newChildData(parent Component, name string, data ComponentData) error
+
 	AddTask(component Component, attributes TaskAttributes, task any) error
+}
+
+func NewChildComponent(
+	ctx MutableContext,
+	parent Component,
+	child Component,
+	name string,
+	opts ...ChildOptions,
+) error {
+	return ctx.newChildComponent(parent, name, child, opts...)
+}
+
+func NewChildData(
+	ctx MutableContext,
+	parent Component,
+	name string,
+	data ComponentData,
+) error {
+	return ctx.newChildData(parent, name, data)
+}
+
+func AddTask(
+	ctx MutableContext,
+	component Component,
+	attributes TaskAttributes,
+	task any,
+) error {
+	return ctx.AddTask(component, attributes, task)
+}
+
+func Now(ctx Context, component Component) time.Time {
+	return ctx.now(component)
 }
 
 type Component interface {
 	RunningState() ComponentState
-}
-
-type DataField[D proto.Message] struct {
-}
-
-func NewDataField[D proto.Message](
-	ctx Context,
-	d D,
-) *DataField[D] {
-	return &DataField[D]{}
-}
-
-func (d *DataField[D]) Get(Context) (D, error) {
-	panic("not implemented")
-}
-
-type ComponentField[C Component] struct {
-	// TODO: this value needs to be create via reflection
-	// but reflection can't set prviate fields...
-	component reflect.Value
-
-	dirty bool
 }
 
 type NewComponentOptions struct {
@@ -82,51 +130,6 @@ const (
 	LifecycleOptionAbandon LifecycleOption = 1 << iota
 	LifecycleOptionBlock
 )
-
-func NewComponentField[C Component](
-	ctx Context,
-	c C,
-	options NewComponentOptions,
-) *ComponentField[C] {
-	// if C is an interface, ignore c and find the ctor from registry
-
-	return &ComponentField[C]{
-		dirty:     true,
-		component: reflect.ValueOf(c),
-	}
-}
-
-func NewComponentForInterface[I Component](ctx Context) (I, error) {
-	// find the ctor for I from registry
-	// call the ctor
-
-	panic("not implemented")
-}
-
-func (c *ComponentField[C]) Get(
-	ctx Context,
-) (C, error) {
-	// handle c == nil
-
-	panic("not implemented")
-}
-
-type ComponentMap[C Component] map[string]*ComponentField[C]
-
-func (m ComponentMap[C]) Get(
-	ctx Context,
-	key string,
-) (*ComponentField[C], error) {
-	panic("not implemented")
-}
-
-func (m ComponentMap[C]) Set(
-	ctx Context,
-	key string,
-	c C,
-) {
-	panic("not implemented")
-}
 
 type ComponentState int
 
@@ -176,95 +179,5 @@ func (r *ComponentRef) Serialize() ([]byte, error) {
 }
 
 func DeserializeComponentRef(data []byte) (ComponentRef, error) {
-	panic("not implemented")
-}
-
-// type Event[E any, C any] struct {
-// 	RawEvent        E
-// 	SourceComponent C
-// }
-
-// type EventListener[E any, C any] func(Context, Event[E, C]) error
-
-type OperationInterceptor[P, C Component] func(P, MutableContext, C, func() error) error
-
-// type ChildOperationRule[P, C Component] func(P, Context, C) bool
-
-// type ChildStateChangeListener[P, C Component] struct {
-// 	PredicateFn func(Context, C) (bool, error)
-// 	UpdateFn    func(MutableContext, P, C) error
-// }
-
-// cases when workflow is closed
-// 1. describe activity, don't want to intercept
-// 2. heatbeat activity, want to intercept, write operation
-// 3. complete activity, want to intercept, write operation
-// 4. dispatch activity, want to intercept, read operation
-
-// parent close policy = terminate
-// 5. child workflow start, want to intercept, read + write operation
-
-// parent close policy = abandon
-// 6. child workflow start, don't want to intercept read + write operation
-
-// 7. record child completion, want to intercept, write operation
-
-// 8. report to parent, process parent close policy, update es, don't want to intercept, read operation
-// 9. callback, don't want to intercept, write operation.
-// Except update ES, we do want intercept if got reset
-// But ES is kinda special. it's a sync storage provided by the framework.
-
-// 10. query, don't want to intercept, read operation
-
-// for 5 and 6, if you model this using marker interface, which is static,
-// this policy has to be on the parent, since it's dynamic.
-// you can't say the startChildTask has marker proceedOnClose()
-
-// for 8 and 9, it's notifying external about the current state of the component,
-// very similar to observe, but original is different. one from outside, one from internal.
-// Also notification should not be delievered if component got reset.
-
-// the marker interface can only define the semantic of the operation,
-// not the result (execute or not is a result)
-
-// so markers should be like
-type OperationProgressBase interface {
-	mustEmbedOperationIntentProgress()
-}
-type OperationObserveBase interface {
-	mustEmbedOperationIntentObserve()
-} // by definition should only be used by api
-type OperationNotificationBase interface {
-	mustEmbedOperationIntentNotification()
-} // by definition should only be used by tasks
-
-type OperationIntent int
-
-const (
-	OperationIntentProgress OperationIntent = 1 << iota
-	OperationIntentObserve
-	OperationIntentNotification
-)
-
-// each component can define it's own marker interface
-// but the semantic should focus on the operation itself.
-
-func NewDefaultChildOperationRule[P, C Component]() RegistrableChildOperationRule[P] {
-	return NewRegistrableChildOperationRule[P, C](
-		ShouldContinueOperation,
-	)
-}
-
-func ShouldContinueOperation[P, C Component](
-	parentComponent P,
-	ctx Context,
-	childComponent C,
-) bool {
-	// default pre-interceptor logic
-	// component in running state => allow all three
-	// component in paused state => block progress
-	// component in completed/failed => block progress
-	// component in reset => block progress and notification
-
 	panic("not implemented")
 }
