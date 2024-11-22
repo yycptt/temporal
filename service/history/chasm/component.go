@@ -36,7 +36,7 @@ type Context interface {
 	lifeCycleOption(Component) LifecycleOption
 	now(Component) time.Time
 
-	listChild(Component, reflect.Type) ([]string, error)
+	listChildNames(Component, reflect.Type) ([]string, error)
 	getChild(Component, string) (any, error)
 
 	getContext() context.Context
@@ -51,11 +51,11 @@ func GetChild[T any](
 	return child.(T), err
 }
 
-func ListChild[T any](
+func ListChildNames[T any](
 	ctx Context,
 	parent Component,
 ) ([]string, error) {
-	return ctx.listChild(parent, reflect.TypeFor[T]())
+	return ctx.listChildNames(parent, reflect.TypeFor[T]())
 }
 
 type childOptions struct {
@@ -80,6 +80,7 @@ type MutableContext interface {
 
 	newChildComponent(parent Component, name string, child Component, opts ...ChildOptions) error
 	newChildData(parent Component, name string, data ComponentData) error
+	removeChild(parent Component, name string) error
 
 	AddTask(component Component, attributes TaskAttributes, task any) error
 }
@@ -101,6 +102,14 @@ func NewChildData(
 	data ComponentData,
 ) error {
 	return ctx.newChildData(parent, name, data)
+}
+
+func RemoveChild(
+	ctx MutableContext,
+	parent Component,
+	name string,
+) error {
+	return ctx.removeChild(parent, name)
 }
 
 func AddTask(
@@ -180,4 +189,9 @@ func (r *ComponentRef) Serialize() ([]byte, error) {
 
 func DeserializeComponentRef(data []byte) (ComponentRef, error) {
 	panic("not implemented")
+}
+
+type SerDe interface {
+	Serialize() ([]byte, error)
+	Deserialize(data []byte) error
 }

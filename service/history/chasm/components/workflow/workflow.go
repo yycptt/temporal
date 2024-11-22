@@ -96,9 +96,47 @@ func (w *WorkflowImpl) CompletedActivityByID(
 		return nil, err
 	}
 
+	if err := chasm.RemoveChild(ctx, w, request.ActivityID); err != nil {
+		return nil, err
+	}
+
 	// continue to schedule workflow task
 
 	return &CompleteActivityByIDResponse{}, nil
+}
+
+func (w *WorkflowImpl) DescribeWorkflow(
+	ctx chasm.Context,
+	request *DescribeWorkflowRequest,
+) (*DescribeWorkflowResponse, error) {
+	resp := &DescribeWorkflowResponse{}
+
+	activityNames, err := chasm.ListChildNames[*activity.ActivityImpl](ctx, w)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, name := range activityNames {
+		a, err := chasm.GetChild[*activity.ActivityImpl](ctx, w, name)
+		if err != nil {
+			return nil, err
+		}
+		descActivityResp, err := a.Describe(ctx, &activity.DescribeActivityRequest{})
+		if err != nil {
+			return nil, err
+		}
+		resp.PendingActivities = append(resp.PendingActivities, descActivityResp)
+	}
+
+	return resp, nil
+}
+
+func (w *WorkflowImpl) Serialize() ([]byte, error) {
+	return w.WorkflowInfo.Marshal()
+}
+
+func (w *WorkflowImpl) Deserialize(data []byte) error {
+	return w.WorkflowInfo.Unmarshal(data)
 }
 
 type WorkflowTimeoutTask struct{}
@@ -125,6 +163,11 @@ type CompleteActivityByIDRequest struct {
 }
 type CompleteActivityByIDResponse struct{}
 
+type DescribeWorkflowRequest struct{}
+type DescribeWorkflowResponse struct {
+	PendingActivities []*activity.DescribeActivityResponse
+}
+
 type WorkflowHandler struct {
 }
 
@@ -144,7 +187,7 @@ func (h *WorkflowHandler) CompleteActivityByID(
 			Ref: chasm.NewComponentRef(request.WorkflowKey, "Workflow"),
 			// for partial load, we need to provide the field name as a string
 			EagerLoadPaths: []chasm.ComponentPath{
-				{"Activities", request.ActivityID},
+				{request.ActivityID},
 			},
 			UpdateFn: (*WorkflowImpl).CompletedActivityByID,
 		},

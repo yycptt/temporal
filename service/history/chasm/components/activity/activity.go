@@ -21,6 +21,8 @@ type (
 		// At the end of a transaction, framework can compare old & new states,
 		// figure out which fields are dirty, and send a proto.Message with only those dirty fields
 		// set to persistence.
+
+		// Or the component needes to implement SerDe interface
 		State persistencepb.ActivityInfo // proto.Message
 	}
 )
@@ -144,4 +146,12 @@ func (i *ActivityImpl) Describe(
 	_ *DescribeActivityRequest,
 ) (*DescribeActivityResponse, error) {
 	panic("not implemented")
+}
+
+func (i *ActivityImpl) Serialize() ([]byte, error) {
+	return i.State.Marshal()
+}
+
+func (i *ActivityImpl) Deserialize(data []byte) error {
+	return i.State.Unmarshal(data)
 }
