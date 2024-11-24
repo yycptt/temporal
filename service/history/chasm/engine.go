@@ -16,7 +16,7 @@ type Engine interface {
 		context.Context,
 		InstanceKey,
 		DynamicInstanceOptions,
-		[]ComponentPath,
+		[]DataFieldPath,
 		func(MutableContext) (Component, error),
 		func(MutableContext, Component) error,
 	) (ComponentRef, error)
@@ -24,7 +24,7 @@ type Engine interface {
 	updateComponent(
 		context.Context,
 		ComponentRef,
-		[]ComponentPath,
+		[]DataFieldPath,
 		func(MutableContext, Component) error,
 	) (ComponentRef, error)
 	readComponent(
@@ -47,6 +47,8 @@ const (
 	BusinessIDReusePolicyAllowDuplicate BusinessIDReusePolicy = iota
 	BusinessIDReusePolicyRejectDuplicate
 )
+
+type DataFieldPath []string
 
 // TODO: same for IDConflictPolicy
 
@@ -85,7 +87,7 @@ type UpdateWithNewInstanceRequest[C Component, I any, O1 any, O2 any] struct {
 	UpdateFn               func(C, MutableContext, I) (O2, error)
 	Input                  I
 
-	EagerLoadPaths []ComponentPath // relative to the component (instance here)
+	EagerLoadPaths []DataFieldPath // relative to the component (instance here)
 }
 
 func UpdateWithNewInstance[C Component, I any, O1 any, O2 any](
@@ -120,7 +122,7 @@ type UpdateComponentRequest[C Component, I any, O any] struct {
 	Input    I
 
 	// relative to the component, serve as additional seeds for lookup
-	EagerLoadPaths []ComponentPath
+	EagerLoadPaths []DataFieldPath
 }
 
 func UpdateComponent[C Component, I any, O any](

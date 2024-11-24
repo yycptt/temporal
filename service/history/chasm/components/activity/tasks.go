@@ -10,18 +10,16 @@ import (
 
 // This should be in fx logic
 
-type DispatchTask struct {
-	chasm.OperationProgressBase
-}
+type DispatchTask struct{}
 
 type DispatchTaskHandler struct {
-	matchingClient matchingservice.MatchingServiceClient
+	MatchingClient matchingservice.MatchingServiceClient
 }
 
 func (h *DispatchTaskHandler) Validate(
 	chasmContext chasm.Context,
 	activity *ActivityImpl,
-	task *DispatchTask,
+	task DispatchTask,
 ) error {
 	if !activity.State.StartedTime.AsTime().IsZero() {
 		return consts.ErrStaleReference
@@ -33,23 +31,23 @@ func (h *DispatchTaskHandler) Validate(
 func (h *DispatchTaskHandler) Execute(
 	ctx context.Context,
 	activityRef chasm.ComponentRef,
-	_ *DispatchTask,
+	_ DispatchTask,
 ) error {
-	if _, _, err := chasm.UpdateComponent(
+	matchingRequest, err := chasm.ReadComponent(
 		ctx,
-		chasm.UpdateComponentRequest[*ActivityImpl, struct{}, struct{}]{
-			Ref: activityRef,
-			UpdateFn: func(activity *ActivityImpl, chasmContext chasm.MutableContext, _ struct{}) (struct{}, error) {
-				// fetch some states here
-				// return nil
-				panic("not implemented")
-			},
+		chasm.ReadComponentRequest[*ActivityImpl, struct{}, *matchingservice.AddActivityTaskRequest]{
+			Ref:    activityRef,
+			ReadFn: (*ActivityImpl).LoadDispatchInfo,
 		},
-	); err != nil {
+	)
+	if err != nil {
 		return err
 	}
 
-	_, err := h.matchingClient.AddActivityTask(ctx, &matchingservice.AddActivityTaskRequest{})
+	// NOTE: we need to have a different set of APIs on matching for this.
+	// because there is no Ref concept any more that works for both
+	// top level activity and workflow activity
+	_, err = h.MatchingClient.AddTopLevelActivityTask(ctx, matchingRequest)
 	return err
 }
 
@@ -62,6 +60,4 @@ type TimeoutTask struct {
 	// similar to component state,
 	// use a proto message if possible
 	TimeoutType int
-
-	chasm.OperationProgressBase
 }

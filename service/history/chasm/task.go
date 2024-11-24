@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+type Task struct {
+	Attributes TaskAttributes
+	Data       any
+}
+
 type TaskAttributes struct {
 	ScheduledTime time.Time
 	Destination   string

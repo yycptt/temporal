@@ -28,7 +28,9 @@ type (
 	RecordStartedRequest  struct{}
 	RecordStartedResponse struct{}
 
-	RecordCompletedRequest  struct{}
+	RecordCompletedRequest struct {
+		Output []byte
+	}
 	RecordCompletedResponse struct{}
 
 	RecordFailedRequest  struct{}

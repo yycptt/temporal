@@ -24,9 +24,6 @@ func NewRegistrableChildOperationRule[P, C Component](
 }
 
 func NewRegistrableComponent[P Component](
-	childOperationRules []RegistrableChildOperationRule[P],
-	childStateListeners []RegistrableChildStateListener[P],
-	childInterceptors []RegistrableChildInterceptor[P],
 	options RegistrableComponentOptions,
 ) RegistrableComponent {
 	panic("not implemented")
@@ -58,6 +55,7 @@ func NewRegistrableTask[C any, T any](
 	panic("not implemented")
 }
 
+// TODO: use option pattern
 type RegistrableComponentOptions struct {
 	// maybe we use use proto name of the state TBD.
 	Name string

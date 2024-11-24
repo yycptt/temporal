@@ -4,8 +4,10 @@ import (
 	"time"
 
 	"go.temporal.io/api/common/v1"
+	"go.temporal.io/server/api/matchingservice/v1"
 	persistencepb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/service/history/chasm"
+	"go.temporal.io/server/service/history/chasm/components/callback"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -32,19 +34,12 @@ type (
 		//
 		// Use field tags to control the default loading behavior
 		// Can also support field name tag, so the fields can be renamed
-		Input  *chasm.DataField[*common.Payload] `chasm:"lazy"`
-		Output *chasm.DataField[*common.Payload] `chasm:"lazy"`
+		Input  *chasm.DataField[*common.Payload] // lazy by default
+		Output *chasm.DataField[*common.Payload] // lazy by default
+
+		Callback *chasm.DataField[*callback.Callback]
 	}
 )
-
-// This is only needed if this component struct is also registered for an interface
-// func NewActivity(
-// 	_ chasm.Context,
-// ) *ActivityImpl {
-// 	return &ActivityImpl{
-// 		State: persistencepb.ActivityInfo{},
-// 	}
-// }
 
 func NewScheduledActivity(
 	chasmContext chasm.MutableContext,
@@ -75,31 +70,55 @@ func (i *ActivityImpl) Schedule(
 ) (*ScheduleResponse, error) {
 	// also validate current state etc.
 
-	i.State.ScheduledTime = timestamppb.New(chasmContext.Now(i))
-	i.Input = chasm.NewDataField(chasmContext, &common.Payload{
-		Data: req.Input,
-	})
+	i.UpdateStateToScheduled(chasmContext, req)
 
-	if err := chasmContext.AddTask(
-		i,
-		chasm.TaskAttributes{}, // immediate task
-		DispatchTask{},
-	); err != nil {
-		return nil, err
-	}
-	if err := chasmContext.AddTask(
-		i,
-		chasm.TaskAttributes{
-			ScheduledTime: chasmContext.Now(i).Add(10 * time.Second),
-		},
-		TimeoutTask{
-			TimeoutType: TimeoutTypeScheduleToStart,
-		},
-	); err != nil {
-		return nil, nil
+	for _, t := range i.GenerateScheduledTasks(chasmContext) {
+		if err := chasmContext.AddTask(chasm.Task{
+			Attributes: t.Attributes,
+			Data:       t.Data,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return &ScheduleResponse{}, nil
+}
+
+func (i *ActivityImpl) UpdateStateToScheduled(
+	chasmContext chasm.MutableContext,
+	req *ScheduleRequest,
+) {
+	i.State.ScheduledTime = timestamppb.New(chasmContext.Now())
+	i.Input = chasm.NewDataField(chasmContext, &common.Payload{
+		Data: req.Input,
+	})
+}
+
+func (i *ActivityImpl) GenerateScheduledTasks(
+	chasmContext chasm.Context,
+) []chasm.Task {
+	return []chasm.Task{
+		{
+			Attributes: chasm.TaskAttributes{}, // immediate task
+			Data:       DispatchTask{},
+		},
+		{
+			Attributes: chasm.TaskAttributes{
+				ScheduledTime: chasmContext.Now().Add(10 * time.Second),
+			},
+			Data: TimeoutTask{
+				TimeoutType: TimeoutTypeScheduleToStart,
+			},
+		},
+	}
+}
+
+func (i *ActivityImpl) LoadDispatchInfo(
+	chasmContext chasm.Context,
+	_ struct{},
+) (*matchingservice.AddActivityTaskRequest, error) {
+	// load dispatch info
+	return &matchingservice.AddActivityTaskRequest{}, nil
 }
 
 func (i *ActivityImpl) RecordStarted(
@@ -107,30 +126,49 @@ func (i *ActivityImpl) RecordStarted(
 	req *RecordStartedRequest,
 ) (*RecordStartedResponse, error) {
 
-	// only this field will be updated
-	i.State.StartedTime = timestamppb.New(chasmContext.Now(i))
-	// update other states
+	i.UpdateStateToStarted(chasmContext, req)
 
 	payload, err := i.Input.Get(chasmContext)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := chasmContext.AddTask(
-		i,
-		chasm.TaskAttributes{
-			ScheduledTime: chasmContext.Now(i).Add(10 * time.Second),
-		},
-		TimeoutTask{
-			TimeoutType: TimeoutTypeStartToClose,
-		},
-	); err != nil {
-		return nil, nil
+	for _, t := range i.GenerateStartedTasks(chasmContext) {
+		if err := chasmContext.AddTask(chasm.Task{
+			Attributes: t.Attributes,
+			Data:       t.Data,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	return &RecordStartedResponse{
 		Input: payload.Data,
 	}, nil
+}
+
+func (i *ActivityImpl) UpdateStateToStarted(
+	chasmContext chasm.MutableContext,
+	req *RecordStartedRequest,
+) {
+	// only this field will be updated
+	i.State.StartedTime = timestamppb.New(chasmContext.Now())
+	// update other states
+}
+
+func (i *ActivityImpl) GenerateStartedTasks(
+	chasmContext chasm.Context,
+) []chasm.Task {
+	return []chasm.Task{
+		{
+			Attributes: chasm.TaskAttributes{
+				ScheduledTime: chasmContext.Now().Add(10 * time.Second),
+			},
+			Data: TimeoutTask{
+				TimeoutType: TimeoutTypeStartToClose,
+			},
+		},
+	}
 }
 
 func (i *ActivityImpl) RecordCompleted(

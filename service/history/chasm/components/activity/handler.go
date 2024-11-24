@@ -90,8 +90,6 @@ func (h *ActivityHandler) RecordCompleted(
 
 type GetActivityResultRequest struct {
 	RefToken []byte
-
-	chasm.OperationObserveBase
 }
 
 type GetActivityResultResponse struct {
