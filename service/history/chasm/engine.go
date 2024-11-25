@@ -36,7 +36,7 @@ type Engine interface {
 	pollComponent(
 		context.Context,
 		ComponentRef,
-		func(Context, Component) bool,
+		func(Context, Component) (bool, error),
 		func(MutableContext, Component) error,
 	) (ComponentRef, error)
 }
@@ -172,7 +172,7 @@ type PollComponentRequest[C Component, I any, O any] struct {
 	// is already gone.
 	// This is very different from parent listen to child's state changes, which needs to be
 	// specified statically. and we can't keep triggering the same operation, over and over again.
-	PredicateFn func(C, Context, I) bool
+	PredicateFn func(C, Context, I) (bool, error)
 	OperationFn func(C, MutableContext, I) (O, error)
 	Input       I
 }
@@ -185,7 +185,7 @@ func PollComponent[C Component, I any, O any](
 	ref, err := engineFromContext(ctx).pollComponent(
 		ctx,
 		request.Ref,
-		func(ctx Context, c Component) bool {
+		func(ctx Context, c Component) (bool, error) {
 			return request.PredicateFn(c.(C), ctx, request.Input)
 		},
 		func(ctx MutableContext, c Component) error {

@@ -6,6 +6,8 @@ import (
 	"go.temporal.io/server/service/history/chasm"
 )
 
+var _ Service = (*ActivityHandler)(nil)
+
 type ActivityHandler struct {
 }
 
@@ -26,7 +28,7 @@ func (h *ActivityHandler) NewActivity(
 		chasm.NewInstanceRequest[*ActivityImpl, *NewActivityRequest, *NewActivityResponse]{
 			Key: chasm.InstanceKey{
 				NamespaceID: "default",
-				BusinessID:  "memo",
+				BusinessID:  "activityID",
 				// in V1 we probably don't support specifying instanceID,
 				// need to change persistence implementation for supporting that.
 				// InstanceID:  uuid.New().String(),
@@ -47,7 +49,6 @@ func (h *ActivityHandler) RecordStarted(
 	ctx context.Context,
 	request *RecordStartedRequest,
 ) (*RecordStartedResponse, error) {
-	// resp := &RecordStartedResponse{}
 
 	ref, err := chasm.DeserializeComponentRef(request.RefToken)
 	if err != nil {
@@ -56,9 +57,9 @@ func (h *ActivityHandler) RecordStarted(
 
 	resp, startedActivityRef, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[Activity, *RecordStartedRequest, *RecordStartedResponse]{
+		chasm.UpdateComponentRequest[*ActivityImpl, *RecordStartedRequest, *RecordStartedResponse]{
 			Ref:      ref,
-			UpdateFn: Activity.RecordStarted, // (*ActivityImpl).RecordStarted,
+			UpdateFn: (*ActivityImpl).RecordStarted,
 			Input:    request,
 		},
 	)
@@ -90,8 +91,6 @@ func (h *ActivityHandler) RecordCompleted(
 
 type GetActivityResultRequest struct {
 	RefToken []byte
-
-	chasm.OperationObserveBase
 }
 
 type GetActivityResultResponse struct {
@@ -112,14 +111,15 @@ func (h *ActivityHandler) GetActivityResult(
 		ctx,
 		chasm.PollComponentRequest[*ActivityImpl, *GetActivityResultRequest, *GetActivityResultResponse]{
 			Ref: ref,
-			PredicateFn: func(ai *ActivityImpl, ctx chasm.Context, garr *GetActivityResultRequest) bool {
-				return ai.RunningState() == chasm.ComponentStateCompleted
+			PredicateFn: func(a *ActivityImpl, _ chasm.Context, _ *GetActivityResultRequest) (bool, error) {
+				return a.RunningState() == chasm.ComponentStateCompleted, nil
 			},
-			OperationFn: func(ai *ActivityImpl, ctx chasm.MutableContext, garr *GetActivityResultRequest) (*GetActivityResultResponse, error) {
-				outputPayload, err := ai.Output.Get(ctx)
+			OperationFn: func(a *ActivityImpl, ctx chasm.MutableContext, _ *GetActivityResultRequest) (*GetActivityResultResponse, error) {
+				outputPayload, err := a.Output.Get(ctx)
 				resp.Output = outputPayload.Data
 				return resp, err
 			},
+			Input: request,
 		},
 	); err != nil {
 		return nil, err

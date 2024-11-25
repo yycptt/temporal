@@ -4,12 +4,11 @@ import (
 	"time"
 
 	"go.temporal.io/api/common/v1"
+	"go.temporal.io/server/api/matchingservice/v1"
 	persistencepb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/service/history/chasm"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-var _ Activity = (*ActivityImpl)(nil)
 
 type (
 	ActivityImpl struct {
@@ -146,9 +145,9 @@ func (i *ActivityImpl) RecordCompleted(
 	return &RecordCompletedResponse{}, nil
 }
 
-func (i *ActivityImpl) Describe(
+func (i *ActivityImpl) GetDispatchInfo(
 	_ chasm.Context,
-	_ *DescribeActivityRequest,
-) (*DescribeActivityResponse, error) {
+	_ *DispatchTask,
+) (*matchingservice.AddActivityTaskRequest, error) {
 	panic("not implemented")
 }

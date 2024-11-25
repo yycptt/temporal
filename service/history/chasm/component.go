@@ -33,9 +33,7 @@ type Context interface {
 	// NOTE: component created in the current transaction won't have a ref
 
 	Ref(Component) (ComponentRef, bool)
-	LifeCycleOption(Component) LifecycleOption
 	Now(Component) time.Time
-	Intent() OperationIntent
 
 	getContext() context.Context
 }
@@ -73,15 +71,7 @@ type ComponentField[C Component] struct {
 }
 
 type NewComponentOptions struct {
-	LifecycleOption LifecycleOption
 }
-
-type LifecycleOption int
-
-const (
-	LifecycleOptionAbandon LifecycleOption = 1 << iota
-	LifecycleOptionBlock
-)
 
 func NewComponentField[C Component](
 	ctx Context,
@@ -96,13 +86,6 @@ func NewComponentField[C Component](
 	}
 }
 
-func NewComponentForInterface[I Component](ctx Context) (I, error) {
-	// find the ctor for I from registry
-	// call the ctor
-
-	panic("not implemented")
-}
-
 func (c *ComponentField[C]) Get(
 	ctx Context,
 ) (C, error) {
@@ -112,21 +95,6 @@ func (c *ComponentField[C]) Get(
 }
 
 type ComponentMap[C Component] map[string]*ComponentField[C]
-
-func (m ComponentMap[C]) Get(
-	ctx Context,
-	key string,
-) (*ComponentField[C], error) {
-	panic("not implemented")
-}
-
-func (m ComponentMap[C]) Set(
-	ctx Context,
-	key string,
-	c C,
-) {
-	panic("not implemented")
-}
 
 type ComponentState int
 
@@ -175,96 +143,10 @@ func (r *ComponentRef) Serialize() ([]byte, error) {
 	panic("not implemented")
 }
 
-func DeserializeComponentRef(data []byte) (ComponentRef, error) {
+func (r *ComponentRef) Path() []string {
 	panic("not implemented")
 }
 
-// type Event[E any, C any] struct {
-// 	RawEvent        E
-// 	SourceComponent C
-// }
-
-// type EventListener[E any, C any] func(Context, Event[E, C]) error
-
-type OperationInterceptor[P, C Component] func(P, MutableContext, C, func() error) error
-
-// type ChildOperationRule[P, C Component] func(P, Context, C) bool
-
-// type ChildStateChangeListener[P, C Component] struct {
-// 	PredicateFn func(Context, C) (bool, error)
-// 	UpdateFn    func(MutableContext, P, C) error
-// }
-
-// cases when workflow is closed
-// 1. describe activity, don't want to intercept
-// 2. heatbeat activity, want to intercept, write operation
-// 3. complete activity, want to intercept, write operation
-// 4. dispatch activity, want to intercept, read operation
-
-// parent close policy = terminate
-// 5. child workflow start, want to intercept, read + write operation
-
-// parent close policy = abandon
-// 6. child workflow start, don't want to intercept read + write operation
-
-// 7. record child completion, want to intercept, write operation
-
-// 8. report to parent, process parent close policy, update es, don't want to intercept, read operation
-// 9. callback, don't want to intercept, write operation.
-// Except update ES, we do want intercept if got reset
-// But ES is kinda special. it's a sync storage provided by the framework.
-
-// 10. query, don't want to intercept, read operation
-
-// for 5 and 6, if you model this using marker interface, which is static,
-// this policy has to be on the parent, since it's dynamic.
-// you can't say the startChildTask has marker proceedOnClose()
-
-// for 8 and 9, it's notifying external about the current state of the component,
-// very similar to observe, but original is different. one from outside, one from internal.
-// Also notification should not be delievered if component got reset.
-
-// the marker interface can only define the semantic of the operation,
-// not the result (execute or not is a result)
-
-// so markers should be like
-type OperationProgressBase interface {
-	mustEmbedOperationIntentProgress()
-}
-type OperationObserveBase interface {
-	mustEmbedOperationIntentObserve()
-} // by definition should only be used by api
-type OperationNotificationBase interface {
-	mustEmbedOperationIntentNotification()
-} // by definition should only be used by tasks
-
-type OperationIntent int
-
-const (
-	OperationIntentProgress OperationIntent = 1 << iota
-	OperationIntentObserve
-	OperationIntentNotification
-)
-
-// each component can define it's own marker interface
-// but the semantic should focus on the operation itself.
-
-func NewDefaultChildOperationRule[P, C Component]() RegistrableChildOperationRule[P] {
-	return NewRegistrableChildOperationRule[P, C](
-		ShouldContinueOperation,
-	)
-}
-
-func ShouldContinueOperation[P, C Component](
-	parentComponent P,
-	ctx Context,
-	childComponent C,
-) bool {
-	// default pre-interceptor logic
-	// component in running state => allow all three
-	// component in paused state => block progress
-	// component in completed/failed => block progress
-	// component in reset => block progress and notification
-
+func DeserializeComponentRef(data []byte) (ComponentRef, error) {
 	panic("not implemented")
 }

@@ -10,49 +10,27 @@ type Library interface {
 	Name() string
 	Components() []RegistrableComponent
 	Tasks() []RegistrableTask
+	Services() []RegistrableService
+}
+
+type RegistrableService struct{}
+
+func NewRegistrableService[S any]() RegistrableService {
+	panic("not implemented")
 }
 
 type RegistrableComponent struct {
 }
 
-type RegistrableChildOperationRule[P Component] struct{}
-
-func NewRegistrableChildOperationRule[P, C Component](
-	rule func(P, Context, C) bool,
-) RegistrableChildOperationRule[P] {
-	panic("not implemented")
-}
-
 func NewRegistrableComponent[P Component](
-	childOperationRules []RegistrableChildOperationRule[P],
-	childStateListeners []RegistrableChildStateListener[P],
-	childInterceptors []RegistrableChildInterceptor[P],
 	options RegistrableComponentOptions,
 ) RegistrableComponent {
 	panic("not implemented")
 }
 
-type RegistrableChildStateListener[P Component] struct{}
-
-func NewRegistrableChildStateListener[P, C Component](
-	predicateFn func(Context, C) (bool, error),
-	transitionFn func(P, MutableContext, C) error,
-) RegistrableChildStateListener[P] {
-	panic("not implemented")
-}
-
-type RegistrableChildInterceptor[P Component] struct{}
-
-func NewRegistrableChildInterceptor[P, C Component](
-	interceptorFn func(P, MutableContext, C, func() error) error,
-) RegistrableChildInterceptor[P] {
-	panic("not implemented")
-}
-
 type RegistrableTask struct{}
 
-func NewRegistrableTask[C any, T any](
-	handler TaskHandler[C, T],
+func NewRegistrableTask[T any](
 	options RegistrableTaskOptions,
 ) RegistrableTask {
 	panic("not implemented")
@@ -64,6 +42,25 @@ type RegistrableComponentOptions struct {
 
 	// only applys when component is used as an instance
 	StaticInstanceOptions StaticInstanceOptions
+
+	ServiceHandlers []RegistrableServiceHandler
+	TaskHandlers    []RegistrableTaskHandler
+}
+
+type RegistrableServiceHandler struct{}
+
+func NewRegistrableServiceHandler[S any](
+	handler S,
+) RegistrableServiceHandler {
+	panic("not implemented")
+}
+
+type RegistrableTaskHandler struct{}
+
+func NewRegistrableTaskHandler[C any, T any](
+	handler TaskHandler[C, T],
+) RegistrableTaskHandler {
+	panic("not implemented")
 }
 
 type StaticInstanceOptions struct {

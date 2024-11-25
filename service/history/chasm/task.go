@@ -11,6 +11,6 @@ type TaskAttributes struct {
 }
 
 type TaskHandler[C any, T any] interface {
-	Validate(Context, C, T) error
+	Validate(Context, C, ComponentRef, T) error
 	Execute(context.Context, ComponentRef, T) error
 }

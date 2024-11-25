@@ -10,17 +10,16 @@ import (
 
 // This should be in fx logic
 
-type DispatchTask struct {
-	chasm.OperationProgressBase
-}
+type DispatchTask struct{}
 
 type DispatchTaskHandler struct {
-	matchingClient matchingservice.MatchingServiceClient
+	MatchingClient matchingservice.MatchingServiceClient
 }
 
 func (h *DispatchTaskHandler) Validate(
 	chasmContext chasm.Context,
 	activity *ActivityImpl,
+	_ chasm.ComponentRef,
 	task *DispatchTask,
 ) error {
 	if !activity.State.StartedTime.AsTime().IsZero() {
@@ -49,7 +48,7 @@ func (h *DispatchTaskHandler) Execute(
 		return err
 	}
 
-	_, err := h.matchingClient.AddActivityTask(ctx, &matchingservice.AddActivityTaskRequest{})
+	_, err := h.MatchingClient.AddActivityTask(ctx, &matchingservice.AddActivityTaskRequest{})
 	return err
 }
 
@@ -62,6 +61,4 @@ type TimeoutTask struct {
 	// similar to component state,
 	// use a proto message if possible
 	TimeoutType int
-
-	chasm.OperationProgressBase
 }
