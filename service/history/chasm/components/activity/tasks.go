@@ -33,23 +33,19 @@ func (h *DispatchTaskHandler) Validate(
 func (h *DispatchTaskHandler) Execute(
 	ctx context.Context,
 	activityRef chasm.ComponentRef,
-	_ *DispatchTask,
+	t *DispatchTask,
 ) error {
-	if _, _, err := chasm.UpdateComponent(
+	addTaskRequest, _, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[*ActivityImpl, struct{}, struct{}]{
-			Ref: activityRef,
-			UpdateFn: func(activity *ActivityImpl, chasmContext chasm.MutableContext, _ struct{}) (struct{}, error) {
-				// fetch some states here
-				// return nil
-				panic("not implemented")
-			},
-		},
-	); err != nil {
+		activityRef,
+		(*ActivityImpl).GetDispatchInfo,
+		t,
+	)
+	if err != nil {
 		return err
 	}
 
-	_, err := h.matchingClient.AddActivityTask(ctx, &matchingservice.AddActivityTaskRequest{})
+	_, err = h.matchingClient.AddActivityTask(ctx, addTaskRequest)
 	return err
 }
 

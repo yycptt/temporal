@@ -17,16 +17,12 @@ func (l Library) Name() string {
 func (l Library) Components() []chasm.RegistrableComponent {
 	return []chasm.RegistrableComponent{
 		chasm.NewRegistrableComponent[*ActivityImpl](
-			chasm.RegistrableComponentOptions{
-				Name: "",
-				StaticInstanceOptions: chasm.StaticInstanceOptions{
-					ShardingOption: chasm.InstanceShardingOption{
-						Sharding: func(key chasm.InstanceKey) string {
-							return key.NamespaceID + key.BusinessID
-						},
-					},
+			"",
+			chasm.ShardingFn(
+				func(key chasm.InstanceKey) string {
+					return key.NamespaceID + key.BusinessID
 				},
-			},
+			),
 		),
 	}
 }
@@ -34,11 +30,9 @@ func (l Library) Components() []chasm.RegistrableComponent {
 func (l Library) Tasks() []chasm.RegistrableTask {
 	return []chasm.RegistrableTask{
 		chasm.NewRegistrableTask(
+			"dispatchTask",
 			&DispatchTaskHandler{
 				l.matchingClient,
-			},
-			chasm.RegistrableTaskOptions{
-				Name: "dispatchTask",
 			},
 		),
 	}

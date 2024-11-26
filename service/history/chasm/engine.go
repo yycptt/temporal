@@ -8,29 +8,28 @@ type Engine interface {
 	newInstance(
 		context.Context,
 		InstanceKey,
-		BusinessIDReusePolicy,
-		DynamicInstanceOptions,
 		func(MutableContext) (Component, error),
+		...EngineOption,
 	) (ComponentRef, error)
 	updateWithNewInstance(
 		context.Context,
 		InstanceKey,
-		DynamicInstanceOptions,
-		[]ComponentPath,
 		func(MutableContext) (Component, error),
 		func(MutableContext, Component) error,
+		...EngineOption,
 	) (ComponentRef, error)
 
 	updateComponent(
 		context.Context,
 		ComponentRef,
-		[]ComponentPath,
 		func(MutableContext, Component) error,
+		...EngineOption,
 	) (ComponentRef, error)
 	readComponent(
 		context.Context,
 		ComponentRef,
 		func(Context, Component) error,
+		...EngineOption,
 	) error
 
 	pollComponent(
@@ -38,6 +37,7 @@ type Engine interface {
 		ComponentRef,
 		func(Context, Component) bool,
 		func(MutableContext, Component) error,
+		...EngineOption,
 	) (ComponentRef, error)
 }
 
@@ -48,118 +48,133 @@ const (
 	BusinessIDReusePolicyRejectDuplicate
 )
 
-// TODO: same for IDConflictPolicy
+type BusinessIDConflictPolicy int
 
-type NewInstanceRequest[C Component, I any, O any] struct {
-	Key                    InstanceKey
-	IDReusePolicy          BusinessIDReusePolicy
-	DynamicInstanceOptions DynamicInstanceOptions
-	NewFn                  func(MutableContext, I) (C, O, error)
-	Input                  I
+const (
+	BusinessIDConflictPolicyFail BusinessIDConflictPolicy = iota
+	BusinessIDConflictPolicyTermiateExisting
+	BusinessIDConflictPolicyUseExisting
+)
+
+type engineOptions struct {
+}
+
+type EngineOption func(*engineOptions)
+
+func EngineStorageOption(
+	option InstanceStorageOption,
+) EngineOption {
+	panic("not implemented")
+}
+
+func EngineReplicationOption(
+	option InstanceReplicationOption,
+) EngineOption {
+	panic("not implemented")
+}
+
+func EngineEagerLoadOption(
+	paths []ComponentPath,
+) EngineOption {
+	panic("not implemented")
+}
+
+func EngineIDReusePolicyOption(
+	reusePolicy BusinessIDReusePolicy,
+	conflictPolicy BusinessIDConflictPolicy,
+) EngineOption {
+	panic("not implemented")
 }
 
 func NewInstance[C Component, I any, O any](
 	ctx context.Context,
-	request NewInstanceRequest[C, I, O],
+	key InstanceKey,
+	newFn func(MutableContext, I) (C, O, error),
+	input I,
+	opts ...EngineOption,
 ) (O, ComponentRef, error) {
 	var output O
 	ref, err := engineFromContext(ctx).newInstance(
 		ctx,
-		request.Key,
-		request.IDReusePolicy,
-		request.DynamicInstanceOptions,
+		key,
 		func(ctx MutableContext) (Component, error) {
 			var c C
 			var err error
-			c, output, err = request.NewFn(ctx, request.Input)
+			c, output, err = newFn(ctx, input)
 			return c, err
 		},
+		opts...,
 	)
 	return output, ref, err
 }
 
-type UpdateWithNewInstanceRequest[C Component, I any, O1 any, O2 any] struct {
-	Key                    InstanceKey
-	DynamicInstanceOptions DynamicInstanceOptions
-	NewFn                  func(MutableContext, I) (C, O1, error)
-	UpdateFn               func(C, MutableContext, I) (O2, error)
-	Input                  I
-
-	EagerLoadPaths []ComponentPath // relative to the component (instance here)
-}
-
 func UpdateWithNewInstance[C Component, I any, O1 any, O2 any](
 	ctx context.Context,
-	request UpdateWithNewInstanceRequest[C, I, O1, O2],
+	key InstanceKey,
+	newFn func(MutableContext, I) (C, O1, error),
+	updateFn func(C, MutableContext, I) (O2, error),
+	input I,
+	opts ...EngineOption,
 ) (O1, O2, ComponentRef, error) {
 	var output1 O1
 	var output2 O2
 	ref, err := engineFromContext(ctx).updateWithNewInstance(
 		ctx,
-		request.Key,
-		request.DynamicInstanceOptions,
-		request.EagerLoadPaths,
+		key,
 		func(ctx MutableContext) (Component, error) {
 			var c C
 			var err error
-			c, output1, err = request.NewFn(ctx, request.Input)
+			c, output1, err = newFn(ctx, input)
 			return c, err
 		},
 		func(ctx MutableContext, c Component) error {
 			var err error
-			output2, err = request.UpdateFn(c.(C), ctx, request.Input)
+			output2, err = updateFn(c.(C), ctx, input)
 			return err
 		},
+		opts...,
 	)
 	return output1, output2, ref, err
 }
 
-type UpdateComponentRequest[C Component, I any, O any] struct {
-	Ref      ComponentRef
-	UpdateFn func(C, MutableContext, I) (O, error)
-	Input    I
-
-	// relative to the component, serve as additional seeds for lookup
-	EagerLoadPaths []ComponentPath
-}
-
 func UpdateComponent[C Component, I any, O any](
 	ctx context.Context,
-	request UpdateComponentRequest[C, I, O],
+	ref ComponentRef,
+	updateFn func(C, MutableContext, I) (O, error),
+	input I,
+	opts ...EngineOption,
 ) (O, ComponentRef, error) {
 	var output O
 	ref, err := engineFromContext(ctx).updateComponent(
 		ctx,
-		request.Ref,
-		request.EagerLoadPaths,
+		ref,
 		func(ctx MutableContext, c Component) error {
 			var err error
-			output, err = request.UpdateFn(c.(C), ctx, request.Input)
+			output, err = updateFn(c.(C), ctx, input)
 			return err
 		},
+		opts...,
 	)
 	return output, ref, err
 }
 
-type ReadComponentRequest[C Component, I any, O any] struct {
-	Ref    ComponentRef
-	ReadFn func(C, Context, I) (O, error)
-	Input  I
-}
-
 func ReadComponent[C Component, I any, O any](
 	ctx context.Context,
-	request ReadComponentRequest[C, I, O],
+	ref ComponentRef,
+	readFn func(C, Context, I) (O, error),
+	input I,
+	opts ...EngineOption,
 ) (O, error) {
 	var output O
 	err := engineFromContext(ctx).readComponent(
 		ctx,
-		request.Ref,
+		ref,
 		func(ctx Context, c Component) error {
 			var err error
-			output, err = request.ReadFn(c.(C), ctx, request.Input)
+			output, err = readFn(c.(C), ctx, input)
 			return err
 		},
+		opts...,
 	)
 	return output, err
 }
@@ -179,20 +194,25 @@ type PollComponentRequest[C Component, I any, O any] struct {
 
 func PollComponent[C Component, I any, O any](
 	ctx context.Context,
-	request PollComponentRequest[C, I, O],
+	ref ComponentRef,
+	predicateFn func(C, Context, I) bool,
+	operationFn func(C, MutableContext, I) (O, error),
+	input I,
+	opts ...EngineOption,
 ) (O, ComponentRef, error) {
 	var output O
 	ref, err := engineFromContext(ctx).pollComponent(
 		ctx,
-		request.Ref,
+		ref,
 		func(ctx Context, c Component) bool {
-			return request.PredicateFn(c.(C), ctx, request.Input)
+			return predicateFn(c.(C), ctx, input)
 		},
 		func(ctx MutableContext, c Component) error {
 			var err error
-			output, err = request.OperationFn(c.(C), ctx, request.Input)
+			output, err = operationFn(c.(C), ctx, input)
 			return err
 		},
+		opts...,
 	)
 	return output, ref, err
 }

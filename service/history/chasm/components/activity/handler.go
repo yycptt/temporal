@@ -23,17 +23,19 @@ func (h *ActivityHandler) NewActivity(
 ) (*NewActivityResponse, error) {
 	resp, activityRef, err := chasm.NewInstance(
 		ctx,
-		chasm.NewInstanceRequest[*ActivityImpl, *NewActivityRequest, *NewActivityResponse]{
-			Key: chasm.InstanceKey{
-				NamespaceID: "default",
-				BusinessID:  "memo",
-				// in V1 we probably don't support specifying instanceID,
-				// need to change persistence implementation for supporting that.
-				// InstanceID:  uuid.New().String(),
-			},
-			IDReusePolicy: chasm.BusinessIDReusePolicyAllowDuplicate,
-			NewFn:         NewScheduledActivity,
+		chasm.InstanceKey{
+			NamespaceID: "default",
+			BusinessID:  "memo",
+			// in V1 we probably don't support specifying instanceID,
+			// need to change persistence implementation for supporting that.
+			// InstanceID:  uuid.New().String(),
 		},
+		NewScheduledActivity,
+		request,
+		chasm.EngineIDReusePolicyOption(
+			chasm.BusinessIDReusePolicyAllowDuplicate,
+			chasm.BusinessIDConflictPolicyFail,
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -56,11 +58,12 @@ func (h *ActivityHandler) RecordStarted(
 
 	resp, startedActivityRef, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[Activity, *RecordStartedRequest, *RecordStartedResponse]{
-			Ref:      ref,
-			UpdateFn: Activity.RecordStarted, // (*ActivityImpl).RecordStarted,
-			Input:    request,
-		},
+		ref,
+		(*ActivityImpl).RecordStarted,
+		request,
+		chasm.EngineEagerLoadOption([]chasm.ComponentPath{
+			{"Input"},
+		}),
 	)
 
 	resp.RefToken, err = startedActivityRef.Serialize()
@@ -78,11 +81,9 @@ func (h *ActivityHandler) RecordCompleted(
 
 	resp, _, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[*ActivityImpl, *RecordCompletedRequest, *RecordCompletedResponse]{
-			Ref:      ref,
-			UpdateFn: (*ActivityImpl).RecordCompleted,
-			Input:    request,
-		},
+		ref,
+		(*ActivityImpl).RecordCompleted,
+		request,
 	)
 
 	return resp, err
@@ -110,17 +111,16 @@ func (h *ActivityHandler) GetActivityResult(
 	var resp *GetActivityResultResponse
 	if resp, _, err = chasm.PollComponent(
 		ctx,
-		chasm.PollComponentRequest[*ActivityImpl, *GetActivityResultRequest, *GetActivityResultResponse]{
-			Ref: ref,
-			PredicateFn: func(ai *ActivityImpl, ctx chasm.Context, garr *GetActivityResultRequest) bool {
-				return ai.RunningState() == chasm.ComponentStateCompleted
-			},
-			OperationFn: func(ai *ActivityImpl, ctx chasm.MutableContext, garr *GetActivityResultRequest) (*GetActivityResultResponse, error) {
-				outputPayload, err := ai.Output.Get(ctx)
-				resp.Output = outputPayload.Data
-				return resp, err
-			},
+		ref,
+		func(a *ActivityImpl, ctx chasm.Context, _ *GetActivityResultRequest) bool {
+			return a.RunningState() == chasm.ComponentStateCompleted
 		},
+		func(a *ActivityImpl, ctx chasm.MutableContext, _ *GetActivityResultRequest) (*GetActivityResultResponse, error) {
+			outputPayload, err := a.Output.Get(ctx)
+			resp.Output = outputPayload.Data
+			return resp, err
+		},
+		request,
 	); err != nil {
 		return nil, err
 	}

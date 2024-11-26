@@ -9,13 +9,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// 2. History event as a append only, immutable ordered storaged model
-// 3. parent notify/intercept child component
-
 // Open questions:
-// 2. event notification?
+// 2. History event as a append only, immutable ordered storaged model
 // 3. history storage model?
-// 4. CompletedActivityByID??? (this is obviously an API on workflow, not Activity)
 
 type InstanceKey struct {
 	NamespaceID string
@@ -249,11 +245,11 @@ const (
 // each component can define it's own marker interface
 // but the semantic should focus on the operation itself.
 
-func NewDefaultChildOperationRule[P, C Component]() RegistrableChildOperationRule[P] {
-	return NewRegistrableChildOperationRule[P, C](
-		ShouldContinueOperation,
-	)
-}
+// func NewDefaultChildOperationRule[P, C Component]() RegistrableChildOperationRule[P] {
+// 	return NewRegistrableChildOperationRule[P, C](
+// 		ShouldContinueOperation,
+// 	)
+// }
 
 func ShouldContinueOperation[P, C Component](
 	parentComponent P,

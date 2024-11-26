@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"go.temporal.io/api/common/v1"
+	"go.temporal.io/server/api/matchingservice/v1"
 	persistencepb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/service/history/chasm"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -34,6 +35,8 @@ type (
 		// Can also support field name tag, so the fields can be renamed
 		Input  *chasm.DataField[*common.Payload] `chasm:"lazy"`
 		Output *chasm.DataField[*common.Payload] `chasm:"lazy"`
+
+		EventListener *chasm.EventListenerField[ActivityEventListener]
 	}
 )
 
@@ -102,6 +105,13 @@ func (i *ActivityImpl) Schedule(
 	return &ScheduleResponse{}, nil
 }
 
+func (i *ActivityImpl) GetDispatchInfo(
+	chasmContext chasm.MutableContext,
+	t *DispatchTask,
+) (*matchingservice.AddActivityTaskRequest, error) {
+	panic("not implemented")
+}
+
 func (i *ActivityImpl) RecordStarted(
 	chasmContext chasm.MutableContext,
 	req *RecordStartedRequest,
@@ -139,9 +149,19 @@ func (i *ActivityImpl) RecordCompleted(
 ) (*RecordCompletedResponse, error) {
 	// say we have a completedTime field
 	// i.State.CompletedTime = timestamppb.New(chasmContext.Now())
-	i.Output = chasm.NewDataField(chasmContext, &common.Payload{
+	output := &common.Payload{
 		Data: req.Output,
-	})
+	}
+	i.Output = chasm.NewDataField(chasmContext, output)
+
+	completedEvent := ActivityCompletedEvent{
+		Output: output,
+	}
+	if listener := i.EventListener.Get(chasmContext); listener != nil {
+		if err := listener.OnCompletion(completedEvent); err != nil {
+			return nil, err
+		}
+	}
 
 	return &RecordCompletedResponse{}, nil
 }

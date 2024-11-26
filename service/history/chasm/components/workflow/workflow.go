@@ -20,7 +20,7 @@ type (
 )
 
 func NewWorkflow(
-	chasmContext chasm.Context,
+	chasmContext chasm.MutableContext,
 	request *NewWorkflowRequest,
 ) (*NewWorkflowResponse, error) {
 	workflow := &WorkflowImpl{
@@ -52,11 +52,11 @@ func (w *WorkflowImpl) RunningState() chasm.ComponentState {
 }
 
 func (w *WorkflowImpl) RespondWorkflowTaskCompleted(
-	chasmContext chasm.Context,
+	chasmContext chasm.MutableContext,
 	request *RespondWorkflowTaskCompletedRequest,
 ) (*RespondWorkflowTaskCompletedResponse, error) {
 	for _, command := range request.ActivityCommands {
-		a, err := activity.NewScheduledActivity(
+		a, _, err := activity.NewScheduledActivity(
 			chasmContext,
 			&activity.NewActivityRequest{},
 		)
@@ -81,25 +81,27 @@ func (w *WorkflowImpl) RespondWorkflowTaskCompleted(
 func (w *WorkflowImpl) CompletedActivityByID(
 	chasmContext chasm.MutableContext,
 	request *CompleteActivityByIDRequest,
-) error {
+) (*CompleteActivityByIDResponse, error) {
 
 	a, err := w.Activities.Get(chasmContext, request.ActivityID)
 	if err != nil {
-		return errors.New("activity not found")
+		return nil, errors.New("activity not found")
 	}
 	activityImpl, err := a.Get(chasmContext)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = activityImpl.RecordCompleted(chasmContext, &activity.RecordCompletedRequest{})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	// continue to schedule workflow task
 
-	return nil
+	delete(w.Activities, request.ActivityID)
+
+	return nil, err
 }
 
 // separate two concerns
@@ -130,28 +132,29 @@ func (w *WorkflowImpl) InterceptActivity(
 	// activity started/completed/failed/timedout/paused.
 	// huge switch case in this method.
 
-	resp, err := childActivity.Describe(
-		chasmContext,
-		&activity.DescribeActivityRequest{},
-	)
-	if err != nil {
-		return err
-	}
-	closedBeforeProcessing := resp.CompletedTime.IsZero()
-	defer func() {
-		// post interceptor
-		//
+	activityClosed := func(childActivity *activity.ActivityImpl) (bool, error) {
 		resp, err := childActivity.Describe(
 			chasmContext,
 			&activity.DescribeActivityRequest{},
 		)
 		if err != nil {
-			retErr = err
-			return
+			return false, err
 		}
-		closedAfterProcessing := resp.CompletedTime.IsZero()
+		return resp.CompletedTime.IsZero(), nil
+	}
+	closedBeforeProcessing, err := activityClosed(childActivity)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		closedAfterProcessing, err := activityClosed(childActivity)
+		if err != nil {
+			retErr = err
+		}
 
 		if !closedBeforeProcessing && closedAfterProcessing {
+			// delete the activity
 			// schedule new workflowTask
 		}
 	}()
@@ -243,23 +246,14 @@ func (h *WorkflowHandler) CompleteActivityByID(
 	ctx context.Context,
 	request *CompleteActivityByIDRequest,
 ) (*CompleteActivityByIDResponse, error) {
-	_, err := chasm.UpdateComponent(
+	resp, _, err := chasm.UpdateComponent(
 		ctx,
-		chasm.UpdateComponentRequest[*WorkflowImpl]{
-			// TODO: take in a struct def, not a registred name
-			// But point here is that tell the framework your struct definition,
-			// so it can determine which sub components needs to be eagerly loaded.
-
-			// Also note that if you don't have a ref,
-			// you can only interact with to the top level component.
-			Ref: chasm.NewComponentRef(request.WorkflowKey, "Workflow"),
-			EagerLoadPaths: []chasm.ComponentPath{
-				{"Activities", request.ActivityID},
-			},
-			UpdateFn: func(ctx chasm.Context, w *WorkflowImpl) error {
-				return w.CompletedActivityByID(ctx, request)
-			},
-		},
+		chasm.NewComponentRef(request.WorkflowKey, "Workflow"),
+		(*WorkflowImpl).CompletedActivityByID,
+		request,
+		chasm.EngineEagerLoadOption([]chasm.ComponentPath{
+			{"Activities", request.ActivityID},
+		}),
 	)
-	return &CompleteActivityByIDResponse{}, err
+	return resp, err
 }
