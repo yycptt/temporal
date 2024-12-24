@@ -88,7 +88,7 @@ type (
 		Nack(err error)
 		Abort()
 		Cancel()
-		Reschedule()
+		Reschedule() bool
 		IsRetryableError(err error) bool
 		RetryPolicy() backoff.RetryPolicy
 		State() ctasks.State
@@ -260,9 +260,9 @@ func (e *ExecutableTaskImpl) Cancel() {
 	e.emitFinishMetrics(now)
 }
 
-func (e *ExecutableTaskImpl) Reschedule() {
+func (e *ExecutableTaskImpl) Reschedule() bool {
 	if atomic.LoadInt32(&e.taskState) != taskStatePending {
-		return
+		return false
 	}
 
 	e.Logger.Info(fmt.Sprintf(
@@ -270,6 +270,7 @@ func (e *ExecutableTaskImpl) Reschedule() {
 		e.taskID,
 	))
 	atomic.AddInt32(&e.attempt, 1)
+	return true
 }
 
 func (e *ExecutableTaskImpl) IsRetryableError(err error) bool {

@@ -140,11 +140,12 @@ func (w *batchedTask) Nack(err error) {
 	}
 }
 
-func (w *batchedTask) Reschedule() {
+func (w *batchedTask) Reschedule() bool {
 	if len(w.individualTasks) == 1 {
-		w.batchedTask.Reschedule()
+		return w.batchedTask.Reschedule()
 	} else {
 		w.handleIndividualTasks()
+		return true
 	}
 }
 

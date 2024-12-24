@@ -71,7 +71,8 @@ func (e *speculativeWorkflowTaskTimeoutExecutable) Ack() {
 func (e *speculativeWorkflowTaskTimeoutExecutable) Nack(err error) {
 }
 
-func (e *speculativeWorkflowTaskTimeoutExecutable) Reschedule() {
+func (e *speculativeWorkflowTaskTimeoutExecutable) Reschedule() bool {
+	return false
 }
 
 func (e *speculativeWorkflowTaskTimeoutExecutable) State() ctasks.State {

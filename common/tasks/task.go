@@ -58,7 +58,7 @@ type (
 		// Nack marks the task as unsuccessful completed
 		Nack(err error)
 		// Reschedule marks the task for retry
-		Reschedule()
+		Reschedule() bool
 		// State returns the current task state
 		State() State
 	}

@@ -24,6 +24,13 @@
 
 package tasks
 
+import (
+	"sync"
+
+	"github.com/dgryski/go-farm"
+	"go.temporal.io/server/common/definition"
+)
+
 type (
 	SequentialTaskQueueFactory[T Task] func(task T) SequentialTaskQueue[T]
 
@@ -40,3 +47,65 @@ type (
 		Len() int
 	}
 )
+
+type (
+	SequentialTaskQueueImpl[T Task] struct {
+		id interface{}
+
+		sync.Mutex
+		taskQueue []T
+	}
+)
+
+func NewSequentialTaskQueue[T Task](id any) *SequentialTaskQueueImpl[T] {
+	return &SequentialTaskQueueImpl[T]{
+		id: id,
+	}
+}
+
+func (q *SequentialTaskQueueImpl[T]) ID() interface{} {
+	return q.id
+}
+
+func (q *SequentialTaskQueueImpl[T]) Add(task T) {
+	q.Lock()
+	defer q.Unlock()
+	q.taskQueue = append(q.taskQueue, task)
+}
+
+func (q *SequentialTaskQueueImpl[T]) Remove() T {
+	q.Lock()
+	defer q.Unlock()
+
+	var t T
+	if len(q.taskQueue) == 0 {
+		return t
+	}
+
+	t = q.taskQueue[0]
+	q.taskQueue = q.taskQueue[1:]
+	return t
+}
+
+func (q *SequentialTaskQueueImpl[T]) IsEmpty() bool {
+	q.Lock()
+	defer q.Unlock()
+	return len(q.taskQueue) == 0
+}
+
+func (q *SequentialTaskQueueImpl[T]) Len() int {
+	q.Lock()
+	defer q.Unlock()
+	return len(q.taskQueue)
+}
+
+func WorkflowKeyHashFn(
+	item interface{},
+) uint32 {
+	workflowKey, ok := item.(definition.WorkflowKey)
+	if !ok {
+		return 0
+	}
+	idBytes := []byte(workflowKey.NamespaceID + "_" + workflowKey.WorkflowID + "_" + workflowKey.RunID)
+	return farm.Fingerprint32(idBytes)
+}

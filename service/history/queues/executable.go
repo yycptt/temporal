@@ -646,15 +646,20 @@ func (e *executableImpl) Nack(err error) {
 	}
 }
 
-func (e *executableImpl) Reschedule() {
+func (e *executableImpl) Reschedule() bool {
 	state := e.State()
 	if state != ctasks.TaskStatePending {
-		return
+		return false
 	}
 
 	e.updatePriority()
 
+	if e.scheduler.TrySubmit(e) {
+		return true
+	}
+
 	e.rescheduler.Add(e, e.timeSource.Now().Add(e.backoffDuration(nil, e.Attempt())))
+	return true
 }
 
 func (e *executableImpl) State() ctasks.State {

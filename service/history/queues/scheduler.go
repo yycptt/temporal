@@ -28,6 +28,7 @@ package queues
 
 import (
 	"go.temporal.io/server/common/clock"
+	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/dynamicconfig"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -136,9 +137,14 @@ func NewScheduler(
 		)[key.Priority]
 	}
 	channelWeightUpdateCh := make(chan struct{}, 1)
-	fifoSchedulerOptions := &tasks.FIFOSchedulerOptions{
-		QueueSize:   prioritySchedulerProcessorQueueSize,
-		WorkerCount: options.WorkerCount,
+	// fifoSchedulerOptions := &tasks.FIFOSchedulerOptions{
+	// 	QueueSize:   prioritySchedulerProcessorQueueSize,
+	// 	WorkerCount: options.WorkerCount,
+	// }
+	sequentialScheduleOptions := &tasks.SequentialSchedulerOptionsV2{
+		QueueSize:            prioritySchedulerProcessorQueueSize,
+		WorkerCount:          options.WorkerCount,
+		TaskQueueConcurrency: 5,
 	}
 
 	scheduler = tasks.NewInterleavedWeightedRoundRobinScheduler(
@@ -148,10 +154,20 @@ func NewScheduler(
 			ChannelWeightUpdateCh:        channelWeightUpdateCh,
 			InactiveChannelDeletionDelay: options.InactiveNamespaceDeletionDelay,
 		},
-		tasks.Scheduler[Executable](tasks.NewFIFOScheduler[Executable](
-			fifoSchedulerOptions,
+		// tasks.Scheduler[Executable](tasks.NewFIFOScheduler[Executable](
+		// 	fifoSchedulerOptions,
+		// 	logger,
+		// )),
+		tasks.NewSequentialSchedulerV2(
+			sequentialScheduleOptions,
+			tasks.WorkflowKeyHashFn,
+			func(e Executable) tasks.SequentialTaskQueue[Executable] {
+				return tasks.NewSequentialTaskQueue[Executable](
+					definition.NewWorkflowKey(e.GetNamespaceID(), e.GetWorkflowID(), ""), // group by workflowID
+				)
+			},
 			logger,
-		)),
+		),
 		logger,
 	)
 

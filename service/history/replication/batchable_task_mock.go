@@ -225,9 +225,11 @@ func (mr *MockBatchableTaskMockRecorder) QueueID() *gomock.Call {
 }
 
 // Reschedule mocks base method.
-func (m *MockBatchableTask) Reschedule() {
+func (m *MockBatchableTask) Reschedule() bool {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Reschedule")
+	ret := m.ctrl.Call(m, "Reschedule")
+	ret0, _ := ret[0].(bool)
+	return ret0
 }
 
 // Reschedule indicates an expected call of Reschedule.

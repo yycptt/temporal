@@ -327,9 +327,11 @@ func (mr *MockExecutableMockRecorder) Nack(err any) *gomock.Call {
 }
 
 // Reschedule mocks base method.
-func (m *MockExecutable) Reschedule() {
+func (m *MockExecutable) Reschedule() bool {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Reschedule")
+	ret := m.ctrl.Call(m, "Reschedule")
+	ret0, _ := ret[0].(bool)
+	return ret0
 }
 
 // Reschedule indicates an expected call of Reschedule.

@@ -121,5 +121,5 @@ func (n *noopTask) Abort()                           { panic("implement me") }
 func (n *noopTask) Cancel()                          { panic("implement me") }
 func (n *noopTask) Ack()                             { n.Done() }
 func (n *noopTask) Nack(err error)                   { panic("implement me") }
-func (n *noopTask) Reschedule()                      { panic("implement me") }
+func (n *noopTask) Reschedule() bool                 { panic("implement me") }
 func (n *noopTask) State() State                     { panic("implement me") }
