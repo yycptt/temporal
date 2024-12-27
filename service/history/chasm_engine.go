@@ -96,7 +96,7 @@ func (e *ChasmEngine) NewExecution(
 	executionRef chasm.ComponentRef,
 	newFn func(chasm.MutableContext) (chasm.Component, error),
 	opts ...chasm.TransitionOption,
-) (executionKey chasm.ExecutionKey, newExecutionRef []byte, retErr error) {
+) (executionKey chasm.ExecutionKey, newExecutionRef []byte, retError error) {
 	options := e.constructTransitionOptions(opts...)
 
 	shardContext, err := e.getShardContext(executionRef)
@@ -120,7 +120,7 @@ func (e *ChasmEngine) NewExecution(
 		return chasm.ExecutionKey{}, nil, err
 	}
 	defer func() {
-		currentExecutionReleaseFn(retErr)
+		retError = currentExecutionReleaseFn(ctx, retError)
 	}()
 
 	newExecutionParams, err := e.createNewExecution(
@@ -186,7 +186,7 @@ func (e *ChasmEngine) UpdateComponent(
 		return nil, err
 	}
 	defer func() {
-		executionLease.GetReleaseFn()(retError)
+		retError = executionLease.GetReleaseFn()(ctx, retError)
 	}()
 
 	mutableState := executionLease.GetMutableState()
@@ -242,7 +242,9 @@ func (e *ChasmEngine) ReadComponent(
 	defer func() {
 		// Always release the lease with nil error since this is a read only operation
 		// So even if it fails, we don't need to clear and reload mutable state.
-		executionLease.GetReleaseFn()(nil)
+		if releaseErr := executionLease.GetReleaseFn()(ctx, nil); releaseErr != nil {
+			retError = releaseErr
+		}
 	}()
 
 	chasmTree, ok := executionLease.GetMutableState().ChasmTree().(*chasm.Node)
@@ -291,12 +293,18 @@ func (e *ChasmEngine) PollComponent(
 		}
 	}()
 
-	checkPredicateOrSubscribe := func() ([]byte, error) {
+	checkPredicateOrSubscribe := func() (_ []byte, fnErr error) {
 		_, executionLease, err := e.getExecutionLease(ctx, requestRef)
 		if err != nil {
 			return nil, err
 		}
-		defer executionLease.GetReleaseFn()(nil) //nolint:revive
+		defer func() {
+			// Always release the lease with nil error since this is a read only operation
+			// So even if it fails, we don't need to clear and reload mutable state.
+			if releaseErr := executionLease.GetReleaseFn()(ctx, nil); releaseErr != nil {
+				fnErr = releaseErr
+			}
+		}()
 
 		ref, err := e.predicateSatisfied(ctx, monotonicPredicate, requestRef, executionLease)
 		if err != nil {
@@ -752,8 +760,10 @@ func (e *ChasmEngine) getExecutionLease(
 		lockPriority,
 	)
 	if err == nil && staleReferenceErr != nil {
-		executionLease.GetReleaseFn()(nil)
-		err = staleReferenceErr
+		if releaseErr := executionLease.GetReleaseFn()(ctx, nil); releaseErr != nil {
+			return nil, nil, releaseErr
+		}
+		return nil, nil, staleReferenceErr
 	}
 
 	return shardContext, executionLease, err

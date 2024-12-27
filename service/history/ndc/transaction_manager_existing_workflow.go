@@ -285,7 +285,9 @@ func (r *nDCTransactionMgrForExistingWorkflowImpl) updateAsZombie(
 
 	// release lock on current workflow, since current cluster maybe the active cluster
 	//  and events maybe reapplied to current workflow
-	currentWorkflow.GetReleaseFn()(nil)
+	if err := currentWorkflow.GetReleaseFn()(ctx, nil); err != nil {
+		return err
+	}
 	currentWorkflow = nil
 
 	return targetWorkflow.GetContext().UpdateWorkflowExecutionWithNew(
@@ -441,7 +443,9 @@ func (r *nDCTransactionMgrForExistingWorkflowImpl) conflictResolveAsZombie(
 
 	// release lock on current workflow, since current cluster maybe the active cluster
 	//  and events maybe reapplied to current workflow
-	currentWorkflow.GetReleaseFn()(nil)
+	if err := currentWorkflow.GetReleaseFn()(ctx, nil); err != nil {
+		return err
+	}
 	currentWorkflow = nil
 
 	return targetWorkflow.GetContext().ConflictResolveWorkflowExecution(
@@ -470,11 +474,11 @@ func (r *nDCTransactionMgrForExistingWorkflowImpl) executeTransaction(
 
 	defer func() {
 		if rec := recover(); rec != nil {
-			r.cleanupTransaction(currentWorkflow, targetWorkflow, newWorkflow, errPanic)
+			_ = r.cleanupTransaction(ctx, currentWorkflow, targetWorkflow, newWorkflow, errPanic)
 			panic(rec)
-		} else {
-			r.cleanupTransaction(currentWorkflow, targetWorkflow, newWorkflow, retError)
 		}
+
+		retError = r.cleanupTransaction(ctx, currentWorkflow, targetWorkflow, newWorkflow, retError)
 	}()
 
 	switch transactionPolicy {
@@ -524,19 +528,27 @@ func (r *nDCTransactionMgrForExistingWorkflowImpl) executeTransaction(
 }
 
 func (r *nDCTransactionMgrForExistingWorkflowImpl) cleanupTransaction(
+	ctx context.Context,
 	currentWorkflow Workflow,
 	targetWorkflow Workflow,
 	newWorkflow Workflow,
 	err error,
-) {
+) error {
 
 	if currentWorkflow != nil {
-		currentWorkflow.GetReleaseFn()(err)
+		if releaseErr := currentWorkflow.GetReleaseFn()(ctx, err); releaseErr != nil {
+			return releaseErr
+		}
 	}
 	if targetWorkflow != nil {
-		targetWorkflow.GetReleaseFn()(err)
+		if releaseErr := targetWorkflow.GetReleaseFn()(ctx, err); releaseErr != nil {
+			return releaseErr
+		}
 	}
 	if newWorkflow != nil {
-		newWorkflow.GetReleaseFn()(err)
+		if releaseErr := newWorkflow.GetReleaseFn()(ctx, err); releaseErr != nil {
+			return releaseErr
+		}
 	}
+	return nil
 }

@@ -48,7 +48,9 @@ func Invoke(
 			if !mutableState.IsWorkflowExecutionRunning() {
 				// in-memory mutable state is still clean, release the lock with nil error to prevent
 				// clearing and reloading mutable state
-				releaseFn(nil)
+				if err := releaseFn(ctx, nil); err != nil {
+					return nil, err
+				}
 				return nil, consts.ErrWorkflowCompleted
 			}
 
@@ -60,7 +62,7 @@ func Invoke(
 				request.GetHeader().Size(),
 				"SignalWorkflowExecution",
 			); err != nil {
-				releaseFn(nil)
+				err = releaseFn(ctx, nil)
 				return nil, err
 			}
 
@@ -74,7 +76,9 @@ func Invoke(
 				parentRunID := executionInfo.ParentRunId
 				if externalWorkflowExecution.GetWorkflowId() != parentWorkflowID ||
 					externalWorkflowExecution.GetRunId() != parentRunID {
-					releaseFn(nil)
+					if err := releaseFn(ctx, nil); err != nil {
+						return nil, err
+					}
 					return nil, consts.ErrWorkflowParent
 				}
 			}

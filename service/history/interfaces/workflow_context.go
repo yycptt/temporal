@@ -17,7 +17,7 @@ type (
 	// Make sure not to access the mutable state or workflow context after releasing back to the cache.
 	// If there is any error when using the mutable state (e.g. mutable state is mutated and dirty), call release with
 	// the error so the in-memory copy will be thrown away.
-	ReleaseWorkflowContextFunc func(err error)
+	ReleaseWorkflowContextFunc func(context.Context, error) error
 
 	WorkflowContext interface {
 		GetWorkflowKey() definition.WorkflowKey
@@ -27,7 +27,11 @@ type (
 		Clear()
 
 		Lock(ctx context.Context, lockPriority locks.Priority) error
-		Unlock()
+		// TODO: we need to provide another method for draining the pending operations
+		// That method must be called if any write operation (outside the shard) will be made during the lock
+		// e.g. start activity, signal external, cancel external, nexus op, visibility, archival
+		// for chasm, as long as there's no side effect within the lock, it's safe
+		Unlock(context.Context) error
 
 		IsDirty() bool
 

@@ -530,9 +530,9 @@ func (t *transferQueueStandbyTaskExecutor) processTransfer(
 		case retError == consts.ErrTaskRetry,
 			errors.Is(retError, consts.ErrStaleReference),
 			errors.As(retError, &verificationErr):
-			release(nil)
+			retError = release(ctx, nil)
 		default:
-			release(retError)
+			retError = release(ctx, retError)
 		}
 	}()
 
@@ -552,7 +552,10 @@ func (t *transferQueueStandbyTaskExecutor) processTransfer(
 	}
 
 	// NOTE: do not access anything related mutable state after this lock release
-	release(nil)
+	// release(ctx, nil) so mutable state is not unloaded from cache
+	if err := release(ctx, nil); err != nil {
+		return err
+	}
 	return postActionFn(ctx, taskInfo, postActionInfo, t.logger)
 }
 

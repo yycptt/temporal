@@ -15,6 +15,7 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/cluster"
 	"go.temporal.io/server/common/definition"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/locks"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -28,6 +29,7 @@ import (
 	historyi "go.temporal.io/server/service/history/interfaces"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/workflow/update"
+	"go.uber.org/multierr"
 )
 
 type (
@@ -42,6 +44,8 @@ type (
 		lock           locks.PrioritySemaphore
 		MutableState   historyi.MutableState
 		updateRegistry update.Registry
+
+		opFutures []future.Future[*persistence.AsyncResponse]
 	}
 )
 
@@ -84,11 +88,46 @@ func (c *ContextImpl) Lock(
 	ctx context.Context,
 	lockPriority locks.Priority,
 ) error {
-	return c.lock.Acquire(ctx, lockPriority, 1)
+	// TODO: limit the number of pending operations
+	if err := c.lock.Acquire(ctx, lockPriority, 1); err != nil {
+		return consts.ErrResourceExhaustedBusyWorkflow
+	}
+
+	// shrink
+	succeededIdx := -1
+	for idx, opFuture := range c.opFutures {
+		if !opFuture.Ready() {
+			break
+		}
+
+		// this is non blocking, as we already checked the future is ready
+		_, err := opFuture.Get(ctx)
+		if err != nil {
+			c.Clear()
+			return nil
+		}
+
+		succeededIdx = idx
+	}
+	c.opFutures = c.opFutures[succeededIdx+1:]
+
+	return nil
 }
 
-func (c *ContextImpl) Unlock() {
+func (c *ContextImpl) Unlock(ctx context.Context) error {
+	opFutures := c.opFutures
 	c.lock.Release(1)
+
+	var err error
+	for _, opFuture := range opFutures {
+		_, opErr := opFuture.Get(ctx)
+		if opErr != nil {
+			// TODO: only return errors for the current transaction
+			multierr.Append(err, opErr)
+		}
+	}
+
+	return err
 }
 
 func (c *ContextImpl) IsDirty() bool {
@@ -109,6 +148,10 @@ func (c *ContextImpl) Clear() {
 		c.updateRegistry.Clear()
 		c.updateRegistry = nil
 	}
+	// Do not need to drain opFutures here.
+	// Upon loading again, the persistence need to guarantee that either those
+	// pending operations are applied or never apply (and fail) them after returing the ms.
+	c.opFutures = nil
 }
 
 func (c *ContextImpl) GetWorkflowKey() definition.WorkflowKey {
@@ -597,7 +640,7 @@ func (c *ContextImpl) UpdateWorkflowExecutionWithNew(
 		return err
 	}
 
-	if _, _, err := NewTransaction(shardContext).UpdateWorkflowExecution(
+	resp, err := NewTransaction(shardContext).UpdateWorkflowExecution(
 		ctx,
 		updateMode,
 		c.archetypeID,
@@ -608,22 +651,31 @@ func (c *ContextImpl) UpdateWorkflowExecutionWithNew(
 		newWorkflow,
 		newWorkflowEventsSeq,
 		c.MutableState.IsWorkflow(),
-	); err != nil {
+		func(_ *persistence.AsyncResponse, err error) {
+			if err != nil {
+				return
+			}
+
+			emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), c.MutableState)
+			emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), newMutableState)
+
+			// finally emit session stats
+			emitWorkflowHistoryStats(
+				c.metricsHandler,
+				c.GetNamespace(shardContext),
+				c.MutableState.GetExecutionState().State,
+				int(c.MutableState.GetExecutionInfo().ExecutionStats.HistorySize),
+				int(c.MutableState.GetNextEventID()-1),
+			)
+		},
+	)
+	if err != nil {
 		return err
 	}
 
-	emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), c.MutableState)
-	emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), newMutableState)
-
-	// finally emit session stats
-	emitWorkflowHistoryStats(
-		c.metricsHandler,
-		c.GetNamespace(shardContext),
-		c.MutableState.GetExecutionState().State,
-		int(c.MutableState.GetExecutionInfo().ExecutionStats.HistorySize),
-		int(c.MutableState.GetNextEventID()-1),
-	)
-
+	c.opFutures = append(c.opFutures, resp.Future)
+	// TODO: put to newWF context as well?
+	// likely unnecessary as the newWF context is not in the cache and release fn is likely no-op
 	return nil
 }
 

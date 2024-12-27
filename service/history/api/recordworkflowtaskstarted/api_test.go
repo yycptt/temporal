@@ -21,6 +21,7 @@ import (
 	"go.temporal.io/server/service/history/consts"
 	historyi "go.temporal.io/server/service/history/interfaces"
 	"go.temporal.io/server/service/history/tests"
+	"go.temporal.io/server/service/history/workflow/cache"
 	"go.uber.org/mock/gomock"
 )
 
@@ -108,7 +109,7 @@ func invoke(t *testing.T, modifyMutableState mutableStateModifier) func() (*hist
 	mutableState.EXPECT().GetExecutionInfo().Return(&persistencespb.WorkflowExecutionInfo{}).AnyTimes()
 
 	mockWorkflowContext := historyi.NewMockWorkflowContext(ctrl)
-	workflowLease := api.NewWorkflowLease(mockWorkflowContext, func(_ error) {}, mutableState)
+	workflowLease := api.NewWorkflowLease(mockWorkflowContext, cache.NoopReleaseFn, mutableState)
 
 	consistencyChecker := api.NewMockWorkflowConsistencyChecker(ctrl)
 	consistencyChecker.EXPECT().GetWorkflowLease(

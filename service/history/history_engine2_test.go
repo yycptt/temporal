@@ -725,7 +725,7 @@ func (s *engine2Suite) TestRecordWorkflowTaskStartedSuccess() {
 	id2, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	id3, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	loadedMS.(*workflow.MutableStateImpl).QueryRegistry = qr
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	response, err := s.historyEngine.RecordWorkflowTaskStarted(metrics.AddMetricsContext(context.Background()), &historyservice.RecordWorkflowTaskStartedRequest{
 		NamespaceId:       namespaceID.String(),
@@ -827,7 +827,7 @@ func (s *engine2Suite) TestRecordWorkflowTaskStartedSuccessWithInternalRawHistor
 	id2, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	id3, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	loadedMS.(*workflow.MutableStateImpl).QueryRegistry = qr
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	response, err := s.historyEngine.RecordWorkflowTaskStarted(metrics.AddMetricsContext(context.Background()), &historyservice.RecordWorkflowTaskStartedRequest{
 		NamespaceId:       namespaceID.String(),
@@ -2825,7 +2825,7 @@ func (s *engine2Suite) getMutableState(namespaceID namespace.ID, we *commonpb.Wo
 	if err != nil {
 		return nil
 	}
-	defer release(nil)
+	defer s.NoError(release(context.Background(), nil))
 
 	return weContext.(*workflow.ContextImpl).MutableState
 }

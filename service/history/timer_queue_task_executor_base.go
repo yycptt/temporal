@@ -105,7 +105,7 @@ func (t *timerQueueTaskExecutorBase) executeDeleteHistoryEventTask(
 	if err != nil {
 		return err
 	}
-	defer func() { release(retError) }()
+	defer func() { retError = release(ctx, retError) }()
 
 	mutableState, err := loadMutableStateForTimerTask(ctx, t.shardContext, weContext, task, t.metricsHandler, t.logger)
 	switch err.(type) {

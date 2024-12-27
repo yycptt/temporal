@@ -278,7 +278,7 @@ func GetMutableState(
 	if err != nil {
 		return nil, err
 	}
-	defer func() { workflowLease.GetReleaseFn()(retError) }()
+	defer func() { retError = workflowLease.GetReleaseFn()(ctx, retError) }()
 
 	mutableState, err := workflowLease.GetContext().LoadMutableState(ctx, shardContext)
 	if err != nil {
@@ -332,7 +332,7 @@ func GetMutableStateWithConsistencyCheck(
 	if err != nil {
 		return nil, err
 	}
-	defer func() { workflowLease.GetReleaseFn()(retError) }()
+	defer func() { retError = workflowLease.GetReleaseFn()(ctx, retError) }()
 
 	mutableState, err := workflowLease.GetContext().LoadMutableState(ctx, shardContext)
 	if err != nil {

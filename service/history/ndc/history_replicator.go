@@ -247,10 +247,10 @@ func (r *HistoryReplicatorImpl) doApplyBackfillEvents(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			releaseFn(errPanic)
+			_ = releaseFn(ctx, errPanic)
 			panic(rec)
 		}
-		releaseFn(retError)
+		retError = releaseFn(ctx, retError)
 	}()
 
 	mutableState, err := wfContext.LoadMutableState(ctx, r.shardContext)
@@ -355,7 +355,9 @@ func (r *HistoryReplicatorImpl) applyBackfillEventsWithNew(
 	task replicationTask,
 ) (retError error) {
 	wfContext.Clear()
-	releaseFn(nil)
+	if err := releaseFn(ctx, nil); err != nil {
+		return err
+	}
 
 	task, newTask, err := task.splitTask()
 	if err != nil {
@@ -445,11 +447,10 @@ func (r *HistoryReplicatorImpl) doApplyEvents(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			releaseFn(errPanic)
+			_ = releaseFn(ctx, errPanic)
 			panic(rec)
-		} else {
-			releaseFn(retError)
 		}
+		retError = releaseFn(ctx, retError)
 	}()
 
 	if task.getFirstEvent().GetEventType() == enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED {
@@ -731,7 +732,9 @@ func (r *HistoryReplicatorImpl) applyNonStartEventsToNonCurrentBranchWithContinu
 
 	// step 1
 	wfContext.Clear()
-	releaseFn(nil)
+	if err := releaseFn(ctx, nil); err != nil {
+		return err
+	}
 
 	// step 2
 	task, newTask, err := task.splitTask()

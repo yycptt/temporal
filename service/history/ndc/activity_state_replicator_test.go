@@ -643,7 +643,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivity_WorkflowClosed() {
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
 	weContext.EXPECT().Clear().AnyTimes()
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)
@@ -723,7 +723,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivities_WorkflowClosed() {
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 	weContext.EXPECT().Clear().AnyTimes()
 
@@ -809,7 +809,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivity_ActivityNotFound() {
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
 	weContext.EXPECT().Clear().AnyTimes()
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)
@@ -890,7 +890,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivities_ActivityNotFound() {
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 	weContext.EXPECT().Clear().AnyTimes()
 
@@ -976,7 +976,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivity_ActivityFound_Zombie() {
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)
@@ -1079,7 +1079,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivities_ActivityFound_Zombie()
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)
@@ -1185,7 +1185,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivity_ActivityFound_NonZombie(
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)
@@ -1287,7 +1287,7 @@ func (s *activityReplicatorStateSuite) TestSyncActivities_ActivityFound_NonZombi
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	weContext.EXPECT().LoadMutableState(gomock.Any(), s.mockShard).Return(s.mockMutableState, nil)
 	weContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	weContext.EXPECT().Unlock()
+	weContext.EXPECT().Unlock(gomock.Any())
 	weContext.EXPECT().IsDirty().Return(false).AnyTimes()
 
 	err := wcache.PutContextIfNotExist(s.workflowCache, key, weContext)

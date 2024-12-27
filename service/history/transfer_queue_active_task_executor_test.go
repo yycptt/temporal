@@ -2935,8 +2935,7 @@ func (s *transferQueueActiveTaskExecutorSuite) TestPendingCloseExecutionTasks() 
 
 			mockWorkflowCache.EXPECT().GetOrCreateChasmExecution(gomock.Any(), mockShard, gomock.Any(), gomock.Any(),
 				chasm.WorkflowArchetypeID, gomock.Any(),
-			).Return(mockWorkflowContext, historyi.ReleaseWorkflowContextFunc(func(err error) {
-			}), nil)
+			).Return(mockWorkflowContext, wcache.NoopReleaseFn, nil)
 
 			mockClusterMetadata := cluster.NewMockMetadata(ctrl)
 			mockClusterMetadata.EXPECT().IsGlobalNamespaceEnabled().Return(false).AnyTimes()

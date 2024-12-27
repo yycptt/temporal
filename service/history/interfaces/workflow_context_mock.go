@@ -234,15 +234,17 @@ func (mr *MockWorkflowContextMockRecorder) SubmitClosedWorkflowSnapshot(ctx, sha
 }
 
 // Unlock mocks base method.
-func (m *MockWorkflowContext) Unlock() {
+func (m *MockWorkflowContext) Unlock(arg0 context.Context) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Unlock")
+	ret := m.ctrl.Call(m, "Unlock", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Unlock indicates an expected call of Unlock.
-func (mr *MockWorkflowContextMockRecorder) Unlock() *gomock.Call {
+func (mr *MockWorkflowContextMockRecorder) Unlock(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unlock", reflect.TypeOf((*MockWorkflowContext)(nil).Unlock))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Unlock", reflect.TypeOf((*MockWorkflowContext)(nil).Unlock), arg0)
 }
 
 // UpdateRegistry mocks base method.

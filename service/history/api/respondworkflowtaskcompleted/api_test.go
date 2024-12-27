@@ -580,7 +580,8 @@ func (s *WorkflowTaskCompletedHandlerSuite) createStartedWorkflow(tv *testvars.T
 	loadedMS, err := wfContext.LoadMutableState(context.Background(), s.mockShard)
 	s.NoError(err)
 	s.NotNil(loadedMS)
-	release(nil)
+	err = release(context.Background(), nil)
+	s.NoError(err)
 
 	return wfContext
 }
@@ -734,7 +735,7 @@ func (s *WorkflowTaskCompletedHandlerSuite) createPausedWorkflowWithWFT(tv *test
 	loadedMS, err := wfContext.LoadMutableState(context.Background(), s.mockShard)
 	s.NoError(err)
 	s.NotNil(loadedMS)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	return wfContext, serializedTaskToken
 }

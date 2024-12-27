@@ -683,7 +683,7 @@ func (s *engineSuite) TestQueryWorkflow_ConsistentQueryBufferFull() {
 	qr := workflow.NewQueryRegistry()
 	queryId, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	loadedMS.(*workflow.MutableStateImpl).QueryRegistry = qr
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	request := &historyservice.QueryWorkflowRequest{
 		NamespaceId: tests.NamespaceID.String(),
@@ -4479,7 +4479,7 @@ func (s *engineSuite) TestRequestCancel_RespondWorkflowTaskCompleted_SuccessWith
 	id2, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	id3, _ := qr.BufferQuery(&querypb.WorkflowQuery{})
 	loadedMS.(*workflow.MutableStateImpl).QueryRegistry = qr
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 	result1 := &querypb.WorkflowQueryResult{
 		ResultType: enumspb.QUERY_RESULT_TYPE_ANSWERED,
 		Answer:     payloads.EncodeBytes([]byte{1, 2, 3}),
@@ -6418,7 +6418,7 @@ func (s *engineSuite) Test_SetRequestDefaultValueAndGetTargetVersionHistory_NonC
 }
 
 func (s *engineSuite) getMutableState(testNamespaceID namespace.ID, we *commonpb.WorkflowExecution) historyi.MutableState {
-	context, release, err := s.workflowCache.GetOrCreateWorkflowExecution(
+	weContext, release, err := s.workflowCache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		s.mockShard,
 		tests.NamespaceID,
@@ -6428,9 +6428,9 @@ func (s *engineSuite) getMutableState(testNamespaceID namespace.ID, we *commonpb
 	if err != nil {
 		return nil
 	}
-	defer release(nil)
+	defer s.NoError(release(context.Background(), nil))
 
-	return context.(*workflow.ContextImpl).MutableState
+	return weContext.(*workflow.ContextImpl).MutableState
 }
 
 func (s *engineSuite) getActivityScheduledEvent(

@@ -106,7 +106,7 @@ func (r *MutableStateInitializerImpl) InitializeFromDB(
 	case nil:
 		mutableState, err = r.flushBufferEvents(ctx, wfContext, mutableState)
 		if err != nil {
-			releaseFn(err)
+			err = releaseFn(ctx, err)
 			return nil, MutableStateInitializationSpec{}, err
 		}
 		_, dbRecordVersion := mutableState.GetUpdateCondition()
@@ -143,7 +143,7 @@ func (r *MutableStateInitializerImpl) InitializeFromDB(
 				DBHistorySize:   0,
 			}, nil
 	default:
-		releaseFn(err)
+		err = releaseFn(ctx, err)
 		return nil, MutableStateInitializationSpec{}, err
 	}
 }

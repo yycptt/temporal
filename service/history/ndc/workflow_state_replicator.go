@@ -130,10 +130,10 @@ func (r *WorkflowStateReplicatorImpl) SyncWorkflowState(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			releaseFn(errPanic)
+			_ = releaseFn(ctx, errPanic)
 			panic(rec)
 		}
-		releaseFn(retError)
+		retError = releaseFn(ctx, retError)
 	}()
 
 	// Handle existing workflows
@@ -176,7 +176,9 @@ func (r *WorkflowStateReplicatorImpl) SyncWorkflowState(
 		}
 
 		// release the workflow lock here otherwise SyncHSM will deadlock
-		releaseFn(nil)
+		if err = releaseFn(ctx, nil); err != nil {
+			return err
+		}
 
 		engine, err := r.shardContext.GetEngine(ctx)
 		if err != nil {
@@ -269,10 +271,10 @@ func (r *WorkflowStateReplicatorImpl) ReplicateVersionedTransition(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			releaseFn(errPanic)
+			_ = releaseFn(ctx, errPanic)
 			panic(rec)
 		}
-		releaseFn(retError)
+		retError = releaseFn(ctx, retError)
 	}()
 
 	ms, err := wfCtx.LoadMutableState(ctx, r.shardContext)
@@ -320,7 +322,9 @@ func (r *WorkflowStateReplicatorImpl) ReplicateVersionedTransition(
 
 			if localLastWriteVersion > sourceLastWriteVersion {
 				// local is newer, try backfill events
-				releaseFn(nil)
+				if err = releaseFn(ctx, nil); err != nil {
+					return err
+				}
 				return r.backFillEvents(ctx, namespaceID, wid, rid, executionInfo.VersionHistories, versionedTransition.EventBatches, versionedTransition.NewRunInfo, sourceClusterName, transitionhistory.LastVersionedTransition(sourceTransitionHistory))
 			}
 			if localLastWriteVersion < sourceLastWriteVersion ||
@@ -342,7 +346,9 @@ func (r *WorkflowStateReplicatorImpl) ReplicateVersionedTransition(
 			}
 			return r.applyMutation(ctx, namespaceID, wid, rid, archetypeID, wfCtx, ms, releaseFn, versionedTransition, sourceClusterName)
 		case errors.Is(err, consts.ErrStaleReference):
-			releaseFn(nil)
+			if err = releaseFn(ctx, nil); err != nil {
+				return err
+			}
 			return r.backFillEvents(ctx, namespaceID, wid, rid, executionInfo.VersionHistories, versionedTransition.EventBatches, versionedTransition.NewRunInfo, sourceClusterName, transitionhistory.LastVersionedTransition(sourceTransitionHistory))
 		default:
 			return err
@@ -391,10 +397,10 @@ func (r *WorkflowStateReplicatorImpl) handleFirstReplicationTask(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			releaseFn(errPanic)
+			_ = releaseFn(ctx, errPanic)
 			panic(rec) //nolint:forbidigo
 		}
-		releaseFn(retErr)
+		retErr = releaseFn(ctx, retErr)
 	}()
 
 	nsEntry, err := r.namespaceRegistry.GetNamespaceByID(namespace.ID(executionInfo.NamespaceId))
@@ -1333,7 +1339,7 @@ func (r *WorkflowStateReplicatorImpl) createNewRunWorkflow(
 	newRunInfo *replicationspb.NewRunInfo,
 	originalMutableState historyi.MutableState,
 	isStateBased bool,
-) error {
+) (newRunErr error) {
 	// CHASM runs don't have new run, so we can continue using GetOrCreateWorkflowExecution here.
 	newRunWfContext, newRunReleaseFn, newRunErr := r.workflowCache.GetOrCreateWorkflowExecution(
 		ctx,
@@ -1350,11 +1356,10 @@ func (r *WorkflowStateReplicatorImpl) createNewRunWorkflow(
 	}
 	defer func() {
 		if rec := recover(); rec != nil {
-			newRunReleaseFn(errPanic)
+			_ = newRunReleaseFn(ctx, errPanic)
 			panic(rec)
 		}
-		newRunReleaseFn(newRunErr)
-
+		newRunErr = newRunReleaseFn(ctx, newRunErr)
 	}()
 	_, newRunErr = newRunWfContext.LoadMutableState(ctx, r.shardContext)
 	switch newRunErr.(type) {
@@ -1472,10 +1477,10 @@ func (r *WorkflowStateReplicatorImpl) backfillHistory(
 		}
 		defer func() {
 			if rec := recover(); rec != nil {
-				rootRunReleaseFn(errPanic)
+				_ = rootRunReleaseFn(ctx, errPanic)
 				panic(rec)
 			}
-			rootRunReleaseFn(retError)
+			retError = rootRunReleaseFn(ctx, retError)
 		}()
 	}
 

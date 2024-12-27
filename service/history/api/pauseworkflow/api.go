@@ -51,7 +51,9 @@ func Invoke(
 			if !mutableState.IsWorkflowExecutionRunning() {
 				// in-memory mutable state is still clean, release the lock with nil error to prevent
 				// clearing and reloading mutable state
-				releaseFn(nil)
+				if err := releaseFn(ctx, nil); err != nil {
+					return nil, err
+				}
 				return nil, consts.ErrWorkflowCompleted
 			}
 
@@ -65,7 +67,9 @@ func Invoke(
 						CreateWorkflowTask: false,
 					}, nil
 				}
-				releaseFn(nil)
+				if err := releaseFn(ctx, nil); err != nil {
+					return nil, err
+				}
 				return nil, serviceerror.NewFailedPrecondition("workflow is already paused.")
 			}
 

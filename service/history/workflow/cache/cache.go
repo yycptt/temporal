@@ -23,7 +23,6 @@ import (
 	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/common/softassert"
 	"go.temporal.io/server/service/history/configs"
-	"go.temporal.io/server/service/history/consts"
 	historyi "go.temporal.io/server/service/history/interfaces"
 	"go.temporal.io/server/service/history/workflow"
 )
@@ -79,7 +78,7 @@ type (
 	}
 )
 
-var NoopReleaseFn historyi.ReleaseWorkflowContextFunc = func(err error) {}
+var NoopReleaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { return err }
 
 const (
 	cacheNotReleased int32 = 0
@@ -114,7 +113,7 @@ func NewHostLevelCache(
 				if err := item.wfContext.Lock(ctx, locks.PriorityHigh); err != nil {
 					return err
 				}
-				defer item.wfContext.Unlock()
+				defer item.wfContext.Unlock(ctx)
 				item.wfContext.Clear()
 				return nil
 			})
@@ -342,11 +341,12 @@ func (c *cacheImpl) lockWorkflowExecution(
 	if err := workflowCtx.Lock(ctx, lockPriority); err != nil {
 		// ctx is done before lock can be acquired
 		c.Release(cacheKey)
-		return consts.ErrResourceExhaustedBusyWorkflow
+		return err
 	}
 	return nil
 }
 
+// TODO: releaseFunc needs to take in a context and return an error
 func (c *cacheImpl) makeReleaseFunc(
 	cacheKey Key,
 	shardContext historyi.ShardContext,
@@ -354,44 +354,50 @@ func (c *cacheImpl) makeReleaseFunc(
 	forceClearContext bool,
 	handler metrics.Handler,
 	acquireTime time.Time,
-) func(error) {
+) historyi.ReleaseWorkflowContextFunc {
 
 	status := cacheNotReleased
-	return func(err error) {
-		if atomic.CompareAndSwapInt32(&status, cacheNotReleased, cacheReleased) {
-			defer func() {
-				metrics.HistoryWorkflowExecutionCacheLockHoldDuration.With(handler).Record(time.Since(acquireTime))
-			}()
-			if rec := recover(); rec != nil {
-				wfContext.Clear()
-				wfContext.Unlock()
-				c.Release(cacheKey)
-				panic(rec)
-			} else {
-				if err != nil || forceClearContext {
-					// TODO see issue #668, there are certain type or errors which can bypass the clear
-					wfContext.Clear()
-					wfContext.Unlock()
-					c.Release(cacheKey)
-				} else {
-					isDirty := wfContext.IsDirty()
-					if isDirty {
-						wfContext.Clear()
-						logger := log.With(shardContext.GetLogger(), tag.ComponentHistoryCache)
-						logger.Error("Cache encountered dirty mutable state transaction",
-							tag.WorkflowNamespaceID(wfContext.GetWorkflowKey().NamespaceID),
-							tag.WorkflowID(wfContext.GetWorkflowKey().WorkflowID),
-							tag.WorkflowRunID(wfContext.GetWorkflowKey().RunID),
-						)
-					}
-					wfContext.Unlock()
-					c.Release(cacheKey)
-					if isDirty {
-						panic("Cache encountered dirty mutable state transaction")
-					}
-				}
-			}
+	return func(ctx context.Context, err error) error {
+		if !atomic.CompareAndSwapInt32(&status, cacheNotReleased, cacheReleased) {
+			return err
 		}
+		defer func() {
+			metrics.HistoryWorkflowExecutionCacheLockHoldDuration.With(handler).Record(time.Since(acquireTime))
+		}()
+		if rec := recover(); rec != nil {
+			wfContext.Clear()
+			_ = wfContext.Unlock(ctx)
+			c.Release(cacheKey)
+			panic(rec)
+		}
+
+		if err != nil || forceClearContext {
+			// TODO see issue #668, there are certain type or errors which can bypass the clear
+			wfContext.Clear()
+			unlockErr := wfContext.Unlock(ctx)
+			c.Release(cacheKey)
+			if unlockErr != nil {
+				return unlockErr
+			}
+			return err
+		}
+		isDirty := wfContext.IsDirty()
+		if isDirty {
+			wfContext.Clear()
+			logger := log.With(shardContext.GetLogger(), tag.ComponentHistoryCache)
+			logger.Error("Cache encountered dirty mutable state transaction",
+				tag.WorkflowNamespaceID(wfContext.GetWorkflowKey().NamespaceID),
+				tag.WorkflowID(wfContext.GetWorkflowKey().WorkflowID),
+				tag.WorkflowRunID(wfContext.GetWorkflowKey().RunID),
+			)
+		}
+		err = wfContext.Unlock(ctx)
+		c.Release(cacheKey)
+		if isDirty {
+			panic("Cache encountered dirty mutable state transaction")
+		}
+
+		return err
 	}
 }
 
@@ -459,7 +465,7 @@ func GetCurrentRunID(
 	if err != nil {
 		return "", err
 	}
-	defer func() { currentRelease(retErr) }()
+	defer func() { retErr = currentRelease(ctx, retErr) }()
 
 	resp, err := shardContext.GetCurrentExecution(
 		ctx,

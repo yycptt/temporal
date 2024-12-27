@@ -128,7 +128,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentTerminated() {
 	currentReleaseCalled := false
 	currentContext := historyi.NewMockWorkflowContext(s.controller)
 	currentMutableState := historyi.NewMockMutableState(s.controller)
-	var currentReleaseFn historyi.ReleaseWorkflowContextFunc = func(error) { currentReleaseCalled = true }
+	var currentReleaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { currentReleaseCalled = true; return err }
 	currentWorkflow.EXPECT().GetContext().Return(currentContext).AnyTimes()
 	currentWorkflow.EXPECT().GetMutableState().Return(currentMutableState).AnyTimes()
 	currentWorkflow.EXPECT().GetReleaseFn().Return(currentReleaseFn).AnyTimes()
@@ -163,7 +163,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentTerminated() {
 	resetReleaseCalled := false
 	resetContext := historyi.NewMockWorkflowContext(s.controller)
 	resetMutableState := historyi.NewMockMutableState(s.controller)
-	var tarGetReleaseFn historyi.ReleaseWorkflowContextFunc = func(error) { resetReleaseCalled = true }
+	var tarGetReleaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { resetReleaseCalled = true; return err }
 	resetWorkflow.EXPECT().GetContext().Return(resetContext).AnyTimes()
 	resetWorkflow.EXPECT().GetMutableState().Return(resetMutableState).AnyTimes()
 	resetWorkflow.EXPECT().GetReleaseFn().Return(tarGetReleaseFn).AnyTimes()
@@ -205,6 +205,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentTerminated() {
 		resetSnapshot,
 		resetEventsSeq,
 		true, // isWorkflow
+		nil,
 	).Return(currentNewEventsSize, resetNewEventsSize, nil)
 
 	err := s.workflowResetter.persistToDB(context.Background(), currentWorkflow, currentWorkflow, currentMutation, currentEventsSeq, resetWorkflow)
@@ -219,7 +220,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentNotTerminated() {
 	currentReleaseCalled := false
 	currentContext := historyi.NewMockWorkflowContext(s.controller)
 	currentMutableState := historyi.NewMockMutableState(s.controller)
-	var currentReleaseFn historyi.ReleaseWorkflowContextFunc = func(error) { currentReleaseCalled = true }
+	var currentReleaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { currentReleaseCalled = true; return err }
 	currentWorkflow.EXPECT().GetContext().Return(currentContext).AnyTimes()
 	currentWorkflow.EXPECT().GetMutableState().Return(currentMutableState).AnyTimes()
 	currentWorkflow.EXPECT().GetReleaseFn().Return(currentReleaseFn).AnyTimes()
@@ -238,7 +239,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentNotTerminated() {
 	resetContext := historyi.NewMockWorkflowContext(s.controller)
 	resetMutableState := historyi.NewMockMutableState(s.controller)
 	resetMutableState.EXPECT().GetCurrentVersion().Return(int64(0)).AnyTimes()
-	var tarGetReleaseFn historyi.ReleaseWorkflowContextFunc = func(error) { resetReleaseCalled = true }
+	var tarGetReleaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { resetReleaseCalled = true; return err }
 	resetWorkflow.EXPECT().GetContext().Return(resetContext).AnyTimes()
 	resetWorkflow.EXPECT().GetMutableState().Return(resetMutableState).AnyTimes()
 	resetWorkflow.EXPECT().GetReleaseFn().Return(tarGetReleaseFn).AnyTimes()
@@ -271,6 +272,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentNotTerminated() {
 		resetSnapshot,
 		resetEventsSeq,
 		true, // isWorkflow
+		nil,
 	).Return(int64(0), int64(0), nil)
 
 	err := s.workflowResetter.persistToDB(context.Background(), currentWorkflow, currentWorkflow, nil, nil, resetWorkflow)
@@ -715,7 +717,7 @@ func (s *workflowResetterSuite) TestReapplyContinueAsNewWorkflowEvents_WithConti
 
 	resetContext := historyi.NewMockWorkflowContext(s.controller)
 	resetContext.EXPECT().Lock(gomock.Any(), locks.PriorityHigh).Return(nil)
-	resetContext.EXPECT().Unlock()
+	resetContext.EXPECT().Unlock(gomock.Any())
 	resetContext.EXPECT().IsDirty().Return(false).AnyTimes()
 	resetMutableState := historyi.NewMockMutableState(s.controller)
 	resetContextCacheKey := wcache.Key{

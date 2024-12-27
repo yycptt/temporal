@@ -460,7 +460,7 @@ func TestArchivalQueueTaskExecutor(t *testing.T) {
 				gomock.Any(),
 			).Return(
 				workflowContext,
-				historyi.ReleaseWorkflowContextFunc(func(err error) {}),
+				historyi.ReleaseWorkflowContextFunc(cache.NoopReleaseFn),
 				p.GetOrCreateWorkflowExecutionError,
 			).AnyTimes()
 

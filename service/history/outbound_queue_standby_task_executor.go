@@ -166,12 +166,12 @@ func (e *outboundQueueStandbyTaskExecutor) executeStateMachineTask(
 func (e *outboundQueueStandbyTaskExecutor) executeChasmSideEffectTask(
 	ctx context.Context,
 	task *tasks.ChasmTask,
-) error {
+) (retError error) {
 	weContext, release, err := getWorkflowExecutionContextForTask(ctx, e.shardContext, e.cache, task)
 	if err != nil {
 		return err
 	}
-	defer func() { release(err) }()
+	defer func() { retError = release(ctx, retError) }()
 
 	ms, err := weContext.LoadMutableState(ctx, e.shardContext)
 	if err != nil {

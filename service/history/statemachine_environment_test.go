@@ -561,7 +561,7 @@ func TestGetCurrentWorkflowExecutionContext(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, workflowContext)
 				require.Equal(t, currentRunID, workflowContext.GetWorkflowKey().RunID)
-				release(nil)
+				require.NoError(t, release(context.Background(), nil))
 			}
 		})
 	}

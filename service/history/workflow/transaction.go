@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/persistence"
 )
 
@@ -47,7 +48,8 @@ type (
 			newWorkflowSnapshot *persistence.WorkflowSnapshot,
 			newWorkflowEventsSeq []*persistence.WorkflowEvents,
 			isWorkflow bool,
-		) (int64, int64, error)
+			futureActionFn future.ActionFn[*persistence.AsyncResponse],
+		) (*persistence.UpdateWorkflowExecutionResponse, error)
 
 		SetWorkflowExecution(
 			ctx context.Context,

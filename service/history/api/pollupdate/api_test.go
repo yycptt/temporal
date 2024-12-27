@@ -23,6 +23,7 @@ import (
 	"go.temporal.io/server/service/history/api/pollupdate"
 	historyi "go.temporal.io/server/service/history/interfaces"
 	"go.temporal.io/server/service/history/tests"
+	"go.temporal.io/server/service/history/workflow/cache"
 	"go.temporal.io/server/service/history/workflow/update"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/protobuf/types/known/anypb"
@@ -94,7 +95,7 @@ func TestPollOutcome(t *testing.T) {
 	wfCtx.EXPECT().UpdateRegistry(gomock.Any()).Return(reg).AnyTimes()
 
 	apiCtx := mockWorkflowLeaseCtx{
-		GetReleaseFnFn: func() historyi.ReleaseWorkflowContextFunc { return func(error) {} },
+		GetReleaseFnFn: func() historyi.ReleaseWorkflowContextFunc { return cache.NoopReleaseFn },
 		GetContextFn: func() historyi.WorkflowContext {
 			return wfCtx
 		},

@@ -11,6 +11,7 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/service/history/api"
 	historyi "go.temporal.io/server/service/history/interfaces"
+	"go.temporal.io/server/service/history/workflow/cache"
 	"go.uber.org/mock/gomock"
 )
 
@@ -39,7 +40,7 @@ func (s *apiSuite) SetupTest() {
 	s.mutableState = historyi.NewMockMutableState(s.controller)
 	s.workflowLease = api.NewWorkflowLease(
 		s.workflowContext,
-		func(err error) {},
+		cache.NoopReleaseFn,
 		s.mutableState,
 	)
 }

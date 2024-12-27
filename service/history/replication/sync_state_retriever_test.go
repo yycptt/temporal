@@ -28,6 +28,7 @@ import (
 	historyi "go.temporal.io/server/service/history/interfaces"
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tests"
+	"go.temporal.io/server/service/history/workflow/cache"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
 	"go.uber.org/mock/gomock"
 )
@@ -41,7 +42,7 @@ type (
 		logger                     log.Logger
 		mockShard                  *shard.ContextTest
 		controller                 *gomock.Controller
-		releaseFunc                func(err error)
+		releaseFunc                historyi.ReleaseWorkflowContextFunc
 		workflowContext            *historyi.MockWorkflowContext
 		newRunWorkflowContext      *historyi.MockWorkflowContext
 		namespaceID                string
@@ -72,7 +73,7 @@ func (s *syncWorkflowStateSuite) SetupSuite() {
 		},
 		tests.NewDynamicConfig(),
 	)
-	s.releaseFunc = func(err error) {}
+	s.releaseFunc = cache.NoopReleaseFn
 	s.workflowCache = wcache.NewMockCache(s.controller)
 	s.logger = s.mockShard.GetLogger()
 	s.namespaceID = tests.NamespaceID.String()
@@ -113,7 +114,7 @@ func (s *syncWorkflowStateSuite) TestSyncWorkflowState_TransitionHistoryDisabled
 		WorkflowID:  s.execution.WorkflowId,
 		RunID:       s.execution.RunId,
 	}, chasm.WorkflowArchetypeID, locks.PriorityLow).Return(
-		api.NewWorkflowLease(nil, func(err error) {}, mu), nil)
+		api.NewWorkflowLease(nil, cache.NoopReleaseFn, mu), nil)
 
 	executionInfo := &persistencespb.WorkflowExecutionInfo{
 		TransitionHistory: nil, // transition history is disabled
@@ -140,7 +141,7 @@ func (s *syncWorkflowStateSuite) TestSyncWorkflowState_UnFlushedBufferedEvents()
 		WorkflowID:  s.execution.WorkflowId,
 		RunID:       s.execution.RunId,
 	}, chasm.WorkflowArchetypeID, locks.PriorityLow).Return(
-		api.NewWorkflowLease(nil, func(err error) {}, mu), nil)
+		api.NewWorkflowLease(nil, cache.NoopReleaseFn, mu), nil)
 
 	mu.EXPECT().HasBufferedEvents().Return(true)
 	result, err := s.syncStateRetriever.GetSyncWorkflowStateArtifact(
@@ -163,7 +164,7 @@ func (s *syncWorkflowStateSuite) TestSyncWorkflowState_ReturnMutation() {
 		WorkflowID:  s.execution.WorkflowId,
 		RunID:       s.execution.RunId,
 	}, chasm.WorkflowArchetypeID, locks.PriorityLow).Return(
-		api.NewWorkflowLease(nil, func(err error) {}, mu), nil)
+		api.NewWorkflowLease(nil, cache.NoopReleaseFn, mu), nil)
 	versionHistories := &historyspb.VersionHistories{
 		CurrentVersionHistoryIndex: 0,
 		Histories: []*historyspb.VersionHistory{
@@ -342,7 +343,7 @@ func (s *syncWorkflowStateSuite) TestGetSyncStateRetrieverForNewWorkflow_WithEve
 		s.namespaceID,
 		s.execution,
 		mu,
-		func(err error) {},
+		cache.NoopReleaseFn,
 		&persistencespb.VersionedTransition{
 			NamespaceFailoverVersion: 1,
 			TransitionCount:          12,
@@ -421,7 +422,7 @@ func (s *syncWorkflowStateSuite) TestGetSyncStateRetrieverForNewWorkflow_NoEvent
 		s.namespaceID,
 		s.execution,
 		mu,
-		func(err error) {},
+		cache.NoopReleaseFn,
 		&persistencespb.VersionedTransition{
 			NamespaceFailoverVersion: 1,
 			TransitionCount:          5,
@@ -517,7 +518,7 @@ func (s *syncWorkflowStateSuite) TestSyncWorkflowState_ReturnSnapshot() {
 				WorkflowID:  s.execution.WorkflowId,
 				RunID:       s.execution.RunId,
 			}, chasm.WorkflowArchetypeID, locks.PriorityLow).Return(
-				api.NewWorkflowLease(nil, func(err error) {}, mu), nil)
+				api.NewWorkflowLease(nil, cache.NoopReleaseFn, mu), nil)
 			versionHistories, transitions, tombstoneBatches, breakPoint := tc.infoFn()
 			executionInfo := &persistencespb.WorkflowExecutionInfo{
 				TransitionHistory:               transitions,
@@ -556,7 +557,7 @@ func (s *syncWorkflowStateSuite) TestSyncWorkflowState_NoVersionTransitionProvid
 		WorkflowID:  s.execution.WorkflowId,
 		RunID:       s.execution.RunId,
 	}, chasm.WorkflowArchetypeID, locks.PriorityLow).Return(
-		api.NewWorkflowLease(nil, func(err error) {}, mu), nil)
+		api.NewWorkflowLease(nil, cache.NoopReleaseFn, mu), nil)
 	versionHistories := &historyspb.VersionHistories{
 		CurrentVersionHistoryIndex: 0,
 		Histories: []*historyspb.VersionHistory{

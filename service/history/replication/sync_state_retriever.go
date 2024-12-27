@@ -130,7 +130,7 @@ func (s *SyncStateRetrieverImpl) GetSyncWorkflowStateArtifact(
 
 	defer func() {
 		if releaseFunc != nil {
-			releaseFunc(retError)
+			retError = releaseFunc(ctx, retError)
 		}
 	}()
 	if mutableState.HasBufferedEvents() {
@@ -252,7 +252,9 @@ func (s *SyncStateRetrieverImpl) getSyncStateResult(
 	sourceVersionHistories := versionhistory.CopyVersionHistories(executionInfo.VersionHistories)
 	sourceTransitionHistory := transitionhistory.CopyVersionedTransitions(executionInfo.TransitionHistory)
 	if cacheReleaseFunc != nil {
-		cacheReleaseFunc(nil)
+		if err := cacheReleaseFunc(ctx, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	if len(newRunID) > 0 {
@@ -309,7 +311,7 @@ func (s *SyncStateRetrieverImpl) getNewRunInfo(ctx context.Context, namespaceId 
 	)
 	defer func() {
 		if releaseFunc != nil {
-			releaseFunc(retError)
+			retError = releaseFunc(ctx, retError)
 		}
 	}()
 
@@ -346,7 +348,9 @@ func (s *SyncStateRetrieverImpl) getNewRunInfo(ctx context.Context, namespaceId 
 		return nil, err
 	}
 	versionHistory = versionhistory.CopyVersionHistory(versionHistory)
-	releaseFunc(nil)
+	if err := releaseFunc(ctx, nil); err != nil {
+		return nil, err
+	}
 	releaseFunc = nil
 	wfKey := definition.WorkflowKey{
 		NamespaceID: namespaceId.String(),

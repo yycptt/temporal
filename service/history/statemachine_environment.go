@@ -136,7 +136,7 @@ func getCurrentWorkflowExecutionContext(
 
 	mutableState, err := wfContext.LoadMutableState(ctx, shardContext)
 	if err != nil {
-		release(err)
+		err = release(ctx, err)
 		return nil, nil, err
 	}
 
@@ -158,13 +158,15 @@ func getCurrentWorkflowExecutionContext(
 	)
 	if err != nil {
 		// release with nil error to prevent mutable state from being unloaded from the cache
-		release(nil)
+		err = release(ctx, nil)
 		return nil, nil, err
 	}
 
 	if currentRunID != wfContext.GetWorkflowKey().RunID {
 		// release with nil error to prevent mutable state from being unloaded from the cache
-		release(nil)
+		if err = release(ctx, nil); err != nil {
+			return nil, nil, err
+		}
 		return nil, nil, consts.ErrLocateCurrentWorkflowExecution
 	}
 
@@ -337,10 +339,9 @@ func (e *stateMachineEnvironment) getValidatedMutableState(
 	}
 
 	ms, err := e.loadAndValidateMutableState(ctx, wfCtx, validate)
-
 	if err != nil {
 		// Release now with no error to prevent mutable state from being unloaded from the cache.
-		release(nil)
+		err = release(ctx, nil)
 		return nil, nil, nil, err
 	}
 	return wfCtx, release, ms, nil
@@ -380,9 +381,9 @@ func (e *stateMachineEnvironment) Access(ctx context.Context, ref hsm.Ref, acces
 	var accessed bool
 	defer func() {
 		if accessType == hsm.AccessWrite && accessed {
-			release(retErr)
+			retErr = release(ctx, retErr)
 		} else {
-			release(nil)
+			retErr = release(ctx, nil)
 		}
 	}()
 	node, err := ms.HSM().Child(ref.StateMachinePath())

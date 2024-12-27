@@ -133,7 +133,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_CurrentWorkflow_Active_Open()
 	mutableState.EXPECT().VisitUpdates(gomock.Any()).Return()
 	mutableState.EXPECT().GetCurrentVersion().Return(int64(0))
 	updateRegistry := update.NewRegistry(mutableState)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{
 		Events: []*historypb.HistoryEvent{{EventId: 1}},
@@ -188,7 +188,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_CurrentWorkflow_Active_Closed
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{}
 
@@ -271,7 +271,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_CurrentWorkflow_Closed_ResetF
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{}
 	historySize := rand.Int63()
@@ -343,7 +343,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_CurrentWorkflow_Passive_Open(
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{
 		Events: []*historypb.HistoryEvent{{EventId: 1}},
@@ -387,7 +387,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_CurrentWorkflow_Passive_Close
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{}
 	historySize := rand.Int63()
@@ -441,7 +441,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_NotCurrentWorkflow_Active() {
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{
 		Events: []*historypb.HistoryEvent{{
@@ -500,7 +500,7 @@ func (s *transactionMgrSuite) TestBackfillWorkflow_NotCurrentWorkflow_Passive() 
 	targetWorkflow := NewMockWorkflow(s.controller)
 	weContext := historyi.NewMockWorkflowContext(s.controller)
 	mutableState := historyi.NewMockMutableState(s.controller)
-	var releaseFn historyi.ReleaseWorkflowContextFunc = func(error) { releaseCalled = true }
+	var releaseFn historyi.ReleaseWorkflowContextFunc = func(_ context.Context, err error) error { releaseCalled = true; return err }
 
 	workflowEvents := &persistence.WorkflowEvents{
 		Events: []*historypb.HistoryEvent{{

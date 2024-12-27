@@ -15,6 +15,7 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/definition"
 	"go.temporal.io/server/common/dynamicconfig"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/persistence/serialization"
@@ -206,21 +207,36 @@ func (m *executionManagerImpl) UpdateWorkflowExecution(
 	}
 
 	err = m.persistence.UpdateWorkflowExecution(ctx, newRequest)
+	resp := &UpdateWorkflowExecutionResponse{
+		UpdateMutableStateStats: *statusOfInternalWorkflowMutation(
+			&newRequest.UpdateWorkflowMutation,
+			updateWorkflowHistoryDiff,
+		),
+		NewMutableStateStats: statusOfInternalWorkflowSnapshot(
+			newRequest.NewWorkflowSnapshot,
+			newWorkflowHistoryDiff,
+		),
+		Future: future.NewReadyFuture(
+			&AsyncResponse{},
+			nil,
+		),
+	}
+
 	switch err.(type) {
 	case nil:
 		m.deleteHistoryTasks(ctx, request.ShardID, updateMutation.BestEffortDeleteTasks, updateMutation.ExecutionInfo.WorkflowId)
 		m.addXDCCacheKV(updateWorkflowXDCKVs)
 		m.addXDCCacheKV(newWorkflowXDCKVs)
-		return &UpdateWorkflowExecutionResponse{
-			UpdateMutableStateStats: *statusOfInternalWorkflowMutation(
-				&newRequest.UpdateWorkflowMutation,
-				updateWorkflowHistoryDiff,
-			),
-			NewMutableStateStats: statusOfInternalWorkflowSnapshot(
-				newRequest.NewWorkflowSnapshot,
-				newWorkflowHistoryDiff,
-			),
-		}, nil
+		// return &UpdateWorkflowExecutionResponse{
+		// 	UpdateMutableStateStats: *statusOfInternalWorkflowMutation(
+		// 		&newRequest.UpdateWorkflowMutation,
+		// 		updateWorkflowHistoryDiff,
+		// 	),
+		// 	NewMutableStateStats: statusOfInternalWorkflowSnapshot(
+		// 		newRequest.NewWorkflowSnapshot,
+		// 		newWorkflowHistoryDiff,
+		// 	),
+		// }, nil
 	case *CurrentWorkflowConditionFailedError,
 		*WorkflowConditionFailedError,
 		*ConditionFailedError:
@@ -232,10 +248,12 @@ func (m *executionManagerImpl) UpdateWorkflowExecution(
 			updateMutation.ExecutionState.RunId,
 			archetypeID,
 		)
-		return nil, err
+		// return nil, err
 	default:
-		return nil, err
+		// return nil, err
 	}
+
+	return resp, nil
 }
 
 // deleteHistoryTasks iterates over provided task keys and completes them when the dynamic config

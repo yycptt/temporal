@@ -96,7 +96,7 @@ func (s *workflowCacheSuite) TestHistoryCacheBasic() {
 	)
 	s.NoError(err)
 	ctx.(*workflow.ContextImpl).MutableState = mockMS1
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 	ctx, release, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		s.mockShard,
@@ -106,7 +106,7 @@ func (s *workflowCacheSuite) TestHistoryCacheBasic() {
 	)
 	s.NoError(err)
 	s.Equal(mockMS1, ctx.(*workflow.ContextImpl).MutableState)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	execution2 := commonpb.WorkflowExecution{
 		WorkflowId: "some random workflow ID",
@@ -121,7 +121,7 @@ func (s *workflowCacheSuite) TestHistoryCacheBasic() {
 	)
 	s.NoError(err)
 	s.NotEqual(mockMS1, ctx.(*workflow.ContextImpl).MutableState)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestHistoryCachePanic() {
@@ -157,12 +157,12 @@ func (s *workflowCacheSuite) TestHistoryCachePanic() {
 			)
 			s.NoError(err)
 			s.Nil(ctx.(*workflow.ContextImpl).MutableState)
-			release(nil)
+			s.NoError(release(context.Background(), nil))
 		} else {
 			s.Fail("test should panic")
 		}
 	}()
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestHistoryCachePinning() {
@@ -199,7 +199,7 @@ func (s *workflowCacheSuite) TestHistoryCachePinning() {
 	s.Error(err2)
 
 	// Now release the context, this should unpin it.
-	release(err2)
+	s.Error(release(context.Background(), err2))
 
 	_, release2, err3 := s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
@@ -209,7 +209,7 @@ func (s *workflowCacheSuite) TestHistoryCachePinning() {
 		locks.PriorityHigh,
 	)
 	s.NoError(err3)
-	release2(err3)
+	s.Error(release2(context.Background(), err3))
 
 	// Old context should be evicted.
 	newContext, release, err4 := s.cache.GetOrCreateWorkflowExecution(
@@ -221,7 +221,7 @@ func (s *workflowCacheSuite) TestHistoryCachePinning() {
 	)
 	s.NoError(err4)
 	s.False(ctx == newContext)
-	release(err4)
+	s.Error(release(context.Background(), err4))
 }
 
 func (s *workflowCacheSuite) TestHistoryCacheClear() {
@@ -248,7 +248,7 @@ func (s *workflowCacheSuite) TestHistoryCacheClear() {
 	mock.EXPECT().RemoveSpeculativeWorkflowTaskTimeoutTask().AnyTimes()
 	ctx.(*workflow.ContextImpl).MutableState = mock
 
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 
 	// since last time, the release function receive a nil error
 	// the ms will not be cleared
@@ -263,7 +263,7 @@ func (s *workflowCacheSuite) TestHistoryCacheClear() {
 
 	s.NotNil(ctx.(*workflow.ContextImpl).MutableState)
 	mock.EXPECT().GetQueryRegistry().Return(workflow.NewQueryRegistry())
-	release(errors.New("some random error message"))
+	s.NoError(release(context.Background(), errors.New("some random error message")))
 
 	// since last time, the release function receive a non-nil error
 	// the ms will be cleared
@@ -276,7 +276,7 @@ func (s *workflowCacheSuite) TestHistoryCacheClear() {
 	)
 	s.NoError(err)
 	s.Nil(ctx.(*workflow.ContextImpl).MutableState)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestHistoryCacheConcurrentAccess_Release() {
@@ -319,7 +319,7 @@ func (s *workflowCacheSuite) TestHistoryCacheConcurrentAccess_Release() {
 		mock.EXPECT().GetQueryRegistry().Return(workflow.NewQueryRegistry())
 		mock.EXPECT().RemoveSpeculativeWorkflowTaskTimeoutTask()
 		ctx.(*workflow.ContextImpl).MutableState = mock
-		release(errors.New("some random error message"))
+		s.NoError(release(context.Background(), errors.New("some random error message")))
 	}
 
 	for i := 0; i < coroutineCount; i++ {
@@ -341,7 +341,7 @@ func (s *workflowCacheSuite) TestHistoryCacheConcurrentAccess_Release() {
 	// since we are just testing whether the release function will clear the cache
 	// all we need is a fake MutableState
 	s.Nil(ctx.(*workflow.ContextImpl).MutableState)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 }
 
 /*
@@ -421,7 +421,7 @@ func (s *workflowCacheSuite) TestHistoryCache_CacheLatencyMetricContext() {
 		locks.PriorityHigh,
 	)
 	s.NoError(err)
-	defer currentRelease(nil)
+	defer s.NoError(currentRelease(context.Background(), nil))
 
 	latency1, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency.Name())
 	s.True(ok)
@@ -438,7 +438,7 @@ func (s *workflowCacheSuite) TestHistoryCache_CacheLatencyMetricContext() {
 		locks.PriorityHigh,
 	)
 	s.NoError(err)
-	defer release(nil)
+	defer s.NoError(release(context.Background(), nil))
 
 	latency2, ok := metrics.ContextCounterGet(ctx, metrics.HistoryWorkflowExecutionCacheLatency.Name())
 	s.True(ok)
@@ -462,7 +462,7 @@ func (s *workflowCacheSuite) TestHistoryCache_CacheHoldTimeMetricContext() {
 	)
 	s.NoError(err)
 	s.Eventually(func() bool {
-		release1(nil)
+		s.NoError(release1(context.Background(), nil))
 		snapshot := capture.Snapshot()
 		s.Greater(snapshot[metrics.HistoryWorkflowExecutionCacheLockHoldDuration.Name()][0].Value, 100*time.Millisecond)
 		return tests.NamespaceID.String() == snapshot[metrics.HistoryWorkflowExecutionCacheLockHoldDuration.Name()][0].Tags["namespace_id"]
@@ -479,7 +479,7 @@ func (s *workflowCacheSuite) TestHistoryCache_CacheHoldTimeMetricContext() {
 	)
 	s.NoError(err)
 	s.Eventually(func() bool {
-		release2(nil)
+		s.NoError(release2(context.Background(), nil))
 		snapshot := capture.Snapshot()
 		s.Greater(snapshot[metrics.HistoryWorkflowExecutionCacheLockHoldDuration.Name()][0].Value, 200*time.Millisecond)
 		return tests.NamespaceID.String() == snapshot[metrics.HistoryWorkflowExecutionCacheLockHoldDuration.Name()][0].Tags["namespace_id"]
@@ -601,7 +601,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitSimple() {
 	// plus the size of commonpb.WorkflowExecution in this case. Even though we are returning a size 900 from
 	// MutableState, the size of workflow.Context object in the cache will be slightly higher (~972bytes).
 	mockMS1.EXPECT().GetApproximatePersistedSize().Return(900).Times(1)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 	ctx, _, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -666,7 +666,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 
 	// Make mockMS1's size 400.
 	mockMS1.EXPECT().GetApproximatePersistedSize().Return(400).Times(1)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 	ctx, release1, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -694,7 +694,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 	s.NoError(err)
 	ctx.(*workflow.ContextImpl).MutableState = mockMS2
 	mockMS2.EXPECT().GetApproximatePersistedSize().Return(400).Times(1)
-	release2(nil)
+	s.NoError(release2(context.Background(), nil))
 	ctx, release2, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -726,7 +726,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 	// Make mockMS1 grow to 1000 bytes. Cache should be able to handle this. Now the cache size will be more than its
 	// limit. Cache will evict this entry and make more space.
 	mockMS1.EXPECT().GetApproximatePersistedSize().Return(1000).Times(1)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 	ctx, release1, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -737,7 +737,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 	s.NoError(err)
 	// Make sure execution 3 was evicted by checking if mutable state is nil.
 	s.Nil(ctx.(*workflow.ContextImpl).MutableState, nil)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 
 	// Insert execution3 again with size 400bytes.
 	ctx, release3, err := s.cache.GetOrCreateWorkflowExecution(
@@ -751,7 +751,7 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 	ctx.(*workflow.ContextImpl).MutableState = mockMS3
 
 	mockMS3.EXPECT().GetApproximatePersistedSize().Return(400).Times(1)
-	release3(nil)
+	s.NoError(release3(context.Background(), nil))
 	ctx, release3, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -764,9 +764,9 @@ func (s *workflowCacheSuite) TestCacheImpl_RejectsRequestWhenAtLimitMultiple() {
 
 	// Release all remaining entries.
 	mockMS2.EXPECT().GetApproximatePersistedSize().Return(400).Times(1)
-	release2(nil)
+	s.NoError(release2(context.Background(), nil))
 	mockMS3.EXPECT().GetApproximatePersistedSize().Return(400).Times(1)
-	release3(nil)
+	s.NoError(release3(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestCacheImpl_CheckCacheLimitSizeBasedFlag() {
@@ -802,7 +802,7 @@ func (s *workflowCacheSuite) TestCacheImpl_CheckCacheLimitSizeBasedFlag() {
 	ctx.(*workflow.ContextImpl).MutableState = mockMS1
 	// GetApproximatePersistedSize() should not be called, since we disabled HistoryHostLevelCacheMaxSize flag.
 	mockMS1.EXPECT().GetApproximatePersistedSize().Times(0)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 	ctx, release1, err = s.cache.GetOrCreateWorkflowExecution(
 		context.Background(),
 		mockShard,
@@ -812,7 +812,7 @@ func (s *workflowCacheSuite) TestCacheImpl_CheckCacheLimitSizeBasedFlag() {
 	)
 	s.NoError(err)
 	s.Equal(mockMS1, ctx.(*workflow.ContextImpl).MutableState)
-	release1(nil)
+	s.NoError(release1(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestCacheImpl_GetCurrentRunID_CurrentRunExists() {
@@ -849,7 +849,7 @@ func (s *workflowCacheSuite) TestCacheImpl_GetCurrentRunID_CurrentRunExists() {
 	s.NoError(err)
 
 	s.Equal(currentRunID, ctx.GetWorkflowKey().RunID)
-	release(nil)
+	s.NoError(release(context.Background(), nil))
 }
 
 func (s *workflowCacheSuite) TestCacheImpl_GetCurrentRunID_NoCurrentRun() {

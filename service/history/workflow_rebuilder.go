@@ -86,7 +86,7 @@ func (r *workflowRebuilderImpl) rebuild(
 		return err
 	}
 	defer func() {
-		releaseFn(retError)
+		retError = releaseFn(ctx, retError)
 		wfContext.Clear()
 	}()
 	rebuildMutableState, err := r.replayResetWorkflow(

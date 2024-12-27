@@ -100,7 +100,7 @@ func (e *outboundQueueActiveTaskExecutor) Execute(
 func (e *outboundQueueActiveTaskExecutor) executeChasmSideEffectTask(
 	ctx context.Context,
 	task *tasks.ChasmTask,
-) error {
+) (retError error) {
 	ctx, cancel := context.WithTimeout(ctx, outboundTaskTimeout)
 	defer cancel()
 
@@ -108,7 +108,7 @@ func (e *outboundQueueActiveTaskExecutor) executeChasmSideEffectTask(
 	if err != nil {
 		return err
 	}
-	defer func() { release(err) }()
+	defer func() { retError = release(ctx, retError) }()
 
 	ms, err := loadMutableStateForTransferTask(ctx, e.shardContext, weContext, task, e.metricsHandler, e.logger)
 	if err != nil {
@@ -119,7 +119,11 @@ func (e *outboundQueueActiveTaskExecutor) executeChasmSideEffectTask(
 	// Now that we've loaded the CHASM tree, we can release the lock before task
 	// execution. The task's executor must do its own locking as needed, and additional
 	// mutable state validations will run at access time.
-	release(nil)
+
+	// TODO: pipelining - do-not-wait
+	if err := release(ctx, retError); err != nil {
+		return err
+	}
 
 	err = executeChasmSideEffectTask(
 		ctx,
