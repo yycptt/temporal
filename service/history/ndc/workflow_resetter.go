@@ -367,7 +367,8 @@ func (r *workflowResetterImpl) persistToDB(
 
 		}
 
-		if _, _, err := r.transaction.UpdateWorkflowExecution(
+		// todo: this should be using workflow.context
+		if _, err := r.transaction.UpdateWorkflowExecution(
 			ctx,
 			persistence.UpdateWorkflowModeUpdateCurrent,
 			currentWorkflow.GetMutableState().GetCurrentVersion(),
@@ -376,6 +377,7 @@ func (r *workflowResetterImpl) persistToDB(
 			workflow.MutableStateFailoverVersion(resetWorkflow.GetMutableState()),
 			resetWorkflowSnapshot,
 			resetWorkflowEventsSeq,
+			nil,
 		); err != nil {
 			return err
 		}

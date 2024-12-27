@@ -50,7 +50,7 @@ func Invoke(
 	waitStage := req.GetRequest().GetWaitPolicy().GetLifecycleStage()
 	updateRef := req.GetRequest().GetUpdateRef()
 	wfexec := updateRef.GetWorkflowExecution()
-	wfKey, upd, err := func() (*definition.WorkflowKey, *update.Update, error) {
+	wfKey, upd, err := func() (wfKey definition.WorkflowKey, upd *update.Update, retError error) {
 		workflowLease, err := ctxLookup.GetWorkflowLease(
 			ctx,
 			nil,
@@ -62,14 +62,14 @@ func Invoke(
 			locks.PriorityHigh,
 		)
 		if err != nil {
-			return nil, nil, err
+			return wfKey, nil, err
 		}
 		release := workflowLease.GetReleaseFn()
-		defer release(nil)
+		defer func() { retError = release(ctx, nil) }()
 		wfCtx := workflowLease.GetContext()
-		upd := wfCtx.UpdateRegistry(ctx).Find(ctx, updateRef.UpdateId)
-		wfKey := wfCtx.GetWorkflowKey()
-		return &wfKey, upd, nil
+		upd = wfCtx.UpdateRegistry(ctx).Find(ctx, updateRef.UpdateId)
+		wfKey = wfCtx.GetWorkflowKey()
+		return wfKey, upd, nil
 	}()
 	if err != nil {
 		return nil, err

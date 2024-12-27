@@ -40,6 +40,7 @@ import (
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/cluster"
 	"go.temporal.io/server/common/definition"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/locks"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
@@ -52,6 +53,7 @@ import (
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tasks"
 	"go.temporal.io/server/service/history/workflow/update"
+	"go.uber.org/multierr"
 )
 
 type (
@@ -63,7 +65,11 @@ type (
 		Clear()
 
 		Lock(ctx context.Context, lockPriority locks.Priority) error
-		Unlock()
+		// TODO: we need to provide another method for draining the pending operations
+		// That method must be called if any write operation (outside the shard) will be made during the lock
+		// e.g. start activity, signal external, cancel external, nexus op, visibility, archival
+		// for chasm, as long as there's no side effect within the lock, it's safe
+		Unlock() error
 
 		IsDirty() bool
 
@@ -167,6 +173,8 @@ type (
 		lock           locks.PrioritySemaphore
 		MutableState   MutableState
 		updateRegistry update.Registry
+
+		opFutures []future.Future[*persistence.AsyncResponse]
 	}
 )
 
@@ -200,11 +208,47 @@ func (c *ContextImpl) Lock(
 	ctx context.Context,
 	lockPriority locks.Priority,
 ) error {
-	return c.lock.Acquire(ctx, lockPriority, 1)
+	// TODO: limit the number of pending operations
+	if err := c.lock.Acquire(ctx, lockPriority, 1); err != nil {
+		return err
+	}
+
+	// shrink
+	succeededIdx := -1
+	for idx, opFuture := range c.opFutures {
+		if !opFuture.Ready() {
+			break
+		}
+
+		// this is non blocking, as we already checked the future is ready
+		_, err := opFuture.Get(ctx)
+		if err != nil {
+			c.Clear()
+			return nil
+		}
+
+		succeededIdx = idx
+	}
+	c.opFutures = c.opFutures[succeededIdx+1:]
+
+	return nil
 }
 
-func (c *ContextImpl) Unlock() {
+// TODO: take in a context and return error
+func (c *ContextImpl) Unlock() error {
+	opFutures := c.opFutures
 	c.lock.Release(1)
+
+	var err error
+	for _, opFuture := range opFutures {
+		_, opErr := opFuture.Get(context.Background())
+		if opErr != nil {
+			// TODO: only return errors for the current transaction
+			multierr.Append(err, opErr)
+		}
+	}
+
+	return err
 }
 
 func (c *ContextImpl) IsDirty() bool {
@@ -225,6 +269,7 @@ func (c *ContextImpl) Clear() {
 		c.updateRegistry.Clear()
 		c.updateRegistry = nil
 	}
+	c.opFutures = nil
 }
 
 func (c *ContextImpl) GetWorkflowKey() definition.WorkflowKey {
@@ -623,32 +668,40 @@ func (c *ContextImpl) UpdateWorkflowExecutionWithNew(
 		return err
 	}
 
-	if _, _, err := NewTransaction(shardContext).UpdateWorkflowExecution(
+	resp, err := NewTransaction(shardContext).UpdateWorkflowExecution(
 		ctx,
 		updateMode,
-
 		c.MutableState.GetCurrentVersion(),
 		updateWorkflow,
 		updateWorkflowEventsSeq,
 		MutableStateFailoverVersion(newMutableState),
 		newWorkflow,
 		newWorkflowEventsSeq,
-	); err != nil {
+		func(_ *persistence.AsyncResponse, err error) {
+			if err != nil {
+				return
+			}
+
+			emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), c.MutableState)
+			emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), newMutableState)
+
+			// finally emit session stats
+			emitWorkflowHistoryStats(
+				c.metricsHandler,
+				c.GetNamespace(shardContext),
+				c.MutableState.GetExecutionState().State,
+				int(c.MutableState.GetExecutionInfo().ExecutionStats.HistorySize),
+				int(c.MutableState.GetNextEventID()-1),
+			)
+		},
+	)
+	if err != nil {
 		return err
 	}
 
-	emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), c.MutableState)
-	emitStateTransitionCount(c.metricsHandler, shardContext.GetClusterMetadata(), newMutableState)
-
-	// finally emit session stats
-	emitWorkflowHistoryStats(
-		c.metricsHandler,
-		c.GetNamespace(shardContext),
-		c.MutableState.GetExecutionState().State,
-		int(c.MutableState.GetExecutionInfo().ExecutionStats.HistorySize),
-		int(c.MutableState.GetNextEventID()-1),
-	)
-
+	c.opFutures = append(c.opFutures, resp.Future)
+	// TODO: put to newWF context as well?
+	// likely unnecessary as the newWF context is not in the cache and release fn is likely no-op
 	return nil
 }
 

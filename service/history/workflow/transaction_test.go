@@ -143,7 +143,7 @@ func (s *transactionSuite) TestUpdateWorkflowExecution_NotifyTaskWhenFailed() {
 	s.setupMockForTaskNotification() // for current workflow mutation
 	s.setupMockForTaskNotification() // for new workflow snapshot
 
-	_, _, err := s.transaction.UpdateWorkflowExecution(
+	_, err := s.transaction.UpdateWorkflowExecution(
 		context.Background(),
 		persistence.UpdateWorkflowModeUpdateCurrent,
 		0,
@@ -160,6 +160,7 @@ func (s *transactionSuite) TestUpdateWorkflowExecution_NotifyTaskWhenFailed() {
 		util.Ptr(int64(0)),
 		&persistence.WorkflowSnapshot{},
 		[]*persistence.WorkflowEvents{},
+		nil,
 	)
 	s.Equal(timeoutErr, err)
 }

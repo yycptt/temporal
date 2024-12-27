@@ -199,7 +199,7 @@ func (handler *WorkflowTaskCompletedHandler) Invoke(
 			}
 		}
 
-		workflowLease.GetReleaseFn()(errForRelease)
+		retError = workflowLease.GetReleaseFn()(ctx, errForRelease)
 	}()
 
 	if !ms.IsWorkflowExecutionRunning() ||

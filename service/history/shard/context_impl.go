@@ -688,11 +688,18 @@ func (s *ContextImpl) UpdateWorkflowExecution(
 	s.wUnlock()
 
 	resp, err := s.executionManager.UpdateWorkflowExecution(ctx, request)
-	requestCompletionFn(err)
-	if err = s.handleWriteError(request.RangeID, err); err != nil {
-		return nil, err
+	if resp.Future == nil {
+		resp.Future = future.NewReadyFuture(&persistence.AsyncResponse{}, nil)
 	}
-	return resp, nil
+	resp.Future = future.NewActionFuture(
+		resp.Future,
+		func(_ *persistence.AsyncResponse, err error) {
+			requestCompletionFn(err)
+			_ = s.handleWriteError(request.RangeID, err)
+		},
+	)
+
+	return resp, err
 }
 
 func (s *ContextImpl) updateCloseTaskIDs(executionInfo *persistencespb.WorkflowExecutionInfo, tasksByCategory map[tasks.Category][]tasks.Task) {

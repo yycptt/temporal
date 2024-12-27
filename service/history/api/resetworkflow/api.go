@@ -71,7 +71,11 @@ func Invoke(
 	if err != nil {
 		return nil, err
 	}
-	defer func() { baseWorkflowLease.GetReleaseFn()(retError) }()
+	// TODO: need to double check this
+	// logic won't work if we lock wf1, lock wf2, based on wf1, modify wf2, persist wf2 mutation, release wf2 lock, release wf1 lock.
+	// then the change for wf2 got persisted based on a pending change of wf1.
+	// to make ^ work, must release wf1 lock before persisting wf2 mutation.
+	defer func() { retError = baseWorkflowLease.GetReleaseFn()(ctx, retError) }()
 
 	baseMutableState := baseWorkflowLease.GetMutableState()
 	if request.GetWorkflowTaskFinishEventId() <= common.FirstEventID ||
@@ -110,7 +114,7 @@ func Invoke(
 		if err != nil {
 			return nil, err
 		}
-		defer func() { currentWorkflowLease.GetReleaseFn()(retError) }()
+		defer func() { retError = currentWorkflowLease.GetReleaseFn()(ctx, retError) }()
 	}
 
 	// dedup by requestID

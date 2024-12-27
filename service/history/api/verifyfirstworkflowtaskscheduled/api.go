@@ -59,7 +59,7 @@ func Invoke(
 	if err != nil {
 		return err
 	}
-	defer func() { workflowLease.GetReleaseFn()(retError) }()
+	defer func() { retError = workflowLease.GetReleaseFn()(ctx, retError) }()
 
 	mutableState := workflowLease.GetMutableState()
 	if !mutableState.IsWorkflowExecutionRunning() &&

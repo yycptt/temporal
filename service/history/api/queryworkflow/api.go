@@ -100,7 +100,7 @@ func Invoke(
 	defer func() {
 		// Do not clear mutable state when query failed. Clear mutable state will fail other buffered pending queries.
 		// Note: QueryWorkflow should not alter mutable state, so it is safe to ignore error and not clear ms.
-		workflowLease.GetReleaseFn()(nil)
+		retError = workflowLease.GetReleaseFn()(ctx, nil)
 	}()
 
 	req := request.GetRequest()
@@ -169,7 +169,9 @@ func Invoke(
 			if err != nil {
 				return nil, err
 			}
-			workflowLease.GetReleaseFn()(nil)
+			if err := workflowLease.GetReleaseFn()(ctx, nil); err != nil {
+				return nil, err
+			}
 			req.Execution.RunId = msResp.Execution.RunId
 			return queryDirectlyThroughMatching(
 				ctx,
@@ -197,7 +199,9 @@ func Invoke(
 	}
 	queryID, completionCh := queryReg.BufferQuery(req.GetQuery())
 	defer queryReg.RemoveQuery(queryID)
-	workflowLease.GetReleaseFn()(nil)
+	if err := workflowLease.GetReleaseFn()(ctx, nil); err != nil {
+		return nil, err
+	}
 	select {
 	case <-completionCh:
 		completionState, err := queryReg.GetCompletionState(queryID)

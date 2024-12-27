@@ -174,7 +174,9 @@ func Invoke(
 	if currentWorkflowLease != nil {
 		if !currentWorkflowLease.GetMutableState().IsWorkflowExecutionRunning() {
 			// ... but cannot receive an update since it's not running.
-			currentWorkflowLease.GetReleaseFn()(nil)
+			if err := currentWorkflowLease.GetReleaseFn()(ctx, nil); err != nil {
+				return nil, err
+			}
 		} else {
 			// and is running, ...
 			switch conflictPolicy {
@@ -191,7 +193,10 @@ func Invoke(
 				}
 
 				// ... otherwise, abort the entire operation
-				currentWorkflowLease.GetReleaseFn()(nil) // nil since nothing was modified
+				// nil since nothing was modified
+				if err := currentWorkflowLease.GetReleaseFn()(ctx, nil); err != nil {
+					return nil, err
+				}
 				wfKey := currentWorkflowLease.GetContext().GetWorkflowKey()
 				err = serviceerror.NewWorkflowExecutionAlreadyStarted(
 					fmt.Sprintf("Workflow execution is already running. WorkflowId: %v, RunId: %v.", wfKey.WorkflowID, wfKey.RunID),
@@ -205,7 +210,10 @@ func Invoke(
 
 			case enumspb.WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED:
 				// ... fail since this policy is invalid
-				currentWorkflowLease.GetReleaseFn()(nil) // nil since nothing was modified
+				// nil since nothing was modified
+				if err := currentWorkflowLease.GetReleaseFn()(ctx, nil); err != nil {
+					return nil, err
+				}
 				return nil, serviceerror.NewInvalidArgument("unhandled workflow id conflict policy: unspecified")
 			}
 		}
@@ -249,8 +257,7 @@ func updateWorkflow(
 	)
 
 	// release lock since all changes to workflow have been completed now
-	currentWorkflowLease.GetReleaseFn()(err)
-
+	err = currentWorkflowLease.GetReleaseFn()(ctx, err)
 	if err != nil {
 		return nil, newMultiOpError(multiOpAbortedErr, err)
 	}

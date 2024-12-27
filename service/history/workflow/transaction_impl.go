@@ -31,6 +31,7 @@ import (
 	enumspb "go.temporal.io/api/enums/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/server/common"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/metrics"
@@ -179,47 +180,103 @@ func (t *TransactionImpl) UpdateWorkflowExecution(
 	newWorkflowFailoverVersion *int64,
 	newWorkflowSnapshot *persistence.WorkflowSnapshot,
 	newWorkflowEventsSeq []*persistence.WorkflowEvents,
-) (int64, int64, error) {
+	futureActionFn future.ActionFn[*persistence.AsyncResponse],
+) (*persistence.UpdateWorkflowExecutionResponse, error) {
 
 	engine, err := t.shard.GetEngine(ctx)
 	if err != nil {
-		return 0, 0, err
-	}
-	resp, err := updateWorkflowExecution(
-		ctx,
-		t.shard,
-		currentWorkflowFailoverVersion,
-		newWorkflowFailoverVersion,
-		&persistence.UpdateWorkflowExecutionRequest{
-			ShardID: t.shard.GetShardID(),
-			// RangeID , this is set by shard context
-			Mode:                   updateMode,
-			UpdateWorkflowMutation: *currentWorkflowMutation,
-			UpdateWorkflowEvents:   currentWorkflowEventsSeq,
-			NewWorkflowSnapshot:    newWorkflowSnapshot,
-			NewWorkflowEvents:      newWorkflowEventsSeq,
-		},
-	)
-	if shard.OperationPossiblySucceeded(err) {
-		NotifyWorkflowMutationTasks(engine, currentWorkflowMutation)
-		NotifyWorkflowSnapshotTasks(engine, newWorkflowSnapshot)
-	}
-	if err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 
-	if err := NotifyNewHistoryMutationEvent(engine, currentWorkflowMutation); err != nil {
-		t.logger.Error("unable to notify workflow mutation", tag.Error(err))
+	request := &persistence.UpdateWorkflowExecutionRequest{
+		ShardID: t.shard.GetShardID(),
+		// RangeID , this is set by shard context
+		Mode:                   updateMode,
+		UpdateWorkflowMutation: *currentWorkflowMutation,
+		UpdateWorkflowEvents:   currentWorkflowEventsSeq,
+		NewWorkflowSnapshot:    newWorkflowSnapshot,
+		NewWorkflowEvents:      newWorkflowEventsSeq,
 	}
-	if err := NotifyNewHistorySnapshotEvent(engine, newWorkflowSnapshot); err != nil {
-		t.logger.Error("unable to notify workflow creation", tag.Error(err))
+
+	resp, err := t.shard.UpdateWorkflowExecution(ctx, request)
+	if err != nil {
+		t.shard.GetLogger().Error(
+			"Update workflow execution operation failed.",
+			tag.WorkflowNamespaceID(request.UpdateWorkflowMutation.ExecutionInfo.NamespaceId),
+			tag.WorkflowID(request.UpdateWorkflowMutation.ExecutionInfo.WorkflowId),
+			tag.WorkflowRunID(request.UpdateWorkflowMutation.ExecutionState.RunId),
+			tag.StoreOperationUpdateWorkflowExecution,
+			tag.Error(err),
+		)
+		return nil, err
 	}
-	updateHistorySizeDiff := int64(resp.UpdateMutableStateStats.HistoryStatistics.SizeDiff)
-	newHistorySizeDiff := int64(0)
-	if resp.NewMutableStateStats != nil {
-		newHistorySizeDiff = int64(resp.NewMutableStateStats.HistoryStatistics.SizeDiff)
-	}
-	return updateHistorySizeDiff, newHistorySizeDiff, nil
+
+	// updateHistorySizeDiff := int64(resp.UpdateMutableStateStats.HistoryStatistics.SizeDiff)
+	// newHistorySizeDiff := int64(0)
+	// if resp.NewMutableStateStats != nil {
+	// 	newHistorySizeDiff = int64(resp.NewMutableStateStats.HistoryStatistics.SizeDiff)
+	// }
+
+	resp.Future = future.NewActionFuture(
+		resp.Future,
+		func(asyncResp *persistence.AsyncResponse, err error) {
+			if shard.OperationPossiblySucceeded(err) {
+				NotifyWorkflowMutationTasks(engine, currentWorkflowMutation)
+				NotifyWorkflowSnapshotTasks(engine, newWorkflowSnapshot)
+			}
+
+			if err != nil {
+				t.shard.GetLogger().Error(
+					"Update workflow execution operation failed.",
+					tag.WorkflowNamespaceID(request.UpdateWorkflowMutation.ExecutionInfo.NamespaceId),
+					tag.WorkflowID(request.UpdateWorkflowMutation.ExecutionInfo.WorkflowId),
+					tag.WorkflowRunID(request.UpdateWorkflowMutation.ExecutionState.RunId),
+					tag.StoreOperationUpdateWorkflowExecution,
+					tag.Error(err),
+				)
+				return
+			}
+
+			if err := NotifyNewHistoryMutationEvent(engine, currentWorkflowMutation); err != nil {
+				t.logger.Error("unable to notify workflow mutation", tag.Error(err))
+			}
+			if err := NotifyNewHistorySnapshotEvent(engine, newWorkflowSnapshot); err != nil {
+				t.logger.Error("unable to notify workflow creation", tag.Error(err))
+			}
+
+			namespaceEntry, getNSErr := t.shard.GetNamespaceRegistry().GetNamespaceByID(
+				namespace.ID(request.UpdateWorkflowMutation.ExecutionInfo.NamespaceId),
+			)
+			if getNSErr != nil {
+				return
+			}
+
+			emitMutationMetrics(
+				t.shard,
+				namespaceEntry,
+				&resp.UpdateMutableStateStats,
+				resp.NewMutableStateStats,
+			)
+			emitCompletionMetrics(
+				t.shard,
+				namespaceEntry,
+				mutationToCompletionMetric(
+					namespaceState(t.shard.GetClusterMetadata(), &currentWorkflowFailoverVersion),
+					&request.UpdateWorkflowMutation,
+				),
+				snapshotToCompletionMetric(
+					namespaceState(t.shard.GetClusterMetadata(), newWorkflowFailoverVersion),
+					request.NewWorkflowSnapshot,
+				),
+			)
+
+			if futureActionFn != nil {
+				futureActionFn(asyncResp, err)
+			}
+		},
+	)
+
+	return resp, nil
 }
 
 func (t *TransactionImpl) SetWorkflowExecution(
@@ -494,53 +551,6 @@ func getWorkflowExecution(
 			&resp.MutableStateStats,
 		)
 	}
-	return resp, nil
-}
-
-func updateWorkflowExecution(
-	ctx context.Context,
-	shard shard.Context,
-	updateWorkflowFailoverVersion int64,
-	newWorkflowFailoverVersion *int64,
-	request *persistence.UpdateWorkflowExecutionRequest,
-) (*persistence.UpdateWorkflowExecutionResponse, error) {
-
-	resp, err := shard.UpdateWorkflowExecution(ctx, request)
-	if err != nil {
-		shard.GetLogger().Error(
-			"Update workflow execution operation failed.",
-			tag.WorkflowNamespaceID(request.UpdateWorkflowMutation.ExecutionInfo.NamespaceId),
-			tag.WorkflowID(request.UpdateWorkflowMutation.ExecutionInfo.WorkflowId),
-			tag.WorkflowRunID(request.UpdateWorkflowMutation.ExecutionState.RunId),
-			tag.StoreOperationUpdateWorkflowExecution,
-			tag.Error(err),
-		)
-		return nil, err
-	}
-
-	if namespaceEntry, err := shard.GetNamespaceRegistry().GetNamespaceByID(
-		namespace.ID(request.UpdateWorkflowMutation.ExecutionInfo.NamespaceId),
-	); err == nil {
-		emitMutationMetrics(
-			shard,
-			namespaceEntry,
-			&resp.UpdateMutableStateStats,
-			resp.NewMutableStateStats,
-		)
-		emitCompletionMetrics(
-			shard,
-			namespaceEntry,
-			mutationToCompletionMetric(
-				namespaceState(shard.GetClusterMetadata(), &updateWorkflowFailoverVersion),
-				&request.UpdateWorkflowMutation,
-			),
-			snapshotToCompletionMetric(
-				namespaceState(shard.GetClusterMetadata(), newWorkflowFailoverVersion),
-				request.NewWorkflowSnapshot,
-			),
-		)
-	}
-
 	return resp, nil
 }
 

@@ -258,9 +258,11 @@ func (mr *MockContextMockRecorder) SubmitClosedWorkflowSnapshot(ctx, shardContex
 }
 
 // Unlock mocks base method.
-func (m *MockContext) Unlock() {
+func (m *MockContext) Unlock() error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Unlock")
+	ret := m.ctrl.Call(m, "Unlock")
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Unlock indicates an expected call of Unlock.

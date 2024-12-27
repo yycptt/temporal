@@ -221,6 +221,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentTerminated() {
 		util.Ptr(int64(0)),
 		resetSnapshot,
 		resetEventsSeq,
+		nil,
 	).Return(currentNewEventsSize, resetNewEventsSize, nil)
 
 	err := s.workflowResetter.persistToDB(context.Background(), currentWorkflow, currentWorkflow, currentMutation, currentEventsSeq, resetWorkflow)
@@ -283,6 +284,7 @@ func (s *workflowResetterSuite) TestPersistToDB_CurrentNotTerminated() {
 		util.Ptr(int64(0)),
 		resetSnapshot,
 		resetEventsSeq,
+		nil,
 	).Return(int64(0), int64(0), nil)
 
 	err := s.workflowResetter.persistToDB(context.Background(), currentWorkflow, currentWorkflow, nil, nil, resetWorkflow)

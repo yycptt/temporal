@@ -27,6 +27,7 @@ package workflow
 import (
 	"context"
 
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/persistence"
 )
 
@@ -64,7 +65,8 @@ type (
 			newWorkflowFailoverVersion *int64,
 			newWorkflowSnapshot *persistence.WorkflowSnapshot,
 			newWorkflowEventsSeq []*persistence.WorkflowEvents,
-		) (int64, int64, error)
+			futureActionFn future.ActionFn[*persistence.AsyncResponse],
+		) (*persistence.UpdateWorkflowExecutionResponse, error)
 
 		SetWorkflowExecution(
 			ctx context.Context,

@@ -48,6 +48,7 @@ import (
 	"go.temporal.io/server/service/history/shard"
 	"go.temporal.io/server/service/history/tests"
 	"go.temporal.io/server/service/history/workflow"
+	"go.temporal.io/server/service/history/workflow/cache"
 	wcache "go.temporal.io/server/service/history/workflow/cache"
 	"go.temporal.io/server/service/history/workflow/update"
 	"go.uber.org/mock/gomock"
@@ -120,7 +121,7 @@ func TestPollOutcome(t *testing.T) {
 	wfCtx.EXPECT().UpdateRegistry(gomock.Any()).Return(reg).AnyTimes()
 
 	apiCtx := mockWorkflowLeaseCtx{
-		GetReleaseFnFn: func() wcache.ReleaseCacheFunc { return func(error) {} },
+		GetReleaseFnFn: func() wcache.ReleaseCacheFunc { return cache.NoopReleaseFn },
 		GetContextFn: func() workflow.Context {
 			return wfCtx
 		},

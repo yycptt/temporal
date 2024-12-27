@@ -22,39 +22,50 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package refreshworkflow
+package future
 
 import (
 	"context"
-
-	"go.temporal.io/server/common/definition"
-	"go.temporal.io/server/common/locks"
-	"go.temporal.io/server/common/namespace"
-	"go.temporal.io/server/service/history/api"
-	"go.temporal.io/server/service/history/shard"
+	"sync"
 )
 
-func Invoke(
+var _ Future[struct{}] = (*ActionFutureImpl[struct{}])(nil)
+
+type (
+	ActionFutureImpl[T any] struct {
+		Future[T]
+
+		once     sync.Once
+		actionFn func(T, error)
+	}
+
+	ActionFn[T any] func(T, error)
+)
+
+func NewActionFuture[T any](
+	future Future[T],
+	action ActionFn[T],
+) *ActionFutureImpl[T] {
+	return &ActionFutureImpl[T]{
+		Future:   future,
+		actionFn: action,
+	}
+}
+
+// Get does not guarantee that actionFn is completed when it returns.
+func (f *ActionFutureImpl[T]) Get(
 	ctx context.Context,
-	workflowKey definition.WorkflowKey,
-	shard shard.Context,
-	workflowConsistencyChecker api.WorkflowConsistencyChecker,
-) (retError error) {
-	err := api.ValidateNamespaceUUID(namespace.ID(workflowKey.NamespaceID))
-	if err != nil {
-		return err
-	}
-
-	workflowLease, err := workflowConsistencyChecker.GetWorkflowLease(
-		ctx,
-		nil,
-		workflowKey,
-		locks.PriorityLow,
+) (T, error) {
+	value, err := f.Future.Get(ctx)
+	f.once.Do(
+		func() {
+			f.actionFn(value, err)
+		},
 	)
-	if err != nil {
-		return err
-	}
-	defer func() { retError = workflowLease.GetReleaseFn()(ctx, retError) }()
 
-	return workflowLease.GetContext().RefreshTasks(ctx, shard)
+	return value, err
+}
+
+func (f *ActionFutureImpl[T]) Ready() bool {
+	return f.Future.Ready()
 }

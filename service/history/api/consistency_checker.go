@@ -213,14 +213,16 @@ func (c *WorkflowConsistencyCheckerImpl) getCurrentWorkflowLease(
 	currentRunID, err := c.GetCurrentRunID(ctx, namespaceID, workflowID, lockPriority)
 
 	if err != nil {
-		workflowLease.GetReleaseFn()(err)
+		err = workflowLease.GetReleaseFn()(ctx, err)
 		return nil, err
 	}
 	if currentRunID == workflowLease.GetContext().GetWorkflowKey().RunID {
 		return workflowLease, nil
 	}
 
-	workflowLease.GetReleaseFn()(nil)
+	if err := workflowLease.GetReleaseFn()(ctx, nil); err != nil {
+		return nil, err
+	}
 	return nil, consts.ErrLocateCurrentWorkflowExecution
 }
 
@@ -247,7 +249,7 @@ func (c *WorkflowConsistencyCheckerImpl) getWorkflowLease(
 
 	mutableState, err := wfContext.LoadMutableState(ctx, c.shardContext)
 	if err != nil {
-		release(err)
+		err = release(ctx, err)
 		return nil, err
 	}
 
@@ -259,7 +261,7 @@ func (c *WorkflowConsistencyCheckerImpl) getWorkflowLease(
 
 	mutableState, err = wfContext.LoadMutableState(ctx, c.shardContext)
 	if err != nil {
-		release(err)
+		err = release(ctx, err)
 		return nil, err
 	}
 	return NewWorkflowLease(wfContext, release, mutableState), nil

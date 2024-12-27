@@ -39,10 +39,13 @@ import (
 	historypb "go.temporal.io/api/history/v1"
 	enumsspb "go.temporal.io/server/api/enums/v1"
 	persistencespb "go.temporal.io/server/api/persistence/v1"
+	"go.temporal.io/server/common/future"
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/service/history/tasks"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type AsyncResponse struct{}
 
 // CreateWorkflowMode workflow creation mode
 type CreateWorkflowMode int
@@ -243,6 +246,8 @@ type (
 	UpdateWorkflowExecutionResponse struct {
 		UpdateMutableStateStats MutableStateStatistics
 		NewMutableStateStats    *MutableStateStatistics
+
+		Future future.Future[*AsyncResponse]
 	}
 
 	// ConflictResolveWorkflowExecutionRequest is used to reset workflow execution state for a single run

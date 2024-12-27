@@ -56,7 +56,7 @@ type (
 	// Make sure not to access the mutable state or workflow context after releasing back to the cache.
 	// If there is any error when using the mutable state (e.g. mutable state is mutated and dirty), call release with
 	// the error so the in-memory copy will be thrown away.
-	ReleaseCacheFunc func(err error)
+	ReleaseCacheFunc func(context.Context, error) error // func(error) error
 
 	Cache interface {
 		GetOrCreateCurrentWorkflowExecution(
@@ -99,7 +99,7 @@ type (
 	}
 )
 
-var NoopReleaseFn ReleaseCacheFunc = func(err error) {}
+var NoopReleaseFn ReleaseCacheFunc = func(_ context.Context, err error) error { return err }
 
 const (
 	cacheNotReleased int32 = 0
@@ -364,51 +364,56 @@ func (c *cacheImpl) lockWorkflowExecution(
 	return nil
 }
 
+// TODO: releaseFunc needs to take in a context and return an error
 func (c *cacheImpl) makeReleaseFunc(
 	cacheKey Key,
 	shardContext shard.Context,
-	context workflow.Context,
+	wfContext workflow.Context,
 	forceClearContext bool,
 	handler metrics.Handler,
 	acquireTime time.Time,
-) func(error) {
+) ReleaseCacheFunc {
 
 	status := cacheNotReleased
-	return func(err error) {
-		if atomic.CompareAndSwapInt32(&status, cacheNotReleased, cacheReleased) {
-			defer func() {
-				metrics.HistoryWorkflowExecutionCacheLockHoldDuration.With(handler).Record(time.Since(acquireTime))
-			}()
-			if rec := recover(); rec != nil {
-				context.Clear()
-				context.Unlock()
-				c.Release(cacheKey)
-				panic(rec)
-			} else {
-				if err != nil || forceClearContext {
-					// TODO see issue #668, there are certain type or errors which can bypass the clear
-					context.Clear()
-					context.Unlock()
-					c.Release(cacheKey)
-				} else {
-					isDirty := context.IsDirty()
-					if isDirty {
-						context.Clear()
-						logger := log.With(shardContext.GetLogger(), tag.ComponentHistoryCache)
-						logger.Error("Cache encountered dirty mutable state transaction",
-							tag.WorkflowNamespaceID(context.GetWorkflowKey().NamespaceID),
-							tag.WorkflowID(context.GetWorkflowKey().WorkflowID),
-							tag.WorkflowRunID(context.GetWorkflowKey().RunID),
-						)
-					}
-					context.Unlock()
-					c.Release(cacheKey)
-					if isDirty {
-						panic("Cache encountered dirty mutable state transaction")
-					}
-				}
-			}
+	return func(_ context.Context, err error) error {
+		if !atomic.CompareAndSwapInt32(&status, cacheNotReleased, cacheReleased) {
+			return err
 		}
+
+		defer func() {
+			metrics.HistoryWorkflowExecutionCacheLockHoldDuration.With(handler).Record(time.Since(acquireTime))
+		}()
+		if rec := recover(); rec != nil {
+			wfContext.Clear()
+			_ = wfContext.Unlock()
+			c.Release(cacheKey)
+			panic(rec)
+		}
+
+		if err != nil || forceClearContext {
+			// TODO see issue #668, there are certain type or errors which can bypass the clear
+			wfContext.Clear()
+			_ = wfContext.Unlock()
+			c.Release(cacheKey)
+			return err
+		}
+
+		isDirty := wfContext.IsDirty()
+		if isDirty {
+			wfContext.Clear()
+			logger := log.With(shardContext.GetLogger(), tag.ComponentHistoryCache)
+			logger.Error("Cache encountered dirty mutable state transaction",
+				tag.WorkflowNamespaceID(wfContext.GetWorkflowKey().NamespaceID),
+				tag.WorkflowID(wfContext.GetWorkflowKey().WorkflowID),
+				tag.WorkflowRunID(wfContext.GetWorkflowKey().RunID),
+			)
+		}
+		err = wfContext.Unlock()
+		c.Release(cacheKey)
+		if isDirty {
+			panic("Cache encountered dirty mutable state transaction")
+		}
+		return err
 	}
 }
 
@@ -478,7 +483,7 @@ func GetCurrentRunID(
 	if err != nil {
 		return "", err
 	}
-	defer func() { currentRelease(retErr) }()
+	defer func() { retErr = currentRelease(ctx, retErr) }()
 
 	resp, err := shardContext.GetCurrentExecution(
 		ctx,
