@@ -1,0 +1,7 @@
+{
+    "CurrVersion": "1.12",
+    "MinCompatibleVersion": "1.0",
+    "Description": "Add child_asm to executions table",
+    "SchemaUpdateCqlFiles": ["child_asm.cql"]
+  }
+  

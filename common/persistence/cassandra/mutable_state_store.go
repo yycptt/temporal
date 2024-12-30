@@ -80,7 +80,7 @@ const (
 		`VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) IF NOT EXISTS `
 
 	templateGetWorkflowExecutionQuery = `SELECT execution, execution_encoding, execution_state, execution_state_encoding, next_event_id, activity_map, activity_map_encoding, timer_map, timer_map_encoding, ` +
-		`child_executions_map, child_executions_map_encoding, request_cancel_map, request_cancel_map_encoding, signal_map, signal_map_encoding, signal_requested, buffered_events_list, ` +
+		`child_executions_map, child_executions_map_encoding, request_cancel_map, request_cancel_map_encoding, signal_map, signal_map_encoding, child_asm_map, child_asm_map_encoding, signal_requested, buffered_events_list, ` +
 		`checksum, checksum_encoding, db_record_version ` +
 		`FROM executions ` +
 		`WHERE shard_id = ? ` +
@@ -243,6 +243,26 @@ const (
 		`and visibility_ts = ? ` +
 		`and task_id = ? `
 
+	templateUpdateChildASMQuery = `UPDATE executions ` +
+		`SET child_asm_map[ ? ] = ?, child_asm_map_encoding = ? ` +
+		`WHERE shard_id = ? ` +
+		`and type = ? ` +
+		`and namespace_id = ? ` +
+		`and workflow_id = ? ` +
+		`and run_id = ? ` +
+		`and visibility_ts = ? ` +
+		`and task_id = ? `
+
+	templateResetChildASMQuery = `UPDATE executions ` +
+		`SET child_asm_map = ?, child_asm_map_encoding = ? ` +
+		`WHERE shard_id = ? ` +
+		`and type = ? ` +
+		`and namespace_id = ? ` +
+		`and workflow_id = ? ` +
+		`and run_id = ? ` +
+		`and visibility_ts = ? ` +
+		`and task_id = ? `
+
 	templateUpdateSignalRequestedQuery = `UPDATE executions ` +
 		`SET signal_requested = signal_requested + ? ` +
 		`WHERE shard_id = ? ` +
@@ -324,6 +344,16 @@ const (
 		`and task_id = ? `
 
 	templateDeleteSignalInfoQuery = `DELETE signal_map[ ? ] ` +
+		`FROM executions ` +
+		`WHERE shard_id = ? ` +
+		`and type = ? ` +
+		`and namespace_id = ? ` +
+		`and workflow_id = ? ` +
+		`and run_id = ? ` +
+		`and visibility_ts = ? ` +
+		`and task_id = ? `
+
+	templateDeleteChildASMQuery = `DELETE child_asm_map[ ? ] ` +
 		`FROM executions ` +
 		`WHERE shard_id = ? ` +
 		`and type = ? ` +
@@ -540,6 +570,15 @@ func (d *MutableStateStore) GetWorkflowExecution(
 		signalInfos[key] = p.NewDataBlob(value, sMapEncoding)
 	}
 	state.SignalInfos = signalInfos
+
+	childASMs := make(map[string]*commonpb.DataBlob)
+	asmMapEncoding := result["child_asm_map_encoding"].(string)
+	asmMap := result["child_asm_map"].(map[string][]byte)
+	for key, value := range asmMap {
+		childASMs[key] = p.NewDataBlob(value, asmMapEncoding)
+	}
+	state.ChildASMs = childASMs
+
 	state.SignalRequestedIDs = gocql.UUIDsToStringSlice(result["signal_requested"])
 
 	eList := result["buffered_events_list"].([]map[string]interface{})

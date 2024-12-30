@@ -57,6 +57,7 @@ import (
 	"go.temporal.io/server/common/sdk"
 	serviceerrors "go.temporal.io/server/common/serviceerror"
 	"go.temporal.io/server/common/worker_versioning"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/ndc"
@@ -80,6 +81,7 @@ type (
 
 func newTransferQueueActiveTaskExecutor(
 	shard shard.Context,
+	chasmRegistry *chasm.Registry,
 	workflowCache wcache.Cache,
 	sdkClientFactory sdk.ClientFactory,
 	logger log.Logger,
@@ -92,6 +94,7 @@ func newTransferQueueActiveTaskExecutor(
 	return &transferQueueActiveTaskExecutor{
 		transferQueueTaskExecutorBase: newTransferQueueTaskExecutorBase(
 			shard,
+			chasmRegistry,
 			workflowCache,
 			logger,
 			metricProvider,
@@ -159,6 +162,8 @@ func (t *transferQueueActiveTaskExecutor) Execute(
 		err = t.processResetWorkflow(ctx, task)
 	case *tasks.DeleteExecutionTask:
 		err = t.processDeleteExecutionTask(ctx, task)
+	case *tasks.ChasmTask:
+		err = t.processChasmTask(ctx, task)
 	default:
 		err = errUnknownTransferTask
 	}
@@ -174,6 +179,23 @@ func (t *transferQueueActiveTaskExecutor) processDeleteExecutionTask(ctx context
 	task *tasks.DeleteExecutionTask) error {
 	return t.transferQueueTaskExecutorBase.processDeleteExecutionTask(ctx, task,
 		t.config.TransferProcessorEnsureCloseBeforeDelete())
+}
+
+func (t *transferQueueActiveTaskExecutor) processChasmTask(
+	ctx context.Context,
+	task *tasks.ChasmTask,
+) (retError error) {
+	ctx, cancel := context.WithTimeout(ctx, taskTimeout)
+	defer cancel()
+
+	if err := validateTaskByClock(t.shardContext, task); err != nil {
+		return err
+	}
+
+	executor := chasm.ChasmTaskExecutor{
+		Registry: t.chasmRegistry,
+	}
+	return executor.Execute(ctx, t.shardContext.GetShardID(), task)
 }
 
 func (t *transferQueueActiveTaskExecutor) processActivityTask(

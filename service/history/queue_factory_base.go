@@ -39,6 +39,7 @@ import (
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/common/quotas"
 	"go.temporal.io/server/common/quotas/calculator"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/circuitbreakerpool"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/queues"
@@ -80,6 +81,7 @@ type (
 		ExecutorWrapper      queues.ExecutorWrapper `optional:"true"`
 		Serializer           serialization.Serializer
 		RemoteHistoryFetcher eventhandler.HistoryPaginatedFetcher
+		ChasmRegistry        *chasm.Registry
 	}
 
 	QueueFactoryBase struct {

@@ -52,6 +52,7 @@ import (
 	"go.temporal.io/server/common/namespace"
 	"go.temporal.io/server/common/persistence"
 	"go.temporal.io/server/components/callbacks"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/historybuilder"
 	"go.temporal.io/server/service/history/hsm"
 	"go.temporal.io/server/service/history/tasks"
@@ -416,6 +417,7 @@ type (
 		HasCompletedAnyWorkflowTask() bool
 
 		HSM() *hsm.Node
+		ChasmTree() *chasm.Tree
 
 		// NextTransitionCount returns the next state transition count from the state transition history.
 		// If state transition history is empty (e.g. when disabled or fresh mutable state), returns 0.

@@ -38,6 +38,7 @@ import (
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/searchattribute"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/events"
 	"go.temporal.io/server/service/history/hsm"
@@ -80,6 +81,7 @@ type (
 		EventsCache                 events.Cache
 
 		StateMachineRegistry *hsm.Registry
+		ChasmRegistry        *chasm.Registry
 	}
 
 	contextFactoryImpl struct {
@@ -121,6 +123,7 @@ func (c *contextFactoryImpl) CreateContext(
 		c.TaskCategoryRegistry,
 		c.EventsCache,
 		c.StateMachineRegistry,
+		c.ChasmRegistry,
 	)
 	if err != nil {
 		return nil, err

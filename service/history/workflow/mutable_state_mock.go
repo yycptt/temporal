@@ -59,6 +59,7 @@ import (
 	definition "go.temporal.io/server/common/definition"
 	namespace "go.temporal.io/server/common/namespace"
 	persistence0 "go.temporal.io/server/common/persistence"
+	chasm "go.temporal.io/server/service/history/chasm"
 	historybuilder "go.temporal.io/server/service/history/historybuilder"
 	hsm "go.temporal.io/server/service/history/hsm"
 	tasks "go.temporal.io/server/service/history/tasks"
@@ -1576,6 +1577,20 @@ func (m *MockMutableState) ApplyWorkflowTaskTimedOutEvent(arg0 enums.TimeoutType
 func (mr *MockMutableStateMockRecorder) ApplyWorkflowTaskTimedOutEvent(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyWorkflowTaskTimedOutEvent", reflect.TypeOf((*MockMutableState)(nil).ApplyWorkflowTaskTimedOutEvent), arg0)
+}
+
+// ChasmTree mocks base method.
+func (m *MockMutableState) ChasmTree() *chasm.Tree {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChasmTree")
+	ret0, _ := ret[0].(*chasm.Tree)
+	return ret0
+}
+
+// ChasmTree indicates an expected call of ChasmTree.
+func (mr *MockMutableStateMockRecorder) ChasmTree() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChasmTree", reflect.TypeOf((*MockMutableState)(nil).ChasmTree))
 }
 
 // CheckResettable mocks base method.

@@ -29,6 +29,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 	"slices"
@@ -79,6 +80,7 @@ import (
 	"go.temporal.io/server/common/util"
 	"go.temporal.io/server/common/worker_versioning"
 	"go.temporal.io/server/components/callbacks"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/events"
@@ -241,6 +243,9 @@ type (
 		metricsHandler   metrics.Handler
 		stateMachineNode *hsm.Node
 
+		chasmTree         *chasm.Tree         // pendingXXX
+		chasmTreeMutation *chasm.TreeMutation // update & deleteXXX
+
 		// Tracks all events added via the AddHistoryEvent method that is used by the state machine framework.
 		currentTransactionAddedStateMachineEventTypes []enumspb.EventType
 	}
@@ -365,6 +370,7 @@ func NewMutableState(
 	s.workflowTaskManager = newWorkflowTaskStateMachine(s, s.metricsHandler)
 
 	s.mustInitHSM()
+	s.initChasmTree(nil)
 
 	return s
 }
@@ -490,6 +496,7 @@ func NewMutableStateFromDB(
 	}
 
 	mutableState.mustInitHSM()
+	mutableState.initChasmTree(dbRecord.ChasmNodes)
 
 	return mutableState, nil
 }
@@ -579,6 +586,21 @@ func (ms *MutableStateImpl) mustInitHSM() {
 
 func (ms *MutableStateImpl) HSM() *hsm.Node {
 	return ms.stateMachineNode
+}
+
+func (ms *MutableStateImpl) ChasmTree() *chasm.Tree {
+	return ms.chasmTree
+}
+
+func (ms *MutableStateImpl) initChasmTree(
+	chasmNodesInDB map[string]*persistencespb.ChasmNode,
+) {
+	ms.chasmTree = chasm.NewTree(
+		ms.shard.ChasmRegistry(),
+		chasmNodesInDB,
+		ms.timeSource,
+		ms,
+	)
 }
 
 // GetNexusCompletion converts a workflow completion event into a [nexus.OperationCompletion].
@@ -785,6 +807,10 @@ func (ms *MutableStateImpl) SetCurrentBranchToken(
 
 func (ms *MutableStateImpl) SetHistoryBuilder(hBuilder *historybuilder.HistoryBuilder) {
 	ms.hBuilder = hBuilder
+}
+
+func (ms *MutableStateImpl) HistoryBuilder() *historybuilder.HistoryBuilder {
+	return ms.hBuilder
 }
 
 func (ms *MutableStateImpl) SetBaseWorkflow(
@@ -5414,7 +5440,10 @@ func (ms *MutableStateImpl) UpdateWorkflowStateStatus(
 }
 
 func (ms *MutableStateImpl) IsDirty() bool {
-	return ms.hBuilder.IsDirty() || len(ms.InsertTasks) > 0 || (ms.stateMachineNode != nil && ms.stateMachineNode.Dirty())
+	return ms.hBuilder.IsDirty() ||
+		len(ms.InsertTasks) > 0 ||
+		(ms.stateMachineNode != nil && ms.stateMachineNode.Dirty()) ||
+		ms.chasmTree.IsDirty()
 }
 
 func (ms *MutableStateImpl) isStateDirty() bool {
@@ -5437,7 +5466,8 @@ func (ms *MutableStateImpl) isStateDirty() bool {
 		ms.visibilityUpdated ||
 		ms.executionStateUpdated ||
 		ms.workflowTaskUpdated ||
-		(ms.stateMachineNode != nil && ms.stateMachineNode.Dirty())
+		(ms.stateMachineNode != nil && ms.stateMachineNode.Dirty()) ||
+		ms.chasmTree.IsDirty()
 }
 
 func (ms *MutableStateImpl) IsTransitionHistoryEnabled() bool {
@@ -5502,6 +5532,8 @@ func (ms *MutableStateImpl) CloseTransactionAsMutation(
 		DeleteSignalInfos:         ms.deleteSignalInfos,
 		UpsertSignalRequestedIDs:  ms.updateSignalRequestedIDs,
 		DeleteSignalRequestedIDs:  ms.deleteSignalRequestedIDs,
+		UpsertChasmNodes:          ms.chasmTreeMutation.UpdatedNodes,
+		DeleteChasmNodes:          ms.chasmTreeMutation.DeletedNodes,
 		NewBufferedEvents:         result.bufferEvents,
 		ClearBufferedEvents:       result.clearBuffer,
 
@@ -5543,6 +5575,7 @@ func (ms *MutableStateImpl) CloseTransactionAsSnapshot(
 		RequestCancelInfos:  ms.pendingRequestCancelInfoIDs,
 		SignalInfos:         ms.pendingSignalInfoIDs,
 		SignalRequestedIDs:  ms.pendingSignalRequestedIDs,
+		ChasmNodes:          ms.chasmTree.PendingNodes(),
 
 		Tasks: ms.InsertTasks,
 
@@ -5632,6 +5665,16 @@ func (ms *MutableStateImpl) closeTransaction(
 	workflowEventsSeq, eventBatches, bufferEvents, clearBuffer, err := ms.closeTransactionPrepareEvents(transactionPolicy)
 	if err != nil {
 		return closeTransactionResult{}, err
+	}
+
+	chasmTreeMutation, err := ms.chasmTree.CloseTransaction()
+	if err != nil {
+		return closeTransactionResult{}, err
+	}
+	if transactionPolicy == TransactionPolicyActive {
+		ms.chasmTreeMutation = chasmTreeMutation
+	} else if len(chasmTreeMutation.DeletedNodes) != 0 || len(chasmTreeMutation.UpdatedNodes) != 0 {
+		return closeTransactionResult{}, serviceerror.NewInternal("chasm tree mutation is not empty in passive transaction")
 	}
 
 	ms.closeTransactionTrackTombstones(transactionPolicy)
@@ -5948,6 +5991,13 @@ func (ms *MutableStateImpl) closeTransactionTrackTombstones(
 			},
 		})
 	}
+	for chasmNodePath := range ms.chasmTreeMutation.DeletedNodes {
+		tombstones = append(tombstones, &persistencespb.StateMachineTombstone{
+			StateMachineKey: &persistencespb.StateMachineTombstone_ChasmNodePath{
+				ChasmNodePath: chasmNodePath,
+			},
+		})
+	}
 	// Entire signalRequestedIDs will be synced if updated, so we don't track individual signalRequestedID tombstone.
 	// TODO: Track signalRequestedID tombstone when we support syncing partial signalRequestedIDs.
 	// This requires tracking the lastUpdateVersionedTransition for each signalRequestedID,
@@ -5993,6 +6043,10 @@ func (ms *MutableStateImpl) closeTransactionPrepareTasks(
 		return err
 	}
 
+	if err := ms.closeTransactionPrepareChasmTasks(); err != nil {
+		return err
+	}
+
 	ms.closeTransactionCollapseVisibilityTasks()
 
 	// TODO merge active & passive task generation
@@ -6005,6 +6059,84 @@ func (ms *MutableStateImpl) closeTransactionPrepareTasks(
 	}
 
 	return ms.closeTransactionPrepareReplicationTasks(transactionPolicy, eventBatches, clearBufferEvents)
+}
+
+func (ms *MutableStateImpl) closeTransactionPrepareChasmTasks() error {
+	// NOTE: no check on transaction policy. replication logic can use the following logic as well.
+
+	chasmTimersInDB := []time.Time{}
+
+	var newTasks []tasks.Task
+	minScheduledTime := time.Unix(0, math.MaxInt64)
+	for path, chasmNode := range ms.chasmTreeMutation.UpdatedNodes {
+		componentAttr := chasmNode.GetComponentAttributes()
+		if componentAttr == nil {
+			continue
+		}
+		componentTasks := componentAttr.GetTasks()
+		for idx := len(componentTasks) - 1; idx >= 0; idx-- {
+			task := componentTasks[idx]
+			if CompareVersionedTransition(
+				ms.versionedTransitionInDB,
+				task.VersionedTransition,
+			) >= 0 {
+				// tasks already created in previous transaction
+				break
+			}
+
+			scheduledTime := task.ScheduledTime.AsTime()
+			if scheduledTime.IsZero() {
+				chasmTask := &tasks.ChasmTask{
+					WorkflowKey: ms.GetWorkflowKey(),
+					Info: &persistencespb.ChasmTaskInfo{
+						Name:                       task.Name,
+						Blob:                       task.Blob,
+						ComponentPath:              path,
+						InitialVersionedTransition: componentAttr.InitialVersionedTransition,
+						VersionedTransition:        task.VersionedTransition,
+					},
+				}
+
+				if task.Destination != "" {
+					newTasks = append(newTasks, &tasks.ChasmOutboundTask{
+						ChasmTask:   *chasmTask,
+						Destination: task.Destination,
+					})
+				} else {
+					newTasks = append(newTasks, chasmTask)
+				}
+			} else if task.Destination != "" {
+				return serviceerror.NewInternal("outbound timer queue is not supported")
+			} else {
+				// no-op
+			}
+		}
+	}
+
+	// create next chasm timer
+	pendingNodes := ms.chasmTree.PendingNodes()
+	for _, node := range pendingNodes {
+		if attr := node.GetComponentAttributes(); attr != nil {
+			for _, task := range attr.Tasks {
+				scheduledTime := task.ScheduledTime.AsTime()
+				if !scheduledTime.IsZero() {
+					minScheduledTime = util.MinTime(minScheduledTime, scheduledTime)
+				}
+			}
+		}
+	}
+	if minScheduledTime.UnixNano() != math.MaxInt64 {
+		if len(chasmTimersInDB) == 0 || !chasmTimersInDB[len(chasmTimersInDB)-1].Before(minScheduledTime) {
+			chasmTimersInDB = append(chasmTimersInDB, minScheduledTime)
+			newTasks = append(newTasks, &tasks.ChasmTimerTask{
+				WorkflowKey:         ms.GetWorkflowKey(),
+				VisibilityTimestamp: minScheduledTime,
+			})
+		}
+	}
+
+	ms.AddTasks(newTasks...)
+	return nil
 }
 
 func (ms *MutableStateImpl) closeTransactionPrepareReplicationTasks(
@@ -6128,6 +6260,8 @@ func (ms *MutableStateImpl) cleanupTransaction() error {
 	ms.updateInfoUpdated = make(map[string]struct{})
 	ms.timerInfosUserDataUpdated = make(map[string]struct{})
 	ms.activityInfosUserDataUpdated = make(map[int64]struct{})
+
+	ms.chasmTreeMutation = &chasm.TreeMutation{}
 
 	ms.stateInDB = ms.executionState.State
 	ms.nextEventIDInDB = ms.GetNextEventID()

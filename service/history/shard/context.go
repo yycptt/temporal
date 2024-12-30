@@ -45,6 +45,7 @@ import (
 	"go.temporal.io/server/common/persistence/serialization"
 	"go.temporal.io/server/common/pingable"
 	"go.temporal.io/server/common/searchattribute"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/events"
 	"go.temporal.io/server/service/history/hsm"
@@ -121,6 +122,7 @@ type (
 		UnloadForOwnershipLost()
 
 		StateMachineRegistry() *hsm.Registry
+		ChasmRegistry() *chasm.Registry
 		GetFinalizer() *finalizer.Finalizer
 	}
 

@@ -70,6 +70,7 @@ import (
 	"go.temporal.io/server/common/rpc"
 	"go.temporal.io/server/common/searchattribute"
 	"go.temporal.io/server/common/util"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/events"
@@ -169,6 +170,7 @@ type (
 		acquireShardRetryPolicy backoff.RetryPolicy
 
 		stateMachineRegistry *hsm.Registry
+		chasmRegistry        *chasm.Registry
 	}
 
 	remoteClusterInfo struct {
@@ -2076,6 +2078,7 @@ func newContext(
 	taskCategoryRegistry tasks.TaskCategoryRegistry,
 	eventsCache events.Cache,
 	stateMachineRegistry *hsm.Registry,
+	chasmRegistry *chasm.Registry,
 ) (*ContextImpl, error) {
 	hostIdentity := hostInfoProvider.HostInfo().Identity()
 	sequenceID := atomic.AddInt64(&shardContextSequenceID, 1)
@@ -2124,6 +2127,7 @@ func newContext(
 		queueMetricEmitter:      sync.Once{},
 		ioSemaphore:             locks.NewPrioritySemaphore(ioConcurrency),
 		stateMachineRegistry:    stateMachineRegistry,
+		chasmRegistry:           chasmRegistry,
 	}
 	shardContext.taskKeyManager = newTaskKeyManager(
 		shardContext.taskCategoryRegistry,
@@ -2224,6 +2228,10 @@ func (s *ContextImpl) GetArchivalMetadata() archiver.ArchivalMetadata {
 
 func (s *ContextImpl) StateMachineRegistry() *hsm.Registry {
 	return s.stateMachineRegistry
+}
+
+func (s *ContextImpl) ChasmRegistry() *chasm.Registry {
+	return s.chasmRegistry
 }
 
 // newDetachedContext creates a detached context with the same deadline

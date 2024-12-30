@@ -258,7 +258,7 @@ func (c *ContextImpl) LoadMutableState(ctx context.Context, shardContext shard.C
 	}
 
 	if c.MutableState == nil {
-		response, err := getWorkflowExecution(ctx, shardContext, &persistence.GetWorkflowExecutionRequest{
+		response, err := GetWorkflowExecutionFromPersistence(ctx, shardContext, &persistence.GetWorkflowExecutionRequest{
 			ShardID:     shardContext.GetShardID(),
 			NamespaceID: c.workflowKey.NamespaceID,
 			WorkflowID:  c.workflowKey.WorkflowID,

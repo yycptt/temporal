@@ -55,6 +55,7 @@ import (
 	serialization "go.temporal.io/server/common/persistence/serialization"
 	pingable "go.temporal.io/server/common/pingable"
 	searchattribute "go.temporal.io/server/common/searchattribute"
+	chasm "go.temporal.io/server/service/history/chasm"
 	configs "go.temporal.io/server/service/history/configs"
 	events "go.temporal.io/server/service/history/events"
 	hsm "go.temporal.io/server/service/history/hsm"
@@ -140,6 +141,20 @@ func (m *MockContext) AssertOwnership(ctx context.Context) error {
 func (mr *MockContextMockRecorder) AssertOwnership(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertOwnership", reflect.TypeOf((*MockContext)(nil).AssertOwnership), ctx)
+}
+
+// ChasmRegistry mocks base method.
+func (m *MockContext) ChasmRegistry() *chasm.Registry {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChasmRegistry")
+	ret0, _ := ret[0].(*chasm.Registry)
+	return ret0
+}
+
+// ChasmRegistry indicates an expected call of ChasmRegistry.
+func (mr *MockContextMockRecorder) ChasmRegistry() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChasmRegistry", reflect.TypeOf((*MockContext)(nil).ChasmRegistry))
 }
 
 // ConflictResolveWorkflowExecution mocks base method.
@@ -856,6 +871,20 @@ func (m *MockControllableContext) AssertOwnership(ctx context.Context) error {
 func (mr *MockControllableContextMockRecorder) AssertOwnership(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AssertOwnership", reflect.TypeOf((*MockControllableContext)(nil).AssertOwnership), ctx)
+}
+
+// ChasmRegistry mocks base method.
+func (m *MockControllableContext) ChasmRegistry() *chasm.Registry {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChasmRegistry")
+	ret0, _ := ret[0].(*chasm.Registry)
+	return ret0
+}
+
+// ChasmRegistry indicates an expected call of ChasmRegistry.
+func (mr *MockControllableContextMockRecorder) ChasmRegistry() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChasmRegistry", reflect.TypeOf((*MockControllableContext)(nil).ChasmRegistry))
 }
 
 // ConflictResolveWorkflowExecution mocks base method.

@@ -75,6 +75,10 @@ enum TaskType {
 
     TASK_TYPE_REPLICATION_SYNC_HSM = 30;
     TASK_TYPE_REPLICATION_SYNC_VERSIONED_TRANSITION = 31;
+
+    TASK_TYPE_CHASM_TRANSFER = 32;
+    TASK_TYPE_CHASM_TIMER = 33;
+    TASK_TYPE_CHASM_OUTBOUND = 34;
 }
 
 // TaskPriority is only used for replication task as of May 2024

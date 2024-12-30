@@ -88,6 +88,9 @@ type (
 		TimerInfoToBlob(info *persistencespb.TimerInfo, encodingType enumspb.EncodingType) (*commonpb.DataBlob, error)
 		TimerInfoFromBlob(data *commonpb.DataBlob) (*persistencespb.TimerInfo, error)
 
+		ChasmNodeToBlob(info *persistencespb.ChasmNode, encodingType enumspb.EncodingType) (*commonpb.DataBlob, error)
+		ChasmNodeFromBlob(data *commonpb.DataBlob) (*persistencespb.ChasmNode, error)
+
 		TaskInfoToBlob(info *persistencespb.AllocatedTaskInfo, encodingType enumspb.EncodingType) (*commonpb.DataBlob, error)
 		TaskInfoFromBlob(data *commonpb.DataBlob) (*persistencespb.AllocatedTaskInfo, error)
 
@@ -487,6 +490,15 @@ func (t *serializerImpl) TimerInfoToBlob(info *persistencespb.TimerInfo, encodin
 
 func (t *serializerImpl) TimerInfoFromBlob(data *commonpb.DataBlob) (*persistencespb.TimerInfo, error) {
 	result := &persistencespb.TimerInfo{}
+	return result, ProtoDecodeBlob(data, result)
+}
+
+func (t *serializerImpl) ChasmNodeToBlob(info *persistencespb.ChasmNode, encodingType enumspb.EncodingType) (*commonpb.DataBlob, error) {
+	return ProtoEncodeBlob(info, encodingType)
+}
+
+func (t *serializerImpl) ChasmNodeFromBlob(data *commonpb.DataBlob) (*persistencespb.ChasmNode, error) {
+	result := &persistencespb.ChasmNode{}
 	return result, ProtoDecodeBlob(data, result)
 }
 

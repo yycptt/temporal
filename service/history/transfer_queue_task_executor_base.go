@@ -44,6 +44,7 @@ import (
 	"go.temporal.io/server/common/persistence/visibility/manager"
 	"go.temporal.io/server/common/resource"
 	"go.temporal.io/server/common/searchattribute"
+	"go.temporal.io/server/service/history/chasm"
 	"go.temporal.io/server/service/history/configs"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/service/history/deletemanager"
@@ -70,6 +71,7 @@ type (
 		currentClusterName       string
 		shardContext             shard.Context
 		registry                 namespace.Registry
+		chasmRegistry            *chasm.Registry
 		cache                    wcache.Cache
 		logger                   log.Logger
 		metricHandler            metrics.Handler
@@ -84,6 +86,7 @@ type (
 
 func newTransferQueueTaskExecutorBase(
 	shardContext shard.Context,
+	chasmRegistry *chasm.Registry,
 	workflowCache wcache.Cache,
 	logger log.Logger,
 	metricHandler metrics.Handler,
@@ -94,6 +97,7 @@ func newTransferQueueTaskExecutorBase(
 	return &transferQueueTaskExecutorBase{
 		currentClusterName:       shardContext.GetClusterMetadata().GetCurrentClusterName(),
 		shardContext:             shardContext,
+		chasmRegistry:            chasmRegistry,
 		registry:                 shardContext.GetNamespaceRegistry(),
 		cache:                    workflowCache,
 		logger:                   logger,

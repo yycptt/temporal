@@ -313,6 +313,8 @@ type (
 	SetWorkflowExecutionResponse struct {
 	}
 
+	UpsertASMResponse struct{}
+
 	// ListConcreteExecutionsRequest is request to ListConcreteExecutions
 	ListConcreteExecutionsRequest struct {
 		ShardID   int32
@@ -354,6 +356,8 @@ type (
 		DeleteRequestCancelInfos  map[int64]struct{}
 		UpsertSignalInfos         map[int64]*persistencespb.SignalInfo
 		DeleteSignalInfos         map[int64]struct{}
+		UpsertChasmNodes          map[string]*persistencespb.ChasmNode
+		DeleteChasmNodes          map[string]struct{}
 		UpsertSignalRequestedIDs  map[string]struct{}
 		DeleteSignalRequestedIDs  map[string]struct{}
 		NewBufferedEvents         []*historypb.HistoryEvent
@@ -379,6 +383,7 @@ type (
 		ChildExecutionInfos map[int64]*persistencespb.ChildExecutionInfo
 		RequestCancelInfos  map[int64]*persistencespb.RequestCancelInfo
 		SignalInfos         map[int64]*persistencespb.SignalInfo
+		ChasmNodes          map[string]*persistencespb.ChasmNode
 		SignalRequestedIDs  map[string]struct{}
 
 		Tasks map[tasks.Category][]tasks.Task

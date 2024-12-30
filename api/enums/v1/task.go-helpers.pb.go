@@ -79,6 +79,9 @@ var (
 		"WorkflowExecutionTimeout":           29,
 		"ReplicationSyncHsm":                 30,
 		"ReplicationSyncVersionedTransition": 31,
+		"ChasmTransfer":                      32,
+		"ChasmTimer":                         33,
+		"ChasmOutbound":                      34,
 	}
 )
 

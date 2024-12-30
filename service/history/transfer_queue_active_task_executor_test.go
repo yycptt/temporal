@@ -238,6 +238,7 @@ func (s *transferQueueActiveTaskExecutorSuite) SetupTest() {
 
 	s.transferQueueActiveTaskExecutor = newTransferQueueActiveTaskExecutor(
 		s.mockShard,
+		nil, // TODO chasm: pass in registry
 		s.workflowCache,
 		h.sdkClientFactory,
 		s.logger,

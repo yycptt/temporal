@@ -127,6 +127,7 @@ func (f *transferQueueFactory) CreateQueue(
 
 	activeExecutor := newTransferQueueActiveTaskExecutor(
 		shardContext,
+		f.ChasmRegistry,
 		workflowCache,
 		f.SdkClientFactory,
 		logger,
@@ -139,6 +140,7 @@ func (f *transferQueueFactory) CreateQueue(
 
 	standbyExecutor := newTransferQueueStandbyTaskExecutor(
 		shardContext,
+		f.ChasmRegistry,
 		workflowCache,
 		logger,
 		f.MetricsHandler,
