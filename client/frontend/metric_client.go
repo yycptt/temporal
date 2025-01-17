@@ -73,7 +73,7 @@ func (c *metricClient) finishMetricsRecording(
 	err error,
 ) {
 	if err != nil {
-		switch err.(type) {
+		switch err := err.(type) {
 		case *serviceerror.Canceled,
 			*serviceerror.DeadlineExceeded,
 			*serviceerror.NotFound,
@@ -82,6 +82,12 @@ func (c *metricClient) finishMetricsRecording(
 			*serviceerror.WorkflowNotReady,
 			*serviceerror.WorkflowExecutionAlreadyStarted:
 			// noop - not interest and too many logs
+		case *serviceerror.ResourceExhausted:
+			metrics.ClientErrResourceExhaustedCounter.With(handler).Record(
+				1,
+				metrics.ResourceExhaustedCauseTag(err.Cause),
+				metrics.ResourceExhaustedScopeTag(err.Scope),
+			)
 		default:
 			c.throttledLogger.Info("frontend client encountered error", tag.Error(err), tag.ServiceErrorType(err))
 		}
