@@ -1,8 +1,6 @@
 // The MIT License
 //
-// Copyright (c) 2020 Temporal Technologies Inc.  All rights reserved.
-//
-// Copyright (c) 2020 Uber Technologies, Inc.
+// Copyright (c) 2025 Temporal Technologies Inc.  All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -60,4 +58,39 @@ type MutableContext interface {
 	// If we provide this method, then the method on the engine doesn't need to
 	// return a Ref
 	// NewRef(Component) (ComponentRef, bool)
+}
+
+type (
+	ContextImpl struct {
+		ctx context.Context
+
+		*Node
+	}
+
+	MutableContextImpl struct {
+		*ContextImpl
+	}
+)
+
+func NewContext(
+	ctx context.Context,
+	root *Node,
+) *ContextImpl {
+	return &ContextImpl{
+		ctx:  ctx,
+		Node: root,
+	}
+}
+
+func (c *ContextImpl) getContext() context.Context {
+	return c.ctx
+}
+
+func NewMutableContext(
+	ctx context.Context,
+	root *Node,
+) *MutableContextImpl {
+	return &MutableContextImpl{
+		ContextImpl: NewContext(ctx, root),
+	}
 }
