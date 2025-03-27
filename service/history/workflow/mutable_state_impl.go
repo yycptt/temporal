@@ -58,6 +58,7 @@ import (
 	tokenspb "go.temporal.io/server/api/token/v1"
 	workflowspb "go.temporal.io/server/api/workflow/v1"
 	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/chasm/lib/workflow"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/clock"
@@ -305,9 +306,6 @@ func NewMutableState(
 		pendingSignalRequestedIDs: make(map[string]struct{}),
 		deleteSignalRequestedIDs:  make(map[string]struct{}),
 
-		// TODO: wire up with real chasm tree implementation
-		chasmTree: &noopChasmTree{},
-
 		approximateSize:              0,
 		totalTombstones:              0,
 		currentVersion:               namespaceEntry.FailoverVersion(),
@@ -383,6 +381,13 @@ func NewMutableState(
 	s.workflowTaskManager = newWorkflowTaskStateMachine(s, s.metricsHandler)
 
 	s.mustInitHSM()
+
+	s.chasmTree = chasm.NewEmptyTree(
+		shard.ChasmRegistry(),
+		shard.GetTimeSource(),
+		s,
+		nil, // TODO: write a path encoder
+	)
 
 	return s
 }
@@ -462,6 +467,13 @@ func NewMutableStateFromDB(
 
 	for _, tombstoneBatch := range dbRecord.ExecutionInfo.SubStateMachineTombstoneBatches {
 		mutableState.totalTombstones += len(tombstoneBatch.StateMachineTombstones)
+	}
+
+	if len(dbRecord.ChasmNodes) == 0 {
+		// Must be a workflow
+		mutableState.initWorkflowChasmTree()
+		mutableState.UpdateMemo(dbRecord.ExecutionInfo.Memo)
+		dbRecord.ExecutionInfo.Memo = nil
 	}
 
 	mutableState.approximateSize += dbRecord.ExecutionState.Size() - mutableState.executionState.Size()
@@ -2505,9 +2517,6 @@ func (ms *MutableStateImpl) ApplyWorkflowExecutionStartedEvent(
 		ms.namespaceEntry.Retention(),
 	)
 
-	if event.Memo != nil {
-		ms.executionInfo.Memo = event.Memo.GetFields()
-	}
 	if event.SearchAttributes != nil {
 		ms.executionInfo.SearchAttributes = event.SearchAttributes.GetIndexedFields()
 	}
@@ -2553,8 +2562,25 @@ func (ms *MutableStateImpl) ApplyWorkflowExecutionStartedEvent(
 	ms.approximateSize += ms.executionInfo.Size()
 	ms.approximateSize += ms.executionState.Size()
 
+	// TODO: init workflow chasm tree and update memo
+	ms.initWorkflowChasmTree()
+	if event.Memo != nil {
+		if err := ms.UpdateMemo(event.Memo.Fields); err != nil {
+			return err
+		}
+	}
+
 	ms.writeEventToCache(startEvent)
 	return nil
+}
+
+func (ms *MutableStateImpl) initWorkflowChasmTree() {
+	chasmContext := chasm.NewMutableContextImpl(
+		context.TODO(),
+		ms.chasmTree,
+	)
+	workflowComponent := workflow.New(chasmContext)
+	ms.chasmTree.InitRoot(workflowComponent)
 }
 
 func (ms *MutableStateImpl) addCompletionCallbacks(
@@ -4214,13 +4240,17 @@ func (ms *MutableStateImpl) AddWorkflowPropertiesModifiedEvent(
 }
 
 func (ms *MutableStateImpl) ApplyWorkflowPropertiesModifiedEvent(
+	// ctx context.Context,
 	event *historypb.HistoryEvent,
 ) {
 	attr := event.GetWorkflowPropertiesModifiedEventAttributes()
 	if attr.UpsertedMemo != nil {
 		upsertMemo := attr.GetUpsertedMemo().GetFields()
 		ms.approximateSize -= ms.executionInfo.Size()
-		ms.updateMemo(upsertMemo)
+		_ = ms.UpdateMemo(upsertMemo)
+		// if err := ms.UpdateMemo(upsertMemo); err != nil {
+		// 	return err
+		// }
 		ms.approximateSize += ms.executionInfo.Size()
 	}
 }
@@ -5948,14 +5978,53 @@ func (ms *MutableStateImpl) updateSearchAttributes(
 	ms.visibilityUpdated = true
 }
 
-func (ms *MutableStateImpl) updateMemo(
+func (ms *MutableStateImpl) UpdateMemo(
 	updatedMemo map[string]*commonpb.Payload,
-) {
-	ms.executionInfo.Memo = payload.MergeMapOfPayload(
-		ms.executionInfo.Memo,
-		updatedMemo,
-	)
+) error {
+
+	chasmContext := chasm.NewMutableContextImpl(context.TODO(), ms.chasmTree)
+	workflowComponent, err := ms.chasmWorkflowComponent(chasmContext)
+	if err != nil {
+		return err
+	}
+
+	if err := workflowComponent.UpsertMemo(chasmContext, &commonpb.Memo{
+		Fields: updatedMemo,
+	}); err != nil {
+		return err
+	}
+
 	ms.visibilityUpdated = true
+	return nil
+}
+
+func (ms *MutableStateImpl) GetMemo() (map[string]*commonpb.Payload, error) {
+	chasmContext := chasm.NewContextImpl(context.TODO(), ms.chasmTree)
+	workflowComponent, err := ms.chasmWorkflowComponent(chasmContext)
+	if err != nil {
+		return nil, err
+	}
+
+	memo, err := workflowComponent.GetMemo(chasmContext)
+	if err != nil {
+		return nil, err
+	}
+
+	return memo.Fields, nil
+}
+
+func (ms *MutableStateImpl) chasmWorkflowComponent(
+	chasmContext chasm.Context,
+) (*workflow.Workflow, error) {
+	component, err := ms.chasmTree.Component(
+		chasmContext,
+		chasm.ComponentRef{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return component.(*workflow.Workflow), nil
 }
 
 type closeTransactionResult struct {

@@ -2207,6 +2207,21 @@ func (mr *MockMutableStateMockRecorder) GetLastWriteVersion() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastWriteVersion", reflect.TypeOf((*MockMutableState)(nil).GetLastWriteVersion))
 }
 
+// GetMemo mocks base method.
+func (m *MockMutableState) GetMemo() (map[string]*common.Payload, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMemo")
+	ret0, _ := ret[0].(map[string]*common.Payload)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMemo indicates an expected call of GetMemo.
+func (mr *MockMutableStateMockRecorder) GetMemo() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMemo", reflect.TypeOf((*MockMutableState)(nil).GetMemo))
+}
+
 // GetMostRecentWorkerVersionStamp mocks base method.
 func (m *MockMutableState) GetMostRecentWorkerVersionStamp() *common.WorkerVersionStamp {
 	m.ctrl.T.Helper()
@@ -3337,6 +3352,20 @@ func (m *MockMutableState) UpdateDuplicatedResource(resourceDedupKey definition.
 func (mr *MockMutableStateMockRecorder) UpdateDuplicatedResource(resourceDedupKey any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDuplicatedResource", reflect.TypeOf((*MockMutableState)(nil).UpdateDuplicatedResource), resourceDedupKey)
+}
+
+// UpdateMemo mocks base method.
+func (m *MockMutableState) UpdateMemo(arg0 map[string]*common.Payload) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateMemo", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateMemo indicates an expected call of UpdateMemo.
+func (mr *MockMutableStateMockRecorder) UpdateMemo(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateMemo", reflect.TypeOf((*MockMutableState)(nil).UpdateMemo), arg0)
 }
 
 // UpdateResetRunID mocks base method.

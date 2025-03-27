@@ -61,3 +61,42 @@ type MutableContext interface {
 	// return a Ref
 	// NewRef(Component) (ComponentRef, bool)
 }
+
+type ContextImpl struct {
+	ctx context.Context
+
+	ContextBackend
+}
+
+type MutableContextImpl struct {
+	*ContextImpl
+}
+
+type ContextBackend interface {
+	Ref(Component) (ComponentRef, bool)
+	Now(Component) time.Time
+	AddTask(Component, TaskAttributes, any) error
+}
+
+func NewContextImpl(
+	ctx context.Context,
+	backend ContextBackend,
+) *ContextImpl {
+	return &ContextImpl{
+		ctx:            ctx,
+		ContextBackend: backend,
+	}
+}
+
+func (c *ContextImpl) getContext() context.Context {
+	return c.ctx
+}
+
+func NewMutableContextImpl(
+	ctx context.Context,
+	backend ContextBackend,
+) *MutableContextImpl {
+	return &MutableContextImpl{
+		ContextImpl: NewContextImpl(ctx, backend),
+	}
+}

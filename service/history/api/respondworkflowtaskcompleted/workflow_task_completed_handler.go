@@ -1271,9 +1271,14 @@ func (handler *workflowTaskCompletedHandler) handleCommandModifyWorkflowProperti
 	}
 
 	// new memo size limit check
+	memo, err := handler.mutableState.GetMemo()
+	if err != nil {
+		return nil, err
+	}
+
 	err = handler.sizeLimitChecker.checkIfMemoSizeExceedsLimit(
 		&commonpb.Memo{
-			Fields: payload.MergeMapOfPayload(executionInfo.Memo, attr.GetUpsertedMemo().GetFields()),
+			Fields: payload.MergeMapOfPayload(memo, attr.GetUpsertedMemo().GetFields()),
 		},
 		metrics.CommandTypeTag(enumspb.COMMAND_TYPE_MODIFY_WORKFLOW_PROPERTIES.String()),
 		"ModifyWorkflowPropertiesCommandAttributes. Memo exceeds size limit.",

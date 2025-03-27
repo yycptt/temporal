@@ -211,6 +211,8 @@ type (
 		GetAssignedBuildId() string
 		GetInheritedBuildId() string
 		GetMostRecentWorkerVersionStamp() *commonpb.WorkerVersionStamp
+		GetMemo() (map[string]*commonpb.Payload, error)
+		UpdateMemo(map[string]*commonpb.Payload) error
 		IsTransientWorkflowTask() bool
 		ClearTransientWorkflowTask() error
 		HasBufferedEvents() bool

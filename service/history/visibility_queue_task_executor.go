@@ -175,7 +175,10 @@ func (t *visibilityQueueTaskExecutor) processStartExecution(
 		return err
 	}
 
-	requestBase := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	requestBase, err := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	if err != nil {
+		return err
+	}
 
 	// NOTE: do not access anything related mutable state after this lock release
 	// release the context lock since we no longer need mutable state and
@@ -217,7 +220,10 @@ func (t *visibilityQueueTaskExecutor) processUpsertExecution(
 		return nil
 	}
 
-	requestBase := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	requestBase, err := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	if err != nil {
+		return err
+	}
 
 	// NOTE: do not access anything related mutable state after this lock release
 	// release the context lock since we no longer need mutable state and
@@ -280,7 +286,10 @@ func (t *visibilityQueueTaskExecutor) processCloseExecution(
 	executionInfo := mutableState.GetExecutionInfo()
 	stateTransitionCount := executionInfo.GetStateTransitionCount()
 	historySizeBytes := executionInfo.GetExecutionStats().GetHistorySize()
-	requestBase := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	requestBase, err := t.getVisibilityRequestBase(task, namespaceEntry, mutableState)
+	if err != nil {
+		return err
+	}
 
 	// NOTE: do not access anything related mutable state after this lock release
 	// release the context lock since we no longer need mutable state and
@@ -363,12 +372,18 @@ func (t *visibilityQueueTaskExecutor) getVisibilityRequestBase(
 	task tasks.Task,
 	namespaceEntry *namespace.Namespace,
 	mutableState historyi.MutableState,
-) *manager.VisibilityRequestBase {
+) (*manager.VisibilityRequestBase, error) {
+
+	memoMap, err := mutableState.GetMemo()
+	if err != nil {
+		return nil, err
+	}
+
 	var (
 		executionInfo    = mutableState.GetExecutionInfo()
 		startTime        = timestamp.TimeValue(mutableState.GetExecutionState().GetStartTime())
 		executionTime    = timestamp.TimeValue(executionInfo.GetExecutionTime())
-		visibilityMemo   = getWorkflowMemo(copyMapPayload(executionInfo.Memo))
+		visibilityMemo   = getWorkflowMemo(copyMapPayload(memoMap))
 		searchAttributes = getSearchAttributes(copyMapPayload(executionInfo.SearchAttributes))
 	)
 
@@ -404,7 +419,7 @@ func (t *visibilityQueueTaskExecutor) getVisibilityRequestBase(
 			WorkflowId: executionInfo.RootWorkflowId,
 			RunId:      executionInfo.RootRunId,
 		},
-	}
+	}, nil
 }
 
 func (t *visibilityQueueTaskExecutor) isCloseExecutionVisibilityTaskPending(task *tasks.DeleteExecutionVisibilityTask) bool {
@@ -457,8 +472,10 @@ func (t *visibilityQueueTaskExecutor) cleanupExecutionInfo(
 		return err
 	}
 
+	if err := mutableState.UpdateMemo(nil); err != nil {
+		return err
+	}
 	executionInfo := mutableState.GetExecutionInfo()
-	executionInfo.Memo = nil
 	executionInfo.SearchAttributes = nil
 	executionInfo.RelocatableAttributesRemoved = true
 	return weContext.SetWorkflowExecution(ctx, t.shardContext)

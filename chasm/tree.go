@@ -153,6 +153,21 @@ func NewEmptyTree(
 	return root
 }
 
+func (n *Node) InitRoot(
+	c Component,
+) {
+	if !softassert.That(
+		n.logger,
+		n.parent == nil && n.value == nil && n.persistence == nil,
+		"chasm.InitRootComponent() should only be called on an empty tree",
+	) {
+		panic("chasm.InitRootComponent() called on non-empty tree")
+	}
+
+	n.value = c
+	// n.valueSynced = false
+}
+
 // Component retrieves a component from the tree rooted at node n
 // using the provided component reference
 // It also performs consistency, access rule, and task validation checks

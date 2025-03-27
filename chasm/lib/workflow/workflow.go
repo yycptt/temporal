@@ -1,6 +1,8 @@
 // The MIT License
 //
-// Copyright (c) 2025 Temporal Technologies Inc.  All rights reserved.
+// Copyright (c) 2020 Temporal Technologies Inc.  All rights reserved.
+//
+// Copyright (c) 2020 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,51 +25,60 @@
 package workflow
 
 import (
-	"time"
-
+	commonpb "go.temporal.io/api/common/v1"
 	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/chasm"
-	historyi "go.temporal.io/server/service/history/interfaces"
+	"go.temporal.io/server/common"
+	"go.temporal.io/server/common/payload"
 )
 
-var _ historyi.ChasmTree = (*noopChasmTree)(nil)
+var _ chasm.Component = (*Workflow)(nil)
 
-type noopChasmTree struct{}
+type Workflow struct {
+	chasm.UnimplementedComponent
 
-func (*noopChasmTree) InitRoot(chasm.Component) {}
+	Data *persistencespb.Workflow
 
-func (*noopChasmTree) CloseTransaction() (chasm.NodesMutation, error) {
-	return chasm.NodesMutation{}, nil
+	Memo chasm.Field[*commonpb.Memo]
+	// Memo chasm.Collection[*commonpb.Payload]
 }
 
-func (*noopChasmTree) Snapshot(*persistencespb.VersionedTransition) chasm.NodesSnapshot {
-	return chasm.NodesSnapshot{}
+func New(
+	mutableContext chasm.MutableContext,
+) *Workflow {
+	return &Workflow{
+		Data: &persistencespb.Workflow{},
+	}
 }
 
-func (*noopChasmTree) ApplyMutation(chasm.NodesMutation) error {
+func (w *Workflow) LifecycleState() chasm.LifecycleState {
+	panic("not implemented")
+}
+
+func (w *Workflow) UpsertMemo(
+	mutableContext chasm.MutableContext,
+	updatedMemo *commonpb.Memo,
+) error {
+	memoValue, err := w.Memo.Get(mutableContext)
+	if err != nil {
+		return err
+	}
+
+	if memoValue == nil {
+		w.Memo = *chasm.NewDataField(mutableContext, common.CloneProto(updatedMemo))
+		return nil
+	}
+
+	memoValue.Fields = payload.MergeMapOfPayload(
+		updatedMemo.Fields,
+		memoValue.Fields,
+	)
+
 	return nil
 }
 
-func (*noopChasmTree) ApplySnapshot(chasm.NodesSnapshot) error {
-	return nil
-}
-
-func (*noopChasmTree) IsDirty() bool {
-	return false
-}
-
-func (*noopChasmTree) Component(chasm.Context, chasm.ComponentRef) (chasm.Component, error) {
-	return nil, nil
-}
-
-func (*noopChasmTree) Ref(chasm.Component) (chasm.ComponentRef, bool) {
-	return chasm.ComponentRef{}, false
-}
-
-func (*noopChasmTree) Now(chasm.Component) time.Time {
-	return time.Time{}
-}
-
-func (*noopChasmTree) AddTask(chasm.Component, chasm.TaskAttributes, any) error {
-	return nil
+func (w *Workflow) GetMemo(
+	context chasm.Context,
+) (*commonpb.Memo, error) {
+	return w.Memo.Get(context)
 }

@@ -35,6 +35,7 @@ package interfaces
 
 import (
 	reflect "reflect"
+	time "time"
 
 	persistence "go.temporal.io/server/api/persistence/v1"
 	chasm "go.temporal.io/server/chasm"
@@ -62,6 +63,20 @@ func NewMockChasmTree(ctrl *gomock.Controller) *MockChasmTree {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockChasmTree) EXPECT() *MockChasmTreeMockRecorder {
 	return m.recorder
+}
+
+// AddTask mocks base method.
+func (m *MockChasmTree) AddTask(arg0 chasm.Component, arg1 chasm.TaskAttributes, arg2 any) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddTask", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddTask indicates an expected call of AddTask.
+func (mr *MockChasmTreeMockRecorder) AddTask(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTask", reflect.TypeOf((*MockChasmTree)(nil).AddTask), arg0, arg1, arg2)
 }
 
 // ApplyMutation mocks base method.
@@ -107,6 +122,33 @@ func (mr *MockChasmTreeMockRecorder) CloseTransaction() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseTransaction", reflect.TypeOf((*MockChasmTree)(nil).CloseTransaction))
 }
 
+// Component mocks base method.
+func (m *MockChasmTree) Component(arg0 chasm.Context, arg1 chasm.ComponentRef) (chasm.Component, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Component", arg0, arg1)
+	ret0, _ := ret[0].(chasm.Component)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Component indicates an expected call of Component.
+func (mr *MockChasmTreeMockRecorder) Component(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Component", reflect.TypeOf((*MockChasmTree)(nil).Component), arg0, arg1)
+}
+
+// InitRoot mocks base method.
+func (m *MockChasmTree) InitRoot(arg0 chasm.Component) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "InitRoot", arg0)
+}
+
+// InitRoot indicates an expected call of InitRoot.
+func (mr *MockChasmTreeMockRecorder) InitRoot(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InitRoot", reflect.TypeOf((*MockChasmTree)(nil).InitRoot), arg0)
+}
+
 // IsDirty mocks base method.
 func (m *MockChasmTree) IsDirty() bool {
 	m.ctrl.T.Helper()
@@ -119,6 +161,35 @@ func (m *MockChasmTree) IsDirty() bool {
 func (mr *MockChasmTreeMockRecorder) IsDirty() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDirty", reflect.TypeOf((*MockChasmTree)(nil).IsDirty))
+}
+
+// Now mocks base method.
+func (m *MockChasmTree) Now(arg0 chasm.Component) time.Time {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Now", arg0)
+	ret0, _ := ret[0].(time.Time)
+	return ret0
+}
+
+// Now indicates an expected call of Now.
+func (mr *MockChasmTreeMockRecorder) Now(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Now", reflect.TypeOf((*MockChasmTree)(nil).Now), arg0)
+}
+
+// Ref mocks base method.
+func (m *MockChasmTree) Ref(arg0 chasm.Component) (chasm.ComponentRef, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Ref", arg0)
+	ret0, _ := ret[0].(chasm.ComponentRef)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// Ref indicates an expected call of Ref.
+func (mr *MockChasmTreeMockRecorder) Ref(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ref", reflect.TypeOf((*MockChasmTree)(nil).Ref), arg0)
 }
 
 // Snapshot mocks base method.

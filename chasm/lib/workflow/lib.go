@@ -1,6 +1,8 @@
 // The MIT License
 //
-// Copyright (c) 2025 Temporal Technologies Inc.  All rights reserved.
+// Copyright (c) 2020 Temporal Technologies Inc.  All rights reserved.
+//
+// Copyright (c) 2020 Uber Technologies, Inc.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,29 +22,28 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-//go:generate mockgen -copyright_file ../../../LICENSE -package $GOPACKAGE -source $GOFILE -destination chasm_tree_mock.go
+package workflow
 
-package interfaces
+import "go.temporal.io/server/chasm"
 
-import (
-	"time"
+const LibraryName = "workflow"
 
-	persistencespb "go.temporal.io/server/api/persistence/v1"
-	"go.temporal.io/server/chasm"
+type (
+	Library struct {
+		chasm.UnimplementedLibrary
+	}
 )
 
-var _ ChasmTree = (*chasm.Node)(nil)
+func (*Library) Name() string {
+	return LibraryName
+}
 
-type ChasmTree interface {
-	InitRoot(chasm.Component)
-	CloseTransaction() (chasm.NodesMutation, error)
-	Snapshot(*persistencespb.VersionedTransition) chasm.NodesSnapshot
-	ApplyMutation(chasm.NodesMutation) error
-	ApplySnapshot(chasm.NodesSnapshot) error
-	IsDirty() bool
+func (*Library) Components() []*chasm.RegistrableComponent {
+	return []*chasm.RegistrableComponent{
+		chasm.NewRegistrableComponent[*Workflow](""),
+	}
+}
 
-	Component(chasm.Context, chasm.ComponentRef) (chasm.Component, error)
-	Ref(chasm.Component) (chasm.ComponentRef, bool)
-	Now(chasm.Component) time.Time
-	AddTask(chasm.Component, chasm.TaskAttributes, any) error
+func (*Library) Tasks() []*chasm.RegistrableTask {
+	return nil
 }

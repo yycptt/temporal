@@ -769,3 +769,9 @@ message ResetChildInfo {
     // If true, the parent workflow should terminate the child before starting it.
     bool should_terminate_and_start = 1;
 }
+
+message Memo {
+    map<string, temporal.api.common.v1.Payload> fields = 1;
+}
+
+message Workflow {}
