@@ -522,6 +522,50 @@ func (x *ChasmTaskInfo) GetData() *v1.DataBlob {
 	return nil
 }
 
+type VisibilityState struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	TransitionCount int64                  `protobuf:"varint,1,opt,name=transition_count,json=transitionCount,proto3" json:"transition_count,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *VisibilityState) Reset() {
+	*x = VisibilityState{}
+	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VisibilityState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VisibilityState) ProtoMessage() {}
+
+func (x *VisibilityState) ProtoReflect() protoreflect.Message {
+	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VisibilityState.ProtoReflect.Descriptor instead.
+func (*VisibilityState) Descriptor() ([]byte, []int) {
+	return file_temporal_server_api_persistence_v1_chasm_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *VisibilityState) GetTransitionCount() int64 {
+	if x != nil {
+		return x.TransitionCount
+	}
+	return 0
+}
+
 type ChasmComponentAttributes_Task struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Fully qualified type name of a registered task.
@@ -545,7 +589,7 @@ type ChasmComponentAttributes_Task struct {
 
 func (x *ChasmComponentAttributes_Task) Reset() {
 	*x = ChasmComponentAttributes_Task{}
-	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[8]
+	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -557,7 +601,7 @@ func (x *ChasmComponentAttributes_Task) String() string {
 func (*ChasmComponentAttributes_Task) ProtoMessage() {}
 
 func (x *ChasmComponentAttributes_Task) ProtoReflect() protoreflect.Message {
-	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[8]
+	mi := &file_temporal_server_api_persistence_v1_chasm_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -663,7 +707,9 @@ const file_temporal_server_api_persistence_v1_chasm_proto_rawDesc = "" +
 	"\rChasmTaskInfo\x12G\n" +
 	"\x03ref\x18\x01 \x01(\v25.temporal.server.api.persistence.v1.ChasmComponentRefR\x03ref\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x124\n" +
-	"\x04data\x18\x03 \x01(\v2 .temporal.api.common.v1.DataBlobR\x04dataB6Z4go.temporal.io/server/api/persistence/v1;persistenceb\x06proto3"
+	"\x04data\x18\x03 \x01(\v2 .temporal.api.common.v1.DataBlobR\x04data\"<\n" +
+	"\x0fVisibilityState\x12)\n" +
+	"\x10transition_count\x18\x01 \x01(\x03R\x0ftransitionCountB6Z4go.temporal.io/server/api/persistence/v1;persistenceb\x06proto3"
 
 var (
 	file_temporal_server_api_persistence_v1_chasm_proto_rawDescOnce sync.Once
@@ -677,7 +723,7 @@ func file_temporal_server_api_persistence_v1_chasm_proto_rawDescGZIP() []byte {
 	return file_temporal_server_api_persistence_v1_chasm_proto_rawDescData
 }
 
-var file_temporal_server_api_persistence_v1_chasm_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_temporal_server_api_persistence_v1_chasm_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_temporal_server_api_persistence_v1_chasm_proto_goTypes = []any{
 	(*ChasmNode)(nil),                     // 0: temporal.server.api.persistence.v1.ChasmNode
 	(*ChasmNodeMetadata)(nil),             // 1: temporal.server.api.persistence.v1.ChasmNodeMetadata
@@ -687,29 +733,30 @@ var file_temporal_server_api_persistence_v1_chasm_proto_goTypes = []any{
 	(*ChasmPointerAttributes)(nil),        // 5: temporal.server.api.persistence.v1.ChasmPointerAttributes
 	(*ChasmComponentRef)(nil),             // 6: temporal.server.api.persistence.v1.ChasmComponentRef
 	(*ChasmTaskInfo)(nil),                 // 7: temporal.server.api.persistence.v1.ChasmTaskInfo
-	(*ChasmComponentAttributes_Task)(nil), // 8: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
-	(*v1.DataBlob)(nil),                   // 9: temporal.api.common.v1.DataBlob
-	(*VersionedTransition)(nil),           // 10: temporal.server.api.persistence.v1.VersionedTransition
-	(*timestamppb.Timestamp)(nil),         // 11: google.protobuf.Timestamp
+	(*VisibilityState)(nil),               // 8: temporal.server.api.persistence.v1.VisibilityState
+	(*ChasmComponentAttributes_Task)(nil), // 9: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
+	(*v1.DataBlob)(nil),                   // 10: temporal.api.common.v1.DataBlob
+	(*VersionedTransition)(nil),           // 11: temporal.server.api.persistence.v1.VersionedTransition
+	(*timestamppb.Timestamp)(nil),         // 12: google.protobuf.Timestamp
 }
 var file_temporal_server_api_persistence_v1_chasm_proto_depIdxs = []int32{
 	1,  // 0: temporal.server.api.persistence.v1.ChasmNode.metadata:type_name -> temporal.server.api.persistence.v1.ChasmNodeMetadata
-	9,  // 1: temporal.server.api.persistence.v1.ChasmNode.data:type_name -> temporal.api.common.v1.DataBlob
-	10, // 2: temporal.server.api.persistence.v1.ChasmNodeMetadata.initial_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
-	10, // 3: temporal.server.api.persistence.v1.ChasmNodeMetadata.last_update_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
+	10, // 1: temporal.server.api.persistence.v1.ChasmNode.data:type_name -> temporal.api.common.v1.DataBlob
+	11, // 2: temporal.server.api.persistence.v1.ChasmNodeMetadata.initial_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
+	11, // 3: temporal.server.api.persistence.v1.ChasmNodeMetadata.last_update_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
 	2,  // 4: temporal.server.api.persistence.v1.ChasmNodeMetadata.component_attributes:type_name -> temporal.server.api.persistence.v1.ChasmComponentAttributes
 	3,  // 5: temporal.server.api.persistence.v1.ChasmNodeMetadata.data_attributes:type_name -> temporal.server.api.persistence.v1.ChasmDataAttributes
 	4,  // 6: temporal.server.api.persistence.v1.ChasmNodeMetadata.collection_attributes:type_name -> temporal.server.api.persistence.v1.ChasmCollectionAttributes
 	5,  // 7: temporal.server.api.persistence.v1.ChasmNodeMetadata.pointer_attributes:type_name -> temporal.server.api.persistence.v1.ChasmPointerAttributes
-	8,  // 8: temporal.server.api.persistence.v1.ChasmComponentAttributes.side_effect_tasks:type_name -> temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
-	8,  // 9: temporal.server.api.persistence.v1.ChasmComponentAttributes.pure_tasks:type_name -> temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
-	10, // 10: temporal.server.api.persistence.v1.ChasmComponentRef.component_initial_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
-	10, // 11: temporal.server.api.persistence.v1.ChasmComponentRef.component_last_update_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
+	9,  // 8: temporal.server.api.persistence.v1.ChasmComponentAttributes.side_effect_tasks:type_name -> temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
+	9,  // 9: temporal.server.api.persistence.v1.ChasmComponentAttributes.pure_tasks:type_name -> temporal.server.api.persistence.v1.ChasmComponentAttributes.Task
+	11, // 10: temporal.server.api.persistence.v1.ChasmComponentRef.component_initial_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
+	11, // 11: temporal.server.api.persistence.v1.ChasmComponentRef.component_last_update_versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
 	6,  // 12: temporal.server.api.persistence.v1.ChasmTaskInfo.ref:type_name -> temporal.server.api.persistence.v1.ChasmComponentRef
-	9,  // 13: temporal.server.api.persistence.v1.ChasmTaskInfo.data:type_name -> temporal.api.common.v1.DataBlob
-	11, // 14: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.scheduled_time:type_name -> google.protobuf.Timestamp
-	9,  // 15: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.data:type_name -> temporal.api.common.v1.DataBlob
-	10, // 16: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
+	10, // 13: temporal.server.api.persistence.v1.ChasmTaskInfo.data:type_name -> temporal.api.common.v1.DataBlob
+	12, // 14: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.scheduled_time:type_name -> google.protobuf.Timestamp
+	10, // 15: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.data:type_name -> temporal.api.common.v1.DataBlob
+	11, // 16: temporal.server.api.persistence.v1.ChasmComponentAttributes.Task.versioned_transition:type_name -> temporal.server.api.persistence.v1.VersionedTransition
 	17, // [17:17] is the sub-list for method output_type
 	17, // [17:17] is the sub-list for method input_type
 	17, // [17:17] is the sub-list for extension type_name
@@ -735,7 +782,7 @@ func file_temporal_server_api_persistence_v1_chasm_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_temporal_server_api_persistence_v1_chasm_proto_rawDesc), len(file_temporal_server_api_persistence_v1_chasm_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

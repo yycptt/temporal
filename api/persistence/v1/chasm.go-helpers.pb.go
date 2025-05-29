@@ -300,3 +300,40 @@ func (this *ChasmTaskInfo) Equal(that interface{}) bool {
 
 	return proto.Equal(this, that1)
 }
+
+// Marshal an object of type VisibilityState to the protobuf v3 wire format
+func (val *VisibilityState) Marshal() ([]byte, error) {
+	return proto.Marshal(val)
+}
+
+// Unmarshal an object of type VisibilityState from the protobuf v3 wire format
+func (val *VisibilityState) Unmarshal(buf []byte) error {
+	return proto.Unmarshal(buf, val)
+}
+
+// Size returns the size of the object, in bytes, once serialized
+func (val *VisibilityState) Size() int {
+	return proto.Size(val)
+}
+
+// Equal returns whether two VisibilityState values are equivalent by recursively
+// comparing the message's fields.
+// For more information see the documentation for
+// https://pkg.go.dev/google.golang.org/protobuf/proto#Equal
+func (this *VisibilityState) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	var that1 *VisibilityState
+	switch t := that.(type) {
+	case *VisibilityState:
+		that1 = t
+	case VisibilityState:
+		that1 = &t
+	default:
+		return false
+	}
+
+	return proto.Equal(this, that1)
+}

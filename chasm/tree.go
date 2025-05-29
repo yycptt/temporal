@@ -1196,6 +1196,10 @@ func (n *Node) closeTransactionGeneratePhysicalSideEffectTasks() error {
 				return err
 			}
 
+			// TODO: if visibility task, only create if parent is root
+			// Alternatively, return an error on close transaction when seeing a visibility component
+			// that's not a child of the root node
+
 			physicalTask := &tasks.ChasmTask{
 				WorkflowKey:         entityKey,
 				VisibilityTimestamp: sideEffectTask.ScheduledTime.AsTime(),
@@ -1732,6 +1736,11 @@ func carryOverTaskStatus(
 func taskCategory(
 	task *persistencespb.ChasmComponentAttributes_Task,
 ) (tasks.Category, error) {
+	if task.Type == "chasm.visibilityTask" {
+		// special handle visibility task and put task to a different queue
+		return tasks.CategoryVisibility, nil
+	}
+
 	isImmediate := task.ScheduledTime == nil || task.ScheduledTime.AsTime().Equal(TaskScheduledTimeImmediate)
 
 	if task.Destination != "" {

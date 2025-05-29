@@ -2,6 +2,8 @@ package chasm
 
 import (
 	"reflect"
+
+	"go.temporal.io/api/enums/v1"
 )
 
 type (
@@ -52,6 +54,18 @@ func WithShardingFn(
 	return func(rc *RegistrableComponent) {
 		rc.shardingFn = shardingFn
 	}
+}
+
+type VisibilityAttribute struct {
+	Name string
+	ID   int32
+	Type enums.IndexedValueType
+}
+
+func WithVisibilityAttributes(
+	attributes []VisibilityAttribute,
+) RegistrableComponentOption {
+	panic("not implemented")
 }
 
 // fqType returns the fully qualified name of the component, which is a combination of

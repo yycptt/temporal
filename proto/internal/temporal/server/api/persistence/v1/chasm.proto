@@ -93,3 +93,7 @@ message ChasmTaskInfo {
     // framework itself.
     temporal.api.common.v1.DataBlob data = 3;
 }
+
+message VisibilityState {
+    int64 transition_count = 1;
+}
