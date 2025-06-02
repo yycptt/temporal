@@ -9,6 +9,7 @@ import "google/protobuf/timestamp.proto";
 import "temporal/api/common/v1/message.proto";
 import "temporal/api/enums/v1/common.proto";
 import "temporal/api/enums/v1/event_type.proto";
+import "temporal/api/enums/v1/failed_cause.proto";
 import "temporal/api/enums/v1/workflow.proto";
 import "temporal/api/failure/v1/message.proto";
 import "temporal/api/workflow/v1/message.proto";
@@ -615,6 +616,9 @@ message ChildExecutionInfo {
     string namespace_id = 14;
     VersionedTransition last_update_versioned_transition = 15;
     temporal.api.common.v1.Priority priority = 16;
+    temporal.api.enums.v1.StartChildWorkflowExecutionFailedCause start_failed_cause = 17;
+    temporal.api.enums.v1.WorkflowExecutionStatus completion_status = 18;
+
 }
 
 // request_cancel_map column

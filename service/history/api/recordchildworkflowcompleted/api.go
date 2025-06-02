@@ -6,6 +6,7 @@ import (
 
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
+	historypb "go.temporal.io/api/history/v1"
 	"go.temporal.io/server/api/historyservice/v1"
 	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common"
@@ -101,8 +102,10 @@ func recordChildWorkflowCompleted(
 		func(workflowLease api.WorkflowLease) (*api.UpdateWorkflowAction, error) {
 			mutableState := workflowLease.GetMutableState()
 			if !mutableState.IsWorkflowExecutionRunning() {
-				resetRunID = mutableState.GetExecutionInfo().ResetRunId
-				return nil, consts.ErrWorkflowCompleted
+				if mutableState.GetExecutionInfo().ResetRunId != "" {
+					resetRunID = mutableState.GetExecutionInfo().ResetRunId
+					return nil, consts.ErrWorkflowCompleted
+				}
 			}
 
 			onCurrentBranch, err := api.IsHistoryEventOnCurrentBranch(mutableState, parentInitiatedID, parentInitiatedVersion)
@@ -119,7 +122,7 @@ func recordChildWorkflowCompleted(
 			// note we already checked if startedEventID is empty (in consistency predicate)
 			// and reloaded mutable state, so if startedEventID is still missing, we need to
 			// record a started event before recording completion event.
-			if err := recordStartedEventIfMissing(ctx, mutableState, request, ci); err != nil {
+			if err := recordStartedIfMissing(ctx, mutableState, request, ci); err != nil {
 				return nil, err
 			}
 
@@ -134,29 +137,93 @@ func recordChildWorkflowCompleted(
 				return nil, consts.ErrChildExecutionNotFound
 			}
 
+			if ci.GetCompletionStatus() != enumspb.WORKFLOW_EXECUTION_STATUS_UNSPECIFIED {
+				return nil, consts.ErrChildExecutionNotFound
+			}
+
 			completionEvent := request.CompletionEvent
 			switch completionEvent.GetEventType() {
 			case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED:
 				attributes := completionEvent.GetWorkflowExecutionCompletedEventAttributes()
-				_, err = mutableState.AddChildWorkflowExecutionCompletedEvent(parentInitiatedID, childExecution, attributes)
+				if mutableState.IsWorkflowExecutionRunning() {
+					_, err = mutableState.AddChildWorkflowExecutionCompletedEvent(parentInitiatedID, childExecution, attributes)
+				} else {
+					err = mutableState.ApplyChildWorkflowExecutionCompletedEvent(&historypb.HistoryEvent{
+						EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED,
+						EventId:   common.EmptyEventID,
+						Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionCompletedEventAttributes{
+							ChildWorkflowExecutionCompletedEventAttributes: &historypb.ChildWorkflowExecutionCompletedEventAttributes{
+								InitiatedEventId: ci.InitiatedEventId,
+							},
+						},
+					})
+				}
 			case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_FAILED:
 				attributes := completionEvent.GetWorkflowExecutionFailedEventAttributes()
-				_, err = mutableState.AddChildWorkflowExecutionFailedEvent(parentInitiatedID, childExecution, attributes)
+				if mutableState.IsWorkflowExecutionRunning() {
+					_, err = mutableState.AddChildWorkflowExecutionFailedEvent(parentInitiatedID, childExecution, attributes)
+				} else {
+					err = mutableState.ApplyChildWorkflowExecutionFailedEvent(&historypb.HistoryEvent{
+						EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED,
+						EventId:   common.EmptyEventID,
+						Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionFailedEventAttributes{
+							ChildWorkflowExecutionFailedEventAttributes: &historypb.ChildWorkflowExecutionFailedEventAttributes{
+								InitiatedEventId: ci.InitiatedEventId,
+							},
+						},
+					})
+				}
 			case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_CANCELED:
 				attributes := completionEvent.GetWorkflowExecutionCanceledEventAttributes()
-				_, err = mutableState.AddChildWorkflowExecutionCanceledEvent(parentInitiatedID, childExecution, attributes)
+				if mutableState.IsWorkflowExecutionRunning() {
+					_, err = mutableState.AddChildWorkflowExecutionCanceledEvent(parentInitiatedID, childExecution, attributes)
+				} else {
+					err = mutableState.ApplyChildWorkflowExecutionCanceledEvent(&historypb.HistoryEvent{
+						EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_CANCELED,
+						EventId:   common.EmptyEventID,
+						Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionCanceledEventAttributes{
+							ChildWorkflowExecutionCanceledEventAttributes: &historypb.ChildWorkflowExecutionCanceledEventAttributes{
+								InitiatedEventId: ci.InitiatedEventId,
+							},
+						},
+					})
+				}
 			case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_TERMINATED:
-				_, err = mutableState.AddChildWorkflowExecutionTerminatedEvent(parentInitiatedID, childExecution)
+				if mutableState.IsWorkflowExecutionRunning() {
+					_, err = mutableState.AddChildWorkflowExecutionTerminatedEvent(parentInitiatedID, childExecution)
+				} else {
+					err = mutableState.ApplyChildWorkflowExecutionTerminatedEvent(&historypb.HistoryEvent{
+						EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TERMINATED,
+						EventId:   common.EmptyEventID,
+						Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionTerminatedEventAttributes{
+							ChildWorkflowExecutionTerminatedEventAttributes: &historypb.ChildWorkflowExecutionTerminatedEventAttributes{
+								InitiatedEventId: ci.InitiatedEventId,
+							},
+						},
+					})
+				}
 			case enumspb.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT:
 				attributes := completionEvent.GetWorkflowExecutionTimedOutEventAttributes()
-				_, err = mutableState.AddChildWorkflowExecutionTimedOutEvent(parentInitiatedID, childExecution, attributes)
+				if mutableState.IsWorkflowExecutionRunning() {
+					_, err = mutableState.AddChildWorkflowExecutionTimedOutEvent(parentInitiatedID, childExecution, attributes)
+				} else {
+					err = mutableState.ApplyChildWorkflowExecutionTimedOutEvent(&historypb.HistoryEvent{
+						EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_TIMED_OUT,
+						EventId:   common.EmptyEventID,
+						Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionTimedOutEventAttributes{
+							ChildWorkflowExecutionTimedOutEventAttributes: &historypb.ChildWorkflowExecutionTimedOutEventAttributes{
+								InitiatedEventId: ci.InitiatedEventId,
+							},
+						},
+					})
+				}
 			}
 			if err != nil {
 				return nil, err
 			}
 			return &api.UpdateWorkflowAction{
 				Noop:               false,
-				CreateWorkflowTask: true,
+				CreateWorkflowTask: mutableState.IsWorkflowExecutionRunning(),
 			}, nil
 		},
 		nil,
@@ -166,38 +233,56 @@ func recordChildWorkflowCompleted(
 	return resetRunID, err
 }
 
-func recordStartedEventIfMissing(
+func recordStartedIfMissing(
 	ctx context.Context,
 	mutableState historyi.MutableState,
 	request *historyservice.RecordChildExecutionCompletedRequest,
 	ci *persistencespb.ChildExecutionInfo,
 ) error {
 	parentInitiatedID := request.ParentInitiatedId
-	if ci.StartedEventId == common.EmptyEventID {
-		initiatedEvent, err := mutableState.GetChildExecutionInitiatedEvent(ctx, parentInitiatedID)
-		if err != nil {
-			return consts.ErrChildExecutionNotFound
-		}
-		initiatedAttr := initiatedEvent.GetStartChildWorkflowExecutionInitiatedEventAttributes()
-		execution := &commonpb.WorkflowExecution{
-			WorkflowId: request.GetChildExecution().GetWorkflowId(),
-			RunId:      request.GetChildExecution().GetRunId(),
-		}
-		if request.GetChildFirstExecutionRunId() != "" {
-			execution.RunId = request.GetChildFirstExecutionRunId()
-		}
-		// note values used here should not matter because the child info will be deleted
-		// when the response is recorded, so it should be fine e.g. that ci.Clock is nil
-		_, err = mutableState.AddChildWorkflowExecutionStartedEvent(
-			execution,
-			initiatedAttr.WorkflowType,
-			initiatedEvent.EventId,
-			initiatedAttr.Header,
+	if ci.StartedRunId != "" {
+		return nil
+	}
+
+	execution := &commonpb.WorkflowExecution{
+		WorkflowId: request.GetChildExecution().GetWorkflowId(),
+		RunId:      request.GetChildExecution().GetRunId(),
+	}
+
+	if !mutableState.IsWorkflowExecutionRunning() {
+		return mutableState.ApplyChildWorkflowExecutionStartedEvent(
+			// this is a fake event, need to do some refactoring here and reuse logic from EventFactory
+			&historypb.HistoryEvent{
+				EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_STARTED,
+				EventId:   common.EndEventID,
+				Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionStartedEventAttributes{
+					ChildWorkflowExecutionStartedEventAttributes: &historypb.ChildWorkflowExecutionStartedEventAttributes{
+						InitiatedEventId:  ci.InitiatedEventId,
+						WorkflowExecution: execution,
+					},
+				},
+			},
 			ci.Clock,
 		)
-		if err != nil {
-			return err
-		}
 	}
-	return nil
+
+	initiatedEvent, err := mutableState.GetChildExecutionInitiatedEvent(ctx, parentInitiatedID)
+	if err != nil {
+		return consts.ErrChildExecutionNotFound
+	}
+	initiatedAttr := initiatedEvent.GetStartChildWorkflowExecutionInitiatedEventAttributes()
+
+	if request.GetChildFirstExecutionRunId() != "" {
+		execution.RunId = request.GetChildFirstExecutionRunId()
+	}
+	// note values used here should not matter because the child info will be deleted
+	// when the response is recorded, so it should be fine e.g. that ci.Clock is nil
+	_, err = mutableState.AddChildWorkflowExecutionStartedEvent(
+		execution,
+		initiatedAttr.WorkflowType,
+		initiatedEvent.EventId,
+		initiatedAttr.Header,
+		ci.Clock,
+	)
+	return err
 }

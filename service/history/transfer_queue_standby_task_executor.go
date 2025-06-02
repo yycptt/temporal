@@ -381,7 +381,7 @@ func (t *transferQueueStandbyTaskExecutor) processStartChildExecution(
 		childStarted := childWorkflowInfo.StartedEventId != common.EmptyEventID
 		childAbandon := childWorkflowInfo.ParentClosePolicy == enumspb.PARENT_CLOSE_POLICY_ABANDON
 
-		if workflowClosed && !(childStarted && childAbandon) {
+		if workflowClosed && !childAbandon {
 			// NOTE: ideally for workflowClosed, child not started, parent close policy is abandon case,
 			// we should continue to start the child workflow in active cluster, so standby logic also need to
 			// perform the verification. However, we can't do that due to some technial reasons.

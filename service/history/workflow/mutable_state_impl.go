@@ -5293,7 +5293,25 @@ func (ms *MutableStateImpl) ApplyStartChildWorkflowExecutionFailedEvent(
 	attributes := event.GetStartChildWorkflowExecutionFailedEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+	ci.StartFailedCause = attributes.GetCause()
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) AddChildWorkflowExecutionCompletedEvent(
@@ -5341,7 +5359,26 @@ func (ms *MutableStateImpl) ApplyChildWorkflowExecutionCompletedEvent(
 	attributes := event.GetChildWorkflowExecutionCompletedEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+
+	ci.CompletionStatus = enumspb.WORKFLOW_EXECUTION_STATUS_COMPLETED
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) AddChildWorkflowExecutionFailedEvent(
@@ -5390,7 +5427,25 @@ func (ms *MutableStateImpl) ApplyChildWorkflowExecutionFailedEvent(
 	attributes := event.GetChildWorkflowExecutionFailedEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+	ci.CompletionStatus = enumspb.WORKFLOW_EXECUTION_STATUS_FAILED
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) AddChildWorkflowExecutionCanceledEvent(
@@ -5438,7 +5493,25 @@ func (ms *MutableStateImpl) ApplyChildWorkflowExecutionCanceledEvent(
 	attributes := event.GetChildWorkflowExecutionCanceledEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+	ci.CompletionStatus = enumspb.WORKFLOW_EXECUTION_STATUS_CANCELED
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) AddChildWorkflowExecutionTerminatedEvent(
@@ -5484,7 +5557,25 @@ func (ms *MutableStateImpl) ApplyChildWorkflowExecutionTerminatedEvent(
 	attributes := event.GetChildWorkflowExecutionTerminatedEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+	ci.CompletionStatus = enumspb.WORKFLOW_EXECUTION_STATUS_TERMINATED
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) AddChildWorkflowExecutionTimedOutEvent(
@@ -5532,7 +5623,25 @@ func (ms *MutableStateImpl) ApplyChildWorkflowExecutionTimedOutEvent(
 	attributes := event.GetChildWorkflowExecutionTimedOutEventAttributes()
 	initiatedID := attributes.GetInitiatedEventId()
 
-	return ms.DeletePendingChildExecution(initiatedID)
+	if ms.IsWorkflowExecutionRunning() {
+		return ms.DeletePendingChildExecution(initiatedID)
+	}
+
+	ci, ok := ms.GetChildExecutionInfo(initiatedID)
+	if !ok {
+		ms.logError(
+			fmt.Sprintf("unable to find child workflow event ID: %v in mutable state", initiatedID),
+			tag.ErrorTypeInvalidMutableStateAction,
+		)
+		return ErrMissingChildWorkflowInfo
+	}
+
+	ms.approximateSize -= ci.Size()
+	ci.CompletionStatus = enumspb.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
+	ms.updateChildExecutionInfos[ci.InitiatedEventId] = ci
+	ms.approximateSize += ci.Size()
+
+	return nil
 }
 
 func (ms *MutableStateImpl) RetryActivity(

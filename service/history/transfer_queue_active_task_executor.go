@@ -731,24 +731,10 @@ func (t *transferQueueActiveTaskExecutor) processStartChildExecution(
 	// 8 cases in total
 	workflowRunning := mutableState.IsWorkflowExecutionRunning()
 	childStarted := childInfo.StartedEventId != common.EmptyEventID
-	if !workflowRunning && (!childStarted || childInfo.ParentClosePolicy != enumspb.PARENT_CLOSE_POLICY_ABANDON) {
-		// three cases here:
+	if !workflowRunning && childInfo.ParentClosePolicy != enumspb.PARENT_CLOSE_POLICY_ABANDON {
+		// two cases here:
 		// case 1: workflow not running, child started, parent close policy is not abandon
 		// case 2: workflow not running, child not started, parent close policy is not abandon
-		// case 3: workflow not running, child not started, parent close policy is abandon
-		//
-		// NOTE: ideally for case 3, we should continue to start child. However, with current start child
-		// and standby start child verification logic, we can't do that because:
-		// 1. Once workflow is closed, we can't update mutable state or record child started event.
-		// If the RPC call for scheduling first workflow task times out but the call actually succeeds on child workflow.
-		// Then the child workflow can run, complete and another unrelated workflow can reuse this workflowID.
-		// Now when the start child task retries, we can't rely on requestID to dedupe the start child call. (We can use runID instead of requestID to dedupe)
-		// 2. No update to mutable state and child started event means we are not able to replicate the information
-		// to the standby cluster, so standby start child logic won't be able to verify the child has started.
-		// To resolve the issue above, we need to
-		// 1. Start child workflow and schedule the first workflow task in one transaction. Use runID to perform deduplication
-		// 2. Standby start child logic need to verify if child workflow actually started instead of relying on the information
-		// in parent mutable state.
 		return nil
 	}
 
@@ -757,8 +743,8 @@ func (t *transferQueueActiveTaskExecutor) processStartChildExecution(
 	// still schedule the workflowTask if the parent close policy is Abandon.
 	// If parent close policy cancel or terminate, parent close policy will be applied in another
 	// transfer task.
-	// case 4, 5: workflow started, child started, parent close policy is or is not abandon
-	// case 6: workflow closed, child started, parent close policy is abandon
+	// case 3, 4: workflow started, child started, parent close policy is or is not abandon
+	// case 5: workflow closed, child started, parent close policy is abandon
 	if childStarted {
 		childExecution := &commonpb.WorkflowExecution{
 			WorkflowId: childInfo.StartedWorkflowId,
@@ -778,7 +764,8 @@ func (t *transferQueueActiveTaskExecutor) processStartChildExecution(
 	}
 
 	// remaining 2 cases:
-	// case 7, 8: workflow running, child not started, parent close policy is or is not abandon
+	// case 6, 7: workflow running, child not started, parent close policy is or is not abandon
+	// case 8: workflow not running, child not started, parent close policy is abandon
 
 	initiatedEvent, err := mutableState.GetChildExecutionInitiatedEvent(ctx, task.InitiatedEventID)
 	if err != nil {
@@ -841,6 +828,9 @@ func (t *transferQueueActiveTaskExecutor) processStartChildExecution(
 	resetChildID := fmt.Sprintf("%s:%s", attributes.GetWorkflowType().Name, attributes.GetWorkflowId())
 	baseWorkflowInfo := mutableState.GetBaseWorkflowInfo()
 	if mutableState.IsResetRun() && baseWorkflowInfo != nil && baseWorkflowInfo.LowestCommonAncestorEventId >= childInfo.InitiatedEventId { // child was started before the reset point.
+
+		// do we need to do anything different here? looks like no.
+
 		childRunID, childFirstRunID, err := t.verifyChildWorkflow(ctx, mutableState, targetNamespaceEntry, attributes.WorkflowId)
 		if err != nil {
 			return err
@@ -1179,27 +1169,42 @@ func (t *transferQueueActiveTaskExecutor) recordChildExecutionStarted(
 ) error {
 	return t.updateWorkflowExecution(ctx, wfContext, true,
 		func(mutableState historyi.MutableState) error {
-			if !mutableState.IsWorkflowExecutionRunning() {
-				return consts.ErrWorkflowCompleted
-			}
-
 			ci, ok := mutableState.GetChildExecutionInfo(task.InitiatedEventID)
 			if !ok || ci.StartedEventId != common.EmptyEventID {
 				return serviceerror.NewNotFound("Pending child execution not found.")
 			}
 
-			_, err := mutableState.AddChildWorkflowExecutionStartedEvent(
-				&commonpb.WorkflowExecution{
-					WorkflowId: task.TargetWorkflowID,
-					RunId:      runID,
+			if mutableState.IsWorkflowExecutionRunning() {
+				_, err := mutableState.AddChildWorkflowExecutionStartedEvent(
+					&commonpb.WorkflowExecution{
+						WorkflowId: task.TargetWorkflowID,
+						RunId:      runID,
+					},
+					initiatedAttributes.WorkflowType,
+					task.InitiatedEventID,
+					initiatedAttributes.Header,
+					clock,
+				)
+				return err
+			}
+
+			return mutableState.ApplyChildWorkflowExecutionStartedEvent(
+				// this is a fake event, need to do some refactoring here and reuse logic from EventFactory
+				&historypb.HistoryEvent{
+					EventType: enumspb.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_STARTED,
+					EventId:   common.EndEventID,
+					Attributes: &historypb.HistoryEvent_ChildWorkflowExecutionStartedEventAttributes{
+						ChildWorkflowExecutionStartedEventAttributes: &historypb.ChildWorkflowExecutionStartedEventAttributes{
+							InitiatedEventId: task.InitiatedEventID,
+							WorkflowExecution: &commonpb.WorkflowExecution{
+								WorkflowId: task.TargetWorkflowID,
+								RunId:      runID,
+							},
+						},
+					},
 				},
-				initiatedAttributes.WorkflowType,
-				task.InitiatedEventID,
-				initiatedAttributes.Header,
 				clock,
 			)
-
-			return err
 		})
 }
 
@@ -1212,21 +1217,35 @@ func (t *transferQueueActiveTaskExecutor) recordStartChildExecutionFailed(
 ) error {
 	return t.updateWorkflowExecution(ctx, wfContext, true,
 		func(mutableState historyi.MutableState) error {
-			if !mutableState.IsWorkflowExecutionRunning() {
-				return consts.ErrWorkflowCompleted
-			}
 
 			ci, ok := mutableState.GetChildExecutionInfo(task.InitiatedEventID)
 			if !ok || ci.StartedEventId != common.EmptyEventID {
 				return serviceerror.NewNotFound("Pending child execution not found.")
 			}
 
-			_, err := mutableState.AddStartChildWorkflowExecutionFailedEvent(
-				task.InitiatedEventID,
-				failedCause,
-				initiatedAttributes,
+			if mutableState.IsWorkflowExecutionRunning() {
+				_, err := mutableState.AddStartChildWorkflowExecutionFailedEvent(
+					task.InitiatedEventID,
+					failedCause,
+					initiatedAttributes,
+				)
+				return err
+			}
+
+			// TODO: instead of deleting the child execution from ms, we probably should
+			// move it to a closed state since we don't have a failed event for it.
+			return mutableState.ApplyChildWorkflowExecutionFailedEvent(
+				// this is a fake event, need to do some refactoring here and reuse logic from EventFactory
+				&historypb.HistoryEvent{
+					EventType: enumspb.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_FAILED,
+					EventId:   common.EndEventID,
+					Attributes: &historypb.HistoryEvent_StartChildWorkflowExecutionFailedEventAttributes{
+						StartChildWorkflowExecutionFailedEventAttributes: &historypb.StartChildWorkflowExecutionFailedEventAttributes{
+							InitiatedEventId: task.InitiatedEventID,
+						},
+					},
+				},
 			)
-			return err
 		})
 }
 
@@ -1396,7 +1415,8 @@ func (t *transferQueueActiveTaskExecutor) updateWorkflowExecution(
 		return err
 	}
 
-	if createWorkflowTask {
+	// TODO: createWorkflowTask flag should be returned from action fn.
+	if createWorkflowTask && mutableState.IsWorkflowExecutionRunning() {
 		// Create a transfer task to schedule a workflow task
 		err := workflow.ScheduleWorkflowTask(mutableState)
 		if err != nil {
