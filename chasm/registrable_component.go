@@ -58,7 +58,6 @@ func WithShardingFn(
 
 type VisibilityAttribute struct {
 	Name string
-	ID   int32
 	Type enums.IndexedValueType
 }
 

@@ -2278,7 +2278,7 @@ type ActivityInfo struct {
 	CancelRequested             bool                   `protobuf:"varint,14,opt,name=cancel_requested,json=cancelRequested,proto3" json:"cancel_requested,omitempty"`
 	CancelRequestId             int64                  `protobuf:"varint,15,opt,name=cancel_request_id,json=cancelRequestId,proto3" json:"cancel_request_id,omitempty"`
 	TimerTaskStatus             int32                  `protobuf:"varint,16,opt,name=timer_task_status,json=timerTaskStatus,proto3" json:"timer_task_status,omitempty"`
-	Attempt                     int32                  `protobuf:"varint,17,opt,name=attempt,proto3" json:"attempt,omitempty"`
+	Attempt                     int32                  `chasm:"vis,indexed,id=3" protobuf:"varint,17,opt,name=attempt,proto3" json:"attempt,omitempty"`
 	TaskQueue                   string                 `protobuf:"bytes,18,opt,name=task_queue,json=taskQueue,proto3" json:"task_queue,omitempty"`
 	StartedIdentity             string                 `protobuf:"bytes,19,opt,name=started_identity,json=startedIdentity,proto3" json:"started_identity,omitempty"`
 	HasRetryPolicy              bool                   `protobuf:"varint,20,opt,name=has_retry_policy,json=hasRetryPolicy,proto3" json:"has_retry_policy,omitempty"`
@@ -2297,7 +2297,7 @@ type ActivityInfo struct {
 	// Deprecated. use `use_workflow_build_id`
 	// Deprecated. Clean up with versioning-2. [cleanup-old-wv]
 	UseCompatibleVersion bool              `protobuf:"varint,33,opt,name=use_compatible_version,json=useCompatibleVersion,proto3" json:"use_compatible_version,omitempty"`
-	ActivityType         *v12.ActivityType `protobuf:"bytes,34,opt,name=activity_type,json=activityType,proto3" json:"activity_type,omitempty"`
+	ActivityType         *v12.ActivityType `chasm:"vis,indexed=text,id=2,name=activityType" protobuf:"bytes,34,opt,name=activity_type,json=activityType,proto3" json:"activity_type,omitempty"`
 	// Absence of `assigned_build_id` generally means this task is on an "unversioned" task queue.
 	// In rare cases, it can also mean that the task queue is versioned but we failed to write activity's
 	// independently-assigned build ID to the database. This case heals automatically once the task is dispatched.
@@ -2343,6 +2343,10 @@ type ActivityInfo struct {
 	ActivityReset bool `protobuf:"varint,47,opt,name=activity_reset,json=activityReset,proto3" json:"activity_reset,omitempty"`
 	// set to true if reset heartbeat flag was set with an activity reset
 	ResetHeartbeats bool `protobuf:"varint,48,opt,name=reset_heartbeats,json=resetHeartbeats,proto3" json:"reset_heartbeats,omitempty"`
+	
+	Status string `chasm:"vis,indexed,id=1"`
+	NonindexedValue string `chasm:"vis"`
+	
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }

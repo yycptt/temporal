@@ -5,6 +5,7 @@ import (
 
 	"go.temporal.io/api/common/v1"
 	"go.temporal.io/server/api/persistence/v1"
+	"go.temporal.io/server/common/payload"
 )
 
 type builtInLibrary struct {
@@ -40,32 +41,74 @@ type Visibility struct {
 	Memo Collection[string, *common.Payload]
 }
 
+func NewVisibility() *Visibility {
+	return &Visibility{}
+}
+
 func (v *Visibility) LifecycleState(_ Context) LifecycleState {
 	return LifecycleStateRunning
 }
 
 func (v *Visibility) SearchAttributes(
 	chasmContext Context,
-) (map[string]*common.Payload, error) {
-	sa := make(map[string]*common.Payload, len(v.SA))
+) (map[string]any, error) {
+	sa := make(map[string]any, len(v.SA))
 	for key, field := range v.SA {
-		value, err := field.Get(chasmContext)
+		p, err := field.Get(chasmContext)
 		if err != nil {
 			return nil, err
 		}
-		sa[key] = value
+		var v any
+		if err = payload.Decode(p, &v); err != nil {
+			return nil, err
+		}
+		sa[key] = v
 	}
 	return sa, nil
 }
 
+func SearchAttributeByName[T any](
+	chasmContext Context,
+	visibility *Visibility,
+	name string,
+) (T, error) {
+	var result T
+	p, err := visibility.SA[name].Get(chasmContext)
+	if err != nil {
+		return result, err
+	}
+	if err = payload.Decode(p, &result); err != nil {
+		return result, err
+	}
+	return result, nil
+}
+
+func UpdateSearchAttribute[T ~int | ~int32 | ~int64 | ~string | ~bool | ~float64 | ~[]byte](
+	chasmContext MutableContext,
+	visibility *Visibility,
+	name string,
+	value T,
+) {
+	p, err := payload.Encode(value)
+	if err != nil {
+		panic(err) // will never happen
+	}
+	visibility.SA[name] = NewDataField(chasmContext, p)
+}
+
 func (v *Visibility) UpdateSearchAttributes(
 	mutableContext MutableContext,
-	updates map[string]*common.Payload,
-) {
+	updates map[string]any,
+) error {
 	for key, value := range updates {
-		v.SA[key] = NewDataField(mutableContext, value)
+		p, err := payload.Encode(value)
+		if err != nil {
+			return err
+		}
+		v.SA[key] = NewDataField(mutableContext, p)
 	}
 	v.generateTask(mutableContext)
+	return nil
 }
 
 func (v *Visibility) RemoveSearchAttributes(
@@ -76,6 +119,34 @@ func (v *Visibility) RemoveSearchAttributes(
 		delete(v.SA, key)
 	}
 	v.generateTask(mutableContext)
+}
+
+func UpdateMemo[T ~int | ~int32 | ~int64 | ~string | ~bool | ~float64 | ~[]byte](
+	chasmContext MutableContext,
+	visibility *Visibility,
+	name string,
+	value T,
+) {
+	p, err := payload.Encode(value)
+	if err != nil {
+		panic(err) // will never happen
+	}
+	visibility.Memo[name] = NewDataField(chasmContext, p)
+}
+
+func (v *Visibility) UpdateMemo(
+	mutableContext MutableContext,
+	updates map[string]any,
+) error {
+	for key, value := range updates {
+		p, err := payload.Encode(value)
+		if err != nil {
+			return err
+		}
+		v.Memo[key] = NewDataField(mutableContext, p)
+	}
+	v.generateTask(mutableContext)
+	return nil
 }
 
 func (v *Visibility) generateTask(
