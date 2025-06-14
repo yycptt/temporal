@@ -161,4 +161,10 @@ service AdminService {
     rpc DescribeTaskQueuePartition (DescribeTaskQueuePartitionRequest) returns (DescribeTaskQueuePartitionResponse) {}
 
     rpc ForceUnloadTaskQueuePartition (ForceUnloadTaskQueuePartitionRequest) returns (ForceUnloadTaskQueuePartitionResponse) {}
+
+    rpc NewPayloadStore (NewPayloadStoreRequest) returns (NewPayloadStoreResponse) {}
+    rpc DescribePayloadStore (DescribePayloadStoreRequest) returns (DescribePayloadStoreResponse) {}
+    rpc AddPayload (AddPayloadRequest) returns (AddPayloadResponse) {}
+    rpc GetPayload (GetPayloadRequest) returns (GetPayloadResponse) {}
+    rpc RemovePayload (RemovePayloadRequest) returns (RemovePayloadResponse) {}
 }

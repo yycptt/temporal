@@ -63,6 +63,26 @@ func (mr *MockAdminServiceClientMockRecorder) AddOrUpdateRemoteCluster(ctx, in a
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOrUpdateRemoteCluster", reflect.TypeOf((*MockAdminServiceClient)(nil).AddOrUpdateRemoteCluster), varargs...)
 }
 
+// AddPayload mocks base method.
+func (m *MockAdminServiceClient) AddPayload(ctx context.Context, in *adminservice.AddPayloadRequest, opts ...grpc.CallOption) (*adminservice.AddPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "AddPayload", varargs...)
+	ret0, _ := ret[0].(*adminservice.AddPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddPayload indicates an expected call of AddPayload.
+func (mr *MockAdminServiceClientMockRecorder) AddPayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPayload", reflect.TypeOf((*MockAdminServiceClient)(nil).AddPayload), varargs...)
+}
+
 // AddSearchAttributes mocks base method.
 func (m *MockAdminServiceClient) AddSearchAttributes(ctx context.Context, in *adminservice.AddSearchAttributesRequest, opts ...grpc.CallOption) (*adminservice.AddSearchAttributesResponse, error) {
 	m.ctrl.T.Helper()
@@ -263,6 +283,26 @@ func (mr *MockAdminServiceClientMockRecorder) DescribeMutableState(ctx, in any, 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeMutableState", reflect.TypeOf((*MockAdminServiceClient)(nil).DescribeMutableState), varargs...)
 }
 
+// DescribePayloadStore mocks base method.
+func (m *MockAdminServiceClient) DescribePayloadStore(ctx context.Context, in *adminservice.DescribePayloadStoreRequest, opts ...grpc.CallOption) (*adminservice.DescribePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DescribePayloadStore", varargs...)
+	ret0, _ := ret[0].(*adminservice.DescribePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribePayloadStore indicates an expected call of DescribePayloadStore.
+func (mr *MockAdminServiceClientMockRecorder) DescribePayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribePayloadStore", reflect.TypeOf((*MockAdminServiceClient)(nil).DescribePayloadStore), varargs...)
+}
+
 // DescribeTaskQueuePartition mocks base method.
 func (m *MockAdminServiceClient) DescribeTaskQueuePartition(ctx context.Context, in *adminservice.DescribeTaskQueuePartitionRequest, opts ...grpc.CallOption) (*adminservice.DescribeTaskQueuePartitionResponse, error) {
 	m.ctrl.T.Helper()
@@ -421,6 +461,26 @@ func (mr *MockAdminServiceClientMockRecorder) GetNamespaceReplicationMessages(ct
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceReplicationMessages", reflect.TypeOf((*MockAdminServiceClient)(nil).GetNamespaceReplicationMessages), varargs...)
+}
+
+// GetPayload mocks base method.
+func (m *MockAdminServiceClient) GetPayload(ctx context.Context, in *adminservice.GetPayloadRequest, opts ...grpc.CallOption) (*adminservice.GetPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetPayload", varargs...)
+	ret0, _ := ret[0].(*adminservice.GetPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPayload indicates an expected call of GetPayload.
+func (mr *MockAdminServiceClientMockRecorder) GetPayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPayload", reflect.TypeOf((*MockAdminServiceClient)(nil).GetPayload), varargs...)
 }
 
 // GetReplicationMessages mocks base method.
@@ -683,6 +743,26 @@ func (mr *MockAdminServiceClientMockRecorder) MergeDLQTasks(ctx, in any, opts ..
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeDLQTasks", reflect.TypeOf((*MockAdminServiceClient)(nil).MergeDLQTasks), varargs...)
 }
 
+// NewPayloadStore mocks base method.
+func (m *MockAdminServiceClient) NewPayloadStore(ctx context.Context, in *adminservice.NewPayloadStoreRequest, opts ...grpc.CallOption) (*adminservice.NewPayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "NewPayloadStore", varargs...)
+	ret0, _ := ret[0].(*adminservice.NewPayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewPayloadStore indicates an expected call of NewPayloadStore.
+func (mr *MockAdminServiceClientMockRecorder) NewPayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPayloadStore", reflect.TypeOf((*MockAdminServiceClient)(nil).NewPayloadStore), varargs...)
+}
+
 // PurgeDLQMessages mocks base method.
 func (m *MockAdminServiceClient) PurgeDLQMessages(ctx context.Context, in *adminservice.PurgeDLQMessagesRequest, opts ...grpc.CallOption) (*adminservice.PurgeDLQMessagesResponse, error) {
 	m.ctrl.T.Helper()
@@ -781,6 +861,26 @@ func (mr *MockAdminServiceClientMockRecorder) RefreshWorkflowTasks(ctx, in any, 
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshWorkflowTasks", reflect.TypeOf((*MockAdminServiceClient)(nil).RefreshWorkflowTasks), varargs...)
+}
+
+// RemovePayload mocks base method.
+func (m *MockAdminServiceClient) RemovePayload(ctx context.Context, in *adminservice.RemovePayloadRequest, opts ...grpc.CallOption) (*adminservice.RemovePayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RemovePayload", varargs...)
+	ret0, _ := ret[0].(*adminservice.RemovePayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemovePayload indicates an expected call of RemovePayload.
+func (mr *MockAdminServiceClientMockRecorder) RemovePayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePayload", reflect.TypeOf((*MockAdminServiceClient)(nil).RemovePayload), varargs...)
 }
 
 // RemoveRemoteCluster mocks base method.
@@ -1080,6 +1180,21 @@ func (mr *MockAdminServiceServerMockRecorder) AddOrUpdateRemoteCluster(arg0, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddOrUpdateRemoteCluster", reflect.TypeOf((*MockAdminServiceServer)(nil).AddOrUpdateRemoteCluster), arg0, arg1)
 }
 
+// AddPayload mocks base method.
+func (m *MockAdminServiceServer) AddPayload(arg0 context.Context, arg1 *adminservice.AddPayloadRequest) (*adminservice.AddPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddPayload", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.AddPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddPayload indicates an expected call of AddPayload.
+func (mr *MockAdminServiceServerMockRecorder) AddPayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPayload", reflect.TypeOf((*MockAdminServiceServer)(nil).AddPayload), arg0, arg1)
+}
+
 // AddSearchAttributes mocks base method.
 func (m *MockAdminServiceServer) AddSearchAttributes(arg0 context.Context, arg1 *adminservice.AddSearchAttributesRequest) (*adminservice.AddSearchAttributesResponse, error) {
 	m.ctrl.T.Helper()
@@ -1230,6 +1345,21 @@ func (mr *MockAdminServiceServerMockRecorder) DescribeMutableState(arg0, arg1 an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeMutableState", reflect.TypeOf((*MockAdminServiceServer)(nil).DescribeMutableState), arg0, arg1)
 }
 
+// DescribePayloadStore mocks base method.
+func (m *MockAdminServiceServer) DescribePayloadStore(arg0 context.Context, arg1 *adminservice.DescribePayloadStoreRequest) (*adminservice.DescribePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribePayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.DescribePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribePayloadStore indicates an expected call of DescribePayloadStore.
+func (mr *MockAdminServiceServerMockRecorder) DescribePayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribePayloadStore", reflect.TypeOf((*MockAdminServiceServer)(nil).DescribePayloadStore), arg0, arg1)
+}
+
 // DescribeTaskQueuePartition mocks base method.
 func (m *MockAdminServiceServer) DescribeTaskQueuePartition(arg0 context.Context, arg1 *adminservice.DescribeTaskQueuePartitionRequest) (*adminservice.DescribeTaskQueuePartitionResponse, error) {
 	m.ctrl.T.Helper()
@@ -1348,6 +1478,21 @@ func (m *MockAdminServiceServer) GetNamespaceReplicationMessages(arg0 context.Co
 func (mr *MockAdminServiceServerMockRecorder) GetNamespaceReplicationMessages(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaceReplicationMessages", reflect.TypeOf((*MockAdminServiceServer)(nil).GetNamespaceReplicationMessages), arg0, arg1)
+}
+
+// GetPayload mocks base method.
+func (m *MockAdminServiceServer) GetPayload(arg0 context.Context, arg1 *adminservice.GetPayloadRequest) (*adminservice.GetPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPayload", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.GetPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPayload indicates an expected call of GetPayload.
+func (mr *MockAdminServiceServerMockRecorder) GetPayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPayload", reflect.TypeOf((*MockAdminServiceServer)(nil).GetPayload), arg0, arg1)
 }
 
 // GetReplicationMessages mocks base method.
@@ -1545,6 +1690,21 @@ func (mr *MockAdminServiceServerMockRecorder) MergeDLQTasks(arg0, arg1 any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeDLQTasks", reflect.TypeOf((*MockAdminServiceServer)(nil).MergeDLQTasks), arg0, arg1)
 }
 
+// NewPayloadStore mocks base method.
+func (m *MockAdminServiceServer) NewPayloadStore(arg0 context.Context, arg1 *adminservice.NewPayloadStoreRequest) (*adminservice.NewPayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewPayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.NewPayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewPayloadStore indicates an expected call of NewPayloadStore.
+func (mr *MockAdminServiceServerMockRecorder) NewPayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPayloadStore", reflect.TypeOf((*MockAdminServiceServer)(nil).NewPayloadStore), arg0, arg1)
+}
+
 // PurgeDLQMessages mocks base method.
 func (m *MockAdminServiceServer) PurgeDLQMessages(arg0 context.Context, arg1 *adminservice.PurgeDLQMessagesRequest) (*adminservice.PurgeDLQMessagesResponse, error) {
 	m.ctrl.T.Helper()
@@ -1618,6 +1778,21 @@ func (m *MockAdminServiceServer) RefreshWorkflowTasks(arg0 context.Context, arg1
 func (mr *MockAdminServiceServerMockRecorder) RefreshWorkflowTasks(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshWorkflowTasks", reflect.TypeOf((*MockAdminServiceServer)(nil).RefreshWorkflowTasks), arg0, arg1)
+}
+
+// RemovePayload mocks base method.
+func (m *MockAdminServiceServer) RemovePayload(arg0 context.Context, arg1 *adminservice.RemovePayloadRequest) (*adminservice.RemovePayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemovePayload", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.RemovePayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemovePayload indicates an expected call of RemovePayload.
+func (mr *MockAdminServiceServerMockRecorder) RemovePayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePayload", reflect.TypeOf((*MockAdminServiceServer)(nil).RemovePayload), arg0, arg1)
 }
 
 // RemoveRemoteCluster mocks base method.

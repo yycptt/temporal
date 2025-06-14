@@ -43,6 +43,26 @@ func (m *MockHistoryServiceClient) EXPECT() *MockHistoryServiceClientMockRecorde
 	return m.recorder
 }
 
+// AddPayload mocks base method.
+func (m *MockHistoryServiceClient) AddPayload(ctx context.Context, in *historyservice.AddPayloadRequest, opts ...grpc.CallOption) (*historyservice.AddPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "AddPayload", varargs...)
+	ret0, _ := ret[0].(*historyservice.AddPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddPayload indicates an expected call of AddPayload.
+func (mr *MockHistoryServiceClientMockRecorder) AddPayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPayload", reflect.TypeOf((*MockHistoryServiceClient)(nil).AddPayload), varargs...)
+}
+
 // AddTasks mocks base method.
 func (m *MockHistoryServiceClient) AddTasks(ctx context.Context, in *historyservice.AddTasksRequest, opts ...grpc.CallOption) (*historyservice.AddTasksResponse, error) {
 	m.ctrl.T.Helper()
@@ -223,6 +243,26 @@ func (mr *MockHistoryServiceClientMockRecorder) DescribeMutableState(ctx, in any
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeMutableState", reflect.TypeOf((*MockHistoryServiceClient)(nil).DescribeMutableState), varargs...)
 }
 
+// DescribePayloadStore mocks base method.
+func (m *MockHistoryServiceClient) DescribePayloadStore(ctx context.Context, in *historyservice.DescribePayloadStoreRequest, opts ...grpc.CallOption) (*historyservice.DescribePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DescribePayloadStore", varargs...)
+	ret0, _ := ret[0].(*historyservice.DescribePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribePayloadStore indicates an expected call of DescribePayloadStore.
+func (mr *MockHistoryServiceClientMockRecorder) DescribePayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribePayloadStore", reflect.TypeOf((*MockHistoryServiceClient)(nil).DescribePayloadStore), varargs...)
+}
+
 // DescribeWorkflowExecution mocks base method.
 func (m *MockHistoryServiceClient) DescribeWorkflowExecution(ctx context.Context, in *historyservice.DescribeWorkflowExecutionRequest, opts ...grpc.CallOption) (*historyservice.DescribeWorkflowExecutionResponse, error) {
 	m.ctrl.T.Helper()
@@ -381,6 +421,26 @@ func (mr *MockHistoryServiceClientMockRecorder) GetMutableState(ctx, in any, opt
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMutableState", reflect.TypeOf((*MockHistoryServiceClient)(nil).GetMutableState), varargs...)
+}
+
+// GetPayload mocks base method.
+func (m *MockHistoryServiceClient) GetPayload(ctx context.Context, in *historyservice.GetPayloadRequest, opts ...grpc.CallOption) (*historyservice.GetPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetPayload", varargs...)
+	ret0, _ := ret[0].(*historyservice.GetPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPayload indicates an expected call of GetPayload.
+func (mr *MockHistoryServiceClientMockRecorder) GetPayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPayload", reflect.TypeOf((*MockHistoryServiceClient)(nil).GetPayload), varargs...)
 }
 
 // GetReplicationMessages mocks base method.
@@ -663,6 +723,26 @@ func (mr *MockHistoryServiceClientMockRecorder) MergeDLQMessages(ctx, in any, op
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeDLQMessages", reflect.TypeOf((*MockHistoryServiceClient)(nil).MergeDLQMessages), varargs...)
 }
 
+// NewPayloadStore mocks base method.
+func (m *MockHistoryServiceClient) NewPayloadStore(ctx context.Context, in *historyservice.NewPayloadStoreRequest, opts ...grpc.CallOption) (*historyservice.NewPayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "NewPayloadStore", varargs...)
+	ret0, _ := ret[0].(*historyservice.NewPayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewPayloadStore indicates an expected call of NewPayloadStore.
+func (mr *MockHistoryServiceClientMockRecorder) NewPayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPayloadStore", reflect.TypeOf((*MockHistoryServiceClient)(nil).NewPayloadStore), varargs...)
+}
+
 // PauseActivity mocks base method.
 func (m *MockHistoryServiceClient) PauseActivity(ctx context.Context, in *historyservice.PauseActivityRequest, opts ...grpc.CallOption) (*historyservice.PauseActivityResponse, error) {
 	m.ctrl.T.Helper()
@@ -901,6 +981,26 @@ func (mr *MockHistoryServiceClientMockRecorder) RefreshWorkflowTasks(ctx, in any
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{ctx, in}, opts...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshWorkflowTasks", reflect.TypeOf((*MockHistoryServiceClient)(nil).RefreshWorkflowTasks), varargs...)
+}
+
+// RemovePayload mocks base method.
+func (m *MockHistoryServiceClient) RemovePayload(ctx context.Context, in *historyservice.RemovePayloadRequest, opts ...grpc.CallOption) (*historyservice.RemovePayloadResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "RemovePayload", varargs...)
+	ret0, _ := ret[0].(*historyservice.RemovePayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemovePayload indicates an expected call of RemovePayload.
+func (mr *MockHistoryServiceClientMockRecorder) RemovePayload(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePayload", reflect.TypeOf((*MockHistoryServiceClient)(nil).RemovePayload), varargs...)
 }
 
 // RemoveSignalMutableState mocks base method.
@@ -1625,6 +1725,21 @@ func (m *MockHistoryServiceServer) EXPECT() *MockHistoryServiceServerMockRecorde
 	return m.recorder
 }
 
+// AddPayload mocks base method.
+func (m *MockHistoryServiceServer) AddPayload(arg0 context.Context, arg1 *historyservice.AddPayloadRequest) (*historyservice.AddPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddPayload", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.AddPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AddPayload indicates an expected call of AddPayload.
+func (mr *MockHistoryServiceServerMockRecorder) AddPayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddPayload", reflect.TypeOf((*MockHistoryServiceServer)(nil).AddPayload), arg0, arg1)
+}
+
 // AddTasks mocks base method.
 func (m *MockHistoryServiceServer) AddTasks(arg0 context.Context, arg1 *historyservice.AddTasksRequest) (*historyservice.AddTasksResponse, error) {
 	m.ctrl.T.Helper()
@@ -1760,6 +1875,21 @@ func (mr *MockHistoryServiceServerMockRecorder) DescribeMutableState(arg0, arg1 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribeMutableState", reflect.TypeOf((*MockHistoryServiceServer)(nil).DescribeMutableState), arg0, arg1)
 }
 
+// DescribePayloadStore mocks base method.
+func (m *MockHistoryServiceServer) DescribePayloadStore(arg0 context.Context, arg1 *historyservice.DescribePayloadStoreRequest) (*historyservice.DescribePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DescribePayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.DescribePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DescribePayloadStore indicates an expected call of DescribePayloadStore.
+func (mr *MockHistoryServiceServerMockRecorder) DescribePayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DescribePayloadStore", reflect.TypeOf((*MockHistoryServiceServer)(nil).DescribePayloadStore), arg0, arg1)
+}
+
 // DescribeWorkflowExecution mocks base method.
 func (m *MockHistoryServiceServer) DescribeWorkflowExecution(arg0 context.Context, arg1 *historyservice.DescribeWorkflowExecutionRequest) (*historyservice.DescribeWorkflowExecutionResponse, error) {
 	m.ctrl.T.Helper()
@@ -1878,6 +2008,21 @@ func (m *MockHistoryServiceServer) GetMutableState(arg0 context.Context, arg1 *h
 func (mr *MockHistoryServiceServerMockRecorder) GetMutableState(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMutableState", reflect.TypeOf((*MockHistoryServiceServer)(nil).GetMutableState), arg0, arg1)
+}
+
+// GetPayload mocks base method.
+func (m *MockHistoryServiceServer) GetPayload(arg0 context.Context, arg1 *historyservice.GetPayloadRequest) (*historyservice.GetPayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPayload", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.GetPayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPayload indicates an expected call of GetPayload.
+func (mr *MockHistoryServiceServerMockRecorder) GetPayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPayload", reflect.TypeOf((*MockHistoryServiceServer)(nil).GetPayload), arg0, arg1)
 }
 
 // GetReplicationMessages mocks base method.
@@ -2090,6 +2235,21 @@ func (mr *MockHistoryServiceServerMockRecorder) MergeDLQMessages(arg0, arg1 any)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MergeDLQMessages", reflect.TypeOf((*MockHistoryServiceServer)(nil).MergeDLQMessages), arg0, arg1)
 }
 
+// NewPayloadStore mocks base method.
+func (m *MockHistoryServiceServer) NewPayloadStore(arg0 context.Context, arg1 *historyservice.NewPayloadStoreRequest) (*historyservice.NewPayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewPayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.NewPayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NewPayloadStore indicates an expected call of NewPayloadStore.
+func (mr *MockHistoryServiceServerMockRecorder) NewPayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewPayloadStore", reflect.TypeOf((*MockHistoryServiceServer)(nil).NewPayloadStore), arg0, arg1)
+}
+
 // PauseActivity mocks base method.
 func (m *MockHistoryServiceServer) PauseActivity(arg0 context.Context, arg1 *historyservice.PauseActivityRequest) (*historyservice.PauseActivityResponse, error) {
 	m.ctrl.T.Helper()
@@ -2268,6 +2428,21 @@ func (m *MockHistoryServiceServer) RefreshWorkflowTasks(arg0 context.Context, ar
 func (mr *MockHistoryServiceServerMockRecorder) RefreshWorkflowTasks(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshWorkflowTasks", reflect.TypeOf((*MockHistoryServiceServer)(nil).RefreshWorkflowTasks), arg0, arg1)
+}
+
+// RemovePayload mocks base method.
+func (m *MockHistoryServiceServer) RemovePayload(arg0 context.Context, arg1 *historyservice.RemovePayloadRequest) (*historyservice.RemovePayloadResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RemovePayload", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.RemovePayloadResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RemovePayload indicates an expected call of RemovePayload.
+func (mr *MockHistoryServiceServerMockRecorder) RemovePayload(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RemovePayload", reflect.TypeOf((*MockHistoryServiceServer)(nil).RemovePayload), arg0, arg1)
 }
 
 // RemoveSignalMutableState mocks base method.

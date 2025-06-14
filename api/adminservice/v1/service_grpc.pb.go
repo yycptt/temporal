@@ -63,6 +63,11 @@ const (
 	AdminService_GenerateLastHistoryReplicationTasks_FullMethodName = "/temporal.server.api.adminservice.v1.AdminService/GenerateLastHistoryReplicationTasks"
 	AdminService_DescribeTaskQueuePartition_FullMethodName          = "/temporal.server.api.adminservice.v1.AdminService/DescribeTaskQueuePartition"
 	AdminService_ForceUnloadTaskQueuePartition_FullMethodName       = "/temporal.server.api.adminservice.v1.AdminService/ForceUnloadTaskQueuePartition"
+	AdminService_NewPayloadStore_FullMethodName                     = "/temporal.server.api.adminservice.v1.AdminService/NewPayloadStore"
+	AdminService_DescribePayloadStore_FullMethodName                = "/temporal.server.api.adminservice.v1.AdminService/DescribePayloadStore"
+	AdminService_AddPayload_FullMethodName                          = "/temporal.server.api.adminservice.v1.AdminService/AddPayload"
+	AdminService_GetPayload_FullMethodName                          = "/temporal.server.api.adminservice.v1.AdminService/GetPayload"
+	AdminService_RemovePayload_FullMethodName                       = "/temporal.server.api.adminservice.v1.AdminService/RemovePayload"
 )
 
 // AdminServiceClient is the client API for AdminService service.
@@ -153,6 +158,11 @@ type AdminServiceClient interface {
 	GenerateLastHistoryReplicationTasks(ctx context.Context, in *GenerateLastHistoryReplicationTasksRequest, opts ...grpc.CallOption) (*GenerateLastHistoryReplicationTasksResponse, error)
 	DescribeTaskQueuePartition(ctx context.Context, in *DescribeTaskQueuePartitionRequest, opts ...grpc.CallOption) (*DescribeTaskQueuePartitionResponse, error)
 	ForceUnloadTaskQueuePartition(ctx context.Context, in *ForceUnloadTaskQueuePartitionRequest, opts ...grpc.CallOption) (*ForceUnloadTaskQueuePartitionResponse, error)
+	NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error)
+	DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error)
+	AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error)
+	GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error)
+	RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error)
 }
 
 type adminServiceClient struct {
@@ -572,6 +582,51 @@ func (c *adminServiceClient) ForceUnloadTaskQueuePartition(ctx context.Context, 
 	return out, nil
 }
 
+func (c *adminServiceClient) NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error) {
+	out := new(NewPayloadStoreResponse)
+	err := c.cc.Invoke(ctx, AdminService_NewPayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error) {
+	out := new(DescribePayloadStoreResponse)
+	err := c.cc.Invoke(ctx, AdminService_DescribePayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error) {
+	out := new(AddPayloadResponse)
+	err := c.cc.Invoke(ctx, AdminService_AddPayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error) {
+	out := new(GetPayloadResponse)
+	err := c.cc.Invoke(ctx, AdminService_GetPayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *adminServiceClient) RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error) {
+	out := new(RemovePayloadResponse)
+	err := c.cc.Invoke(ctx, AdminService_RemovePayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AdminServiceServer is the server API for AdminService service.
 // All implementations must embed UnimplementedAdminServiceServer
 // for forward compatibility
@@ -660,6 +715,11 @@ type AdminServiceServer interface {
 	GenerateLastHistoryReplicationTasks(context.Context, *GenerateLastHistoryReplicationTasksRequest) (*GenerateLastHistoryReplicationTasksResponse, error)
 	DescribeTaskQueuePartition(context.Context, *DescribeTaskQueuePartitionRequest) (*DescribeTaskQueuePartitionResponse, error)
 	ForceUnloadTaskQueuePartition(context.Context, *ForceUnloadTaskQueuePartitionRequest) (*ForceUnloadTaskQueuePartitionResponse, error)
+	NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error)
+	DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error)
+	AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error)
+	GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error)
+	RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error)
 	mustEmbedUnimplementedAdminServiceServer()
 }
 
@@ -795,6 +855,21 @@ func (UnimplementedAdminServiceServer) DescribeTaskQueuePartition(context.Contex
 }
 func (UnimplementedAdminServiceServer) ForceUnloadTaskQueuePartition(context.Context, *ForceUnloadTaskQueuePartitionRequest) (*ForceUnloadTaskQueuePartitionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ForceUnloadTaskQueuePartition not implemented")
+}
+func (UnimplementedAdminServiceServer) NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewPayloadStore not implemented")
+}
+func (UnimplementedAdminServiceServer) DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribePayloadStore not implemented")
+}
+func (UnimplementedAdminServiceServer) AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPayload not implemented")
+}
+func (UnimplementedAdminServiceServer) GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPayload not implemented")
+}
+func (UnimplementedAdminServiceServer) RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemovePayload not implemented")
 }
 func (UnimplementedAdminServiceServer) mustEmbedUnimplementedAdminServiceServer() {}
 
@@ -1591,6 +1666,96 @@ func _AdminService_ForceUnloadTaskQueuePartition_Handler(srv interface{}, ctx co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_NewPayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NewPayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).NewPayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_NewPayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).NewPayloadStore(ctx, req.(*NewPayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_DescribePayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribePayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).DescribePayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_DescribePayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).DescribePayloadStore(ctx, req.(*DescribePayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_AddPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).AddPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_AddPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).AddPayload(ctx, req.(*AddPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_GetPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).GetPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_GetPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).GetPayload(ctx, req.(*GetPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AdminService_RemovePayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemovePayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).RemovePayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_RemovePayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).RemovePayload(ctx, req.(*RemovePayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AdminService_ServiceDesc is the grpc.ServiceDesc for AdminService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1765,6 +1930,26 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ForceUnloadTaskQueuePartition",
 			Handler:    _AdminService_ForceUnloadTaskQueuePartition_Handler,
+		},
+		{
+			MethodName: "NewPayloadStore",
+			Handler:    _AdminService_NewPayloadStore_Handler,
+		},
+		{
+			MethodName: "DescribePayloadStore",
+			Handler:    _AdminService_DescribePayloadStore_Handler,
+		},
+		{
+			MethodName: "AddPayload",
+			Handler:    _AdminService_AddPayload_Handler,
+		},
+		{
+			MethodName: "GetPayload",
+			Handler:    _AdminService_GetPayload_Handler,
+		},
+		{
+			MethodName: "RemovePayload",
+			Handler:    _AdminService_RemovePayload_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

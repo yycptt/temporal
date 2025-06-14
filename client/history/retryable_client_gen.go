@@ -11,6 +11,21 @@ import (
 	"go.temporal.io/server/common/backoff"
 )
 
+func (c *retryableClient) AddPayload(
+	ctx context.Context,
+	request *historyservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.AddPayloadResponse, error) {
+	var resp *historyservice.AddPayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.AddPayload(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) AddTasks(
 	ctx context.Context,
 	request *historyservice.AddTasksRequest,
@@ -146,6 +161,21 @@ func (c *retryableClient) DescribeMutableState(
 	return resp, err
 }
 
+func (c *retryableClient) DescribePayloadStore(
+	ctx context.Context,
+	request *historyservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.DescribePayloadStoreResponse, error) {
+	var resp *historyservice.DescribePayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.DescribePayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) DescribeWorkflowExecution(
 	ctx context.Context,
 	request *historyservice.DescribeWorkflowExecutionRequest,
@@ -260,6 +290,21 @@ func (c *retryableClient) GetMutableState(
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.GetMutableState(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
+func (c *retryableClient) GetPayload(
+	ctx context.Context,
+	request *historyservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.GetPayloadResponse, error) {
+	var resp *historyservice.GetPayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.GetPayload(ctx, request, opts...)
 		return err
 	}
 	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
@@ -476,6 +521,21 @@ func (c *retryableClient) MergeDLQMessages(
 	return resp, err
 }
 
+func (c *retryableClient) NewPayloadStore(
+	ctx context.Context,
+	request *historyservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.NewPayloadStoreResponse, error) {
+	var resp *historyservice.NewPayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.NewPayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) PauseActivity(
 	ctx context.Context,
 	request *historyservice.PauseActivityRequest,
@@ -650,6 +710,21 @@ func (c *retryableClient) RefreshWorkflowTasks(
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.RefreshWorkflowTasks(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
+func (c *retryableClient) RemovePayload(
+	ctx context.Context,
+	request *historyservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.RemovePayloadResponse, error) {
+	var resp *historyservice.RemovePayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.RemovePayload(ctx, request, opts...)
 		return err
 	}
 	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)

@@ -9,6 +9,8 @@ var (
 	FlagNamespaceAlias             = []string{"n"}
 	FlagShardID                    = "shard-id"
 	FlagWorkflowID                 = "workflow-id"
+	FlagStoreID                    = "store-id"
+	FlagKey                        = "key"
 	FlagWorkflowIDAlias            = []string{"wid"}
 	FlagRunID                      = "run-id"
 	FlagRunIDAlias                 = []string{"rid"}

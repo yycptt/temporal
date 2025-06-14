@@ -596,3 +596,77 @@ message ForceUnloadTaskQueuePartitionRequest {
 message ForceUnloadTaskQueuePartitionResponse {
   bool was_loaded = 1;
 }
+
+message NewPayloadStoreRequest {
+  string namespace = 1;
+  string store_id = 2;
+}
+
+message NewPayloadStoreResponse {
+  string run_id = 1;
+}
+
+message DescribePayloadStoreRequest {
+  string namespace = 1;
+  string store_id = 2;
+  string run_id = 3;
+}
+
+message DescribePayloadStoreResponse {
+  // The total number of payloads in the store.
+  int64 total_count = 1;
+  // The total size of all payloads in the store.
+  int64 total_size = 2;
+}
+
+message AddPayloadRequest {
+  // The namespace for the payload store.
+  string namespace = 1;
+  // The store ID to which the payload is added.
+  string store_id = 2;
+  // The run ID of the payload store.
+  string run_id = 3;
+  string payload_key  = 4;
+  // The payload to be added.
+  temporal.api.common.v1.Payload payload = 5;
+}
+
+message AddPayloadResponse {
+  // The total number of payloads in the store after adding the new payload.
+  int64 total_count = 1;
+  // The total size of all payloads in the store after adding the new payload.
+  int64 total_size = 2;
+}
+
+message GetPayloadRequest {
+  // The namespace for the payload store.
+  string namespace = 1;
+  // The store ID from which the payload is removed.
+  string store_id = 2;
+  // The run ID of the payload store.
+  string run_id = 3;
+  // The key of the payload to be removed.
+  string payload_key = 4;
+}
+
+message GetPayloadResponse {
+  temporal.api.common.v1.Payload payload = 1;
+}
+
+message RemovePayloadRequest {
+  // The namespace for the payload store.
+  string namespace = 1;
+  // The store ID from which the payload is removed.
+  string store_id = 2;
+  // The run ID of the payload store.
+  string run_id = 3;
+  // The key of the payload to be removed.
+  string payload_key = 4;
+}
+
+message RemovePayloadResponse {
+  // The total number of payloads in the store after removing the payload.
+  int64 total_count = 1;
+  // The total size of all payloads in the store after removing the payload.
+  int64 total_size = 2;
+}

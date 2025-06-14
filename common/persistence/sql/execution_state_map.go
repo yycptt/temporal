@@ -3,6 +3,7 @@ package sql
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/api/serviceerror"
@@ -478,6 +479,9 @@ func updateChasmNodes(
 	if len(chasmNodes) > 0 {
 		rows := make([]sqlplugin.ChasmNodeMapsRow, 0, len(chasmNodes))
 		for path, node := range chasmNodes {
+			if node.Data == nil {
+				fmt.Println("?????? node.Data is nil for path:", path)
+			}
 			rows = append(rows, sqlplugin.ChasmNodeMapsRow{
 				ShardID:          shardID,
 				NamespaceID:      namespaceID,

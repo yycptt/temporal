@@ -19,6 +19,16 @@ func (c *clientImpl) AddOrUpdateRemoteCluster(
 	return c.client.AddOrUpdateRemoteCluster(ctx, request, opts...)
 }
 
+func (c *clientImpl) AddPayload(
+	ctx context.Context,
+	request *adminservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.AddPayloadResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.AddPayload(ctx, request, opts...)
+}
+
 func (c *clientImpl) AddSearchAttributes(
 	ctx context.Context,
 	request *adminservice.AddSearchAttributesRequest,
@@ -119,6 +129,16 @@ func (c *clientImpl) DescribeMutableState(
 	return c.client.DescribeMutableState(ctx, request, opts...)
 }
 
+func (c *clientImpl) DescribePayloadStore(
+	ctx context.Context,
+	request *adminservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.DescribePayloadStoreResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.DescribePayloadStore(ctx, request, opts...)
+}
+
 func (c *clientImpl) DescribeTaskQueuePartition(
 	ctx context.Context,
 	request *adminservice.DescribeTaskQueuePartitionRequest,
@@ -197,6 +217,16 @@ func (c *clientImpl) GetNamespaceReplicationMessages(
 	ctx, cancel := c.createContext(ctx)
 	defer cancel()
 	return c.client.GetNamespaceReplicationMessages(ctx, request, opts...)
+}
+
+func (c *clientImpl) GetPayload(
+	ctx context.Context,
+	request *adminservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.GetPayloadResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.GetPayload(ctx, request, opts...)
 }
 
 func (c *clientImpl) GetReplicationMessages(
@@ -329,6 +359,16 @@ func (c *clientImpl) MergeDLQTasks(
 	return c.client.MergeDLQTasks(ctx, request, opts...)
 }
 
+func (c *clientImpl) NewPayloadStore(
+	ctx context.Context,
+	request *adminservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.NewPayloadStoreResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.NewPayloadStore(ctx, request, opts...)
+}
+
 func (c *clientImpl) PurgeDLQMessages(
 	ctx context.Context,
 	request *adminservice.PurgeDLQMessagesRequest,
@@ -377,6 +417,16 @@ func (c *clientImpl) RefreshWorkflowTasks(
 	ctx, cancel := c.createContext(ctx)
 	defer cancel()
 	return c.client.RefreshWorkflowTasks(ctx, request, opts...)
+}
+
+func (c *clientImpl) RemovePayload(
+	ctx context.Context,
+	request *adminservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.RemovePayloadResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.RemovePayload(ctx, request, opts...)
 }
 
 func (c *clientImpl) RemoveRemoteCluster(

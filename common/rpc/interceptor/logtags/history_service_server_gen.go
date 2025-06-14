@@ -9,6 +9,12 @@ import (
 
 func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []tag.Tag {
 	switch r := message.(type) {
+	case *historyservice.AddPayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *historyservice.AddPayloadResponse:
+		return nil
 	case *historyservice.AddTasksRequest:
 		return nil
 	case *historyservice.AddTasksResponse:
@@ -60,6 +66,12 @@ func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []ta
 		}
 	case *historyservice.DescribeMutableStateResponse:
 		return nil
+	case *historyservice.DescribePayloadStoreRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *historyservice.DescribePayloadStoreResponse:
+		return nil
 	case *historyservice.DescribeWorkflowExecutionRequest:
 		return []tag.Tag{
 			tag.WorkflowID(r.GetRequest().GetExecution().GetWorkflowId()),
@@ -109,6 +121,12 @@ func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []ta
 			tag.WorkflowID(r.GetExecution().GetWorkflowId()),
 			tag.WorkflowRunID(r.GetExecution().GetRunId()),
 		}
+	case *historyservice.GetPayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *historyservice.GetPayloadResponse:
+		return nil
 	case *historyservice.GetReplicationMessagesRequest:
 		return nil
 	case *historyservice.GetReplicationMessagesResponse:
@@ -189,6 +207,12 @@ func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []ta
 		return nil
 	case *historyservice.MergeDLQMessagesResponse:
 		return nil
+	case *historyservice.NewPayloadStoreRequest:
+		return nil
+	case *historyservice.NewPayloadStoreResponse:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
 	case *historyservice.PauseActivityRequest:
 		return []tag.Tag{
 			tag.WorkflowID(r.GetFrontendRequest().GetExecution().GetWorkflowId()),
@@ -269,6 +293,12 @@ func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []ta
 			tag.WorkflowRunID(r.GetRequest().GetExecution().GetRunId()),
 		}
 	case *historyservice.RefreshWorkflowTasksResponse:
+		return nil
+	case *historyservice.RemovePayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *historyservice.RemovePayloadResponse:
 		return nil
 	case *historyservice.RemoveSignalMutableStateRequest:
 		return []tag.Tag{

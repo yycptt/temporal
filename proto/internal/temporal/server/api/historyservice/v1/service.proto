@@ -415,4 +415,9 @@ service HistoryService {
     rpc ResetActivity (ResetActivityRequest) returns (ResetActivityResponse) {
     }
 
+    rpc NewPayloadStore (NewPayloadStoreRequest) returns (NewPayloadStoreResponse) {}
+    rpc DescribePayloadStore (DescribePayloadStoreRequest) returns (DescribePayloadStoreResponse) {}
+    rpc AddPayload (AddPayloadRequest) returns (AddPayloadResponse) {}
+    rpc GetPayload (GetPayloadRequest) returns (GetPayloadResponse) {}
+    rpc RemovePayload (RemovePayloadRequest) returns (RemovePayloadResponse) {}
 }

@@ -1,0 +1,21 @@
+package example
+
+import "go.temporal.io/server/chasm"
+
+type (
+	library struct {
+		chasm.UnimplementedLibrary
+	}
+)
+
+var Library = &library{}
+
+func (l *library) Name() string {
+	return "example"
+}
+
+func (l *library) Components() []*chasm.RegistrableComponent {
+	return []*chasm.RegistrableComponent{
+		chasm.NewRegistrableComponent[*PayloadStore]("payloadStore"),
+	}
+}

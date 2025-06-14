@@ -10,6 +10,26 @@ import (
 	"google.golang.org/grpc"
 )
 
+func (c *clientImpl) AddPayload(
+	ctx context.Context,
+	request *historyservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.AddPayloadResponse, error) {
+	shardID := c.shardIDFromWorkflowID(request.GetNamespaceId(), request.GetStoreId())
+	var response *historyservice.AddPayloadResponse
+	op := func(ctx context.Context, client historyservice.HistoryServiceClient) error {
+		var err error
+		ctx, cancel := c.createContext(ctx)
+		defer cancel()
+		response, err = client.AddPayload(ctx, request, opts...)
+		return err
+	}
+	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (c *clientImpl) AddTasks(
 	ctx context.Context,
 	request *historyservice.AddTasksRequest,
@@ -142,6 +162,26 @@ func (c *clientImpl) DescribeMutableState(
 		ctx, cancel := c.createContext(ctx)
 		defer cancel()
 		response, err = client.DescribeMutableState(ctx, request, opts...)
+		return err
+	}
+	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *clientImpl) DescribePayloadStore(
+	ctx context.Context,
+	request *historyservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.DescribePayloadStoreResponse, error) {
+	shardID := c.shardIDFromWorkflowID(request.GetNamespaceId(), request.GetStoreId())
+	var response *historyservice.DescribePayloadStoreResponse
+	op := func(ctx context.Context, client historyservice.HistoryServiceClient) error {
+		var err error
+		ctx, cancel := c.createContext(ctx)
+		defer cancel()
+		response, err = client.DescribePayloadStore(ctx, request, opts...)
 		return err
 	}
 	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
@@ -306,6 +346,26 @@ func (c *clientImpl) GetMutableState(
 		ctx, cancel := c.createContext(ctx)
 		defer cancel()
 		response, err = client.GetMutableState(ctx, request, opts...)
+		return err
+	}
+	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *clientImpl) GetPayload(
+	ctx context.Context,
+	request *historyservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.GetPayloadResponse, error) {
+	shardID := c.shardIDFromWorkflowID(request.GetNamespaceId(), request.GetStoreId())
+	var response *historyservice.GetPayloadResponse
+	op := func(ctx context.Context, client historyservice.HistoryServiceClient) error {
+		var err error
+		ctx, cancel := c.createContext(ctx)
+		defer cancel()
+		response, err = client.GetPayload(ctx, request, opts...)
 		return err
 	}
 	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
@@ -554,6 +614,26 @@ func (c *clientImpl) MergeDLQMessages(
 	return response, nil
 }
 
+func (c *clientImpl) NewPayloadStore(
+	ctx context.Context,
+	request *historyservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.NewPayloadStoreResponse, error) {
+	shardID := c.shardIDFromWorkflowID(request.GetNamespaceId(), request.GetStoreId())
+	var response *historyservice.NewPayloadStoreResponse
+	op := func(ctx context.Context, client historyservice.HistoryServiceClient) error {
+		var err error
+		ctx, cancel := c.createContext(ctx)
+		defer cancel()
+		response, err = client.NewPayloadStore(ctx, request, opts...)
+		return err
+	}
+	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
 func (c *clientImpl) PauseActivity(
 	ctx context.Context,
 	request *historyservice.PauseActivityRequest,
@@ -791,6 +871,26 @@ func (c *clientImpl) RefreshWorkflowTasks(
 		ctx, cancel := c.createContext(ctx)
 		defer cancel()
 		response, err = client.RefreshWorkflowTasks(ctx, request, opts...)
+		return err
+	}
+	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (c *clientImpl) RemovePayload(
+	ctx context.Context,
+	request *historyservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.RemovePayloadResponse, error) {
+	shardID := c.shardIDFromWorkflowID(request.GetNamespaceId(), request.GetStoreId())
+	var response *historyservice.RemovePayloadResponse
+	op := func(ctx context.Context, client historyservice.HistoryServiceClient) error {
+		var err error
+		ctx, cancel := c.createContext(ctx)
+		defer cancel()
+		response, err = client.RemovePayload(ctx, request, opts...)
 		return err
 	}
 	if err := c.executeWithRedirect(ctx, shardID, op); err != nil {

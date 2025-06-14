@@ -26,6 +26,21 @@ func (c *retryableClient) AddOrUpdateRemoteCluster(
 	return resp, err
 }
 
+func (c *retryableClient) AddPayload(
+	ctx context.Context,
+	request *adminservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.AddPayloadResponse, error) {
+	var resp *adminservice.AddPayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.AddPayload(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) AddSearchAttributes(
 	ctx context.Context,
 	request *adminservice.AddSearchAttributesRequest,
@@ -176,6 +191,21 @@ func (c *retryableClient) DescribeMutableState(
 	return resp, err
 }
 
+func (c *retryableClient) DescribePayloadStore(
+	ctx context.Context,
+	request *adminservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.DescribePayloadStoreResponse, error) {
+	var resp *adminservice.DescribePayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.DescribePayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) DescribeTaskQueuePartition(
 	ctx context.Context,
 	request *adminservice.DescribeTaskQueuePartitionRequest,
@@ -290,6 +320,21 @@ func (c *retryableClient) GetNamespaceReplicationMessages(
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.GetNamespaceReplicationMessages(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
+func (c *retryableClient) GetPayload(
+	ctx context.Context,
+	request *adminservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.GetPayloadResponse, error) {
+	var resp *adminservice.GetPayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.GetPayload(ctx, request, opts...)
 		return err
 	}
 	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
@@ -491,6 +536,21 @@ func (c *retryableClient) MergeDLQTasks(
 	return resp, err
 }
 
+func (c *retryableClient) NewPayloadStore(
+	ctx context.Context,
+	request *adminservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.NewPayloadStoreResponse, error) {
+	var resp *adminservice.NewPayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.NewPayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) PurgeDLQMessages(
 	ctx context.Context,
 	request *adminservice.PurgeDLQMessagesRequest,
@@ -560,6 +620,21 @@ func (c *retryableClient) RefreshWorkflowTasks(
 	op := func(ctx context.Context) error {
 		var err error
 		resp, err = c.client.RefreshWorkflowTasks(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
+func (c *retryableClient) RemovePayload(
+	ctx context.Context,
+	request *adminservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.RemovePayloadResponse, error) {
+	var resp *adminservice.RemovePayloadResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.RemovePayload(ctx, request, opts...)
 		return err
 	}
 	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)

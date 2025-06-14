@@ -2220,6 +2220,120 @@ func (adh *AdminHandler) getDLQWorkflowID(
 	)
 }
 
+func (adh *AdminHandler) NewPayloadStore(ctx context.Context, request *adminservice.NewPayloadStoreRequest) (*adminservice.NewPayloadStoreResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := adh.historyClient.NewPayloadStore(
+		ctx,
+		&historyservice.NewPayloadStoreRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.NewPayloadStoreResponse{
+		RunId: resp.GetRunId(),
+	}, nil
+}
+func (adh *AdminHandler) DescribePayloadStore(ctx context.Context, request *adminservice.DescribePayloadStoreRequest) (*adminservice.DescribePayloadStoreResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := adh.historyClient.DescribePayloadStore(
+		ctx,
+		&historyservice.DescribePayloadStoreRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+			RunId:       request.GetRunId(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.DescribePayloadStoreResponse{
+		TotalCount: resp.GetTotalCount(),
+		TotalSize:  resp.GetTotalSize(),
+	}, nil
+}
+func (adh *AdminHandler) AddPayload(ctx context.Context, request *adminservice.AddPayloadRequest) (*adminservice.AddPayloadResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := adh.historyClient.AddPayload(
+		ctx,
+		&historyservice.AddPayloadRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+			RunId:       request.GetRunId(),
+			PayloadKey:  request.GetPayloadKey(),
+			Payload:     request.GetPayload(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.AddPayloadResponse{
+		TotalCount: resp.GetTotalCount(),
+		TotalSize:  resp.GetTotalSize(),
+	}, nil
+}
+
+func (adh *AdminHandler) GetPayload(ctx context.Context, request *adminservice.GetPayloadRequest) (*adminservice.GetPayloadResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := adh.historyClient.GetPayload(
+		ctx,
+		&historyservice.GetPayloadRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+			RunId:       request.GetRunId(),
+			PayloadKey:  request.GetPayloadKey(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.GetPayloadResponse{
+		Payload: resp.GetPayload(),
+	}, nil
+}
+
+func (adh *AdminHandler) RemovePayload(ctx context.Context, request *adminservice.RemovePayloadRequest) (*adminservice.RemovePayloadResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := adh.historyClient.RemovePayload(
+		ctx,
+		&historyservice.RemovePayloadRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+			RunId:       request.GetRunId(),
+			PayloadKey:  request.GetPayloadKey(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.RemovePayloadResponse{
+		TotalCount: resp.GetTotalCount(),
+		TotalSize:  resp.GetTotalSize(),
+	}, nil
+}
+
 func validateHistoryDLQKey(
 	key *commonspb.HistoryDLQKey,
 ) error {

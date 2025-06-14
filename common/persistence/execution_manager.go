@@ -18,6 +18,7 @@ import (
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/log/tag"
 	"go.temporal.io/server/common/persistence/serialization"
+	"go.temporal.io/server/common/persistence/transitionhistory"
 	"go.temporal.io/server/common/persistence/versionhistory"
 	"go.temporal.io/server/service/history/tasks"
 )
@@ -634,7 +635,7 @@ func (m *executionManagerImpl) SerializeWorkflowMutation( // unexport
 		}
 	}
 
-	result.LastWriteVersion, err = getCurrentBranchLastWriteVersion(input.ExecutionInfo.VersionHistories)
+	result.LastWriteVersion, err = getCurrentBranchLastWriteVersion(input.ExecutionInfo.VersionHistories, input.ExecutionInfo.TransitionHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +687,7 @@ func (m *executionManagerImpl) SerializeWorkflowSnapshot( // unexport
 	if err != nil {
 		return nil, err
 	}
-	result.LastWriteVersion, err = getCurrentBranchLastWriteVersion(input.ExecutionInfo.VersionHistories)
+	result.LastWriteVersion, err = getCurrentBranchLastWriteVersion(input.ExecutionInfo.VersionHistories, input.ExecutionInfo.TransitionHistory)
 	if err != nil {
 		return nil, err
 	}
@@ -1099,7 +1100,12 @@ func getCurrentBranchToken(
 
 func getCurrentBranchLastWriteVersion(
 	versionHistories *historyspb.VersionHistories,
+	transitions []*persistencespb.VersionedTransition,
 ) (int64, error) {
+	if len(transitions) > 0 {
+		return transitionhistory.LastVersionedTransition(transitions).NamespaceFailoverVersion, nil
+	}
+
 	// TODO remove this if check once legacy execution tests are removed
 	if versionHistories == nil {
 		return common.EmptyVersion, nil

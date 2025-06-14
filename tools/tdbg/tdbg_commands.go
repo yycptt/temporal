@@ -68,6 +68,11 @@ func getCommands(
 			Usage:       "Decode payload",
 			Subcommands: newDecodeCommands(taskBlobEncoder),
 		},
+		{
+			Name:        "payload",
+			Usage:       "Example Payload Store",
+			Subcommands: newPayloadCommands(clientFactory),
+		},
 	}
 }
 

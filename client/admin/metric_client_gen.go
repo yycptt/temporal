@@ -23,6 +23,20 @@ func (c *metricClient) AddOrUpdateRemoteCluster(
 	return c.client.AddOrUpdateRemoteCluster(ctx, request, opts...)
 }
 
+func (c *metricClient) AddPayload(
+	ctx context.Context,
+	request *adminservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.AddPayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientAddPayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.AddPayload(ctx, request, opts...)
+}
+
 func (c *metricClient) AddSearchAttributes(
 	ctx context.Context,
 	request *adminservice.AddSearchAttributesRequest,
@@ -163,6 +177,20 @@ func (c *metricClient) DescribeMutableState(
 	return c.client.DescribeMutableState(ctx, request, opts...)
 }
 
+func (c *metricClient) DescribePayloadStore(
+	ctx context.Context,
+	request *adminservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.DescribePayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientDescribePayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.DescribePayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) DescribeTaskQueuePartition(
 	ctx context.Context,
 	request *adminservice.DescribeTaskQueuePartitionRequest,
@@ -273,6 +301,20 @@ func (c *metricClient) GetNamespaceReplicationMessages(
 	}()
 
 	return c.client.GetNamespaceReplicationMessages(ctx, request, opts...)
+}
+
+func (c *metricClient) GetPayload(
+	ctx context.Context,
+	request *adminservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.GetPayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientGetPayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.GetPayload(ctx, request, opts...)
 }
 
 func (c *metricClient) GetReplicationMessages(
@@ -457,6 +499,20 @@ func (c *metricClient) MergeDLQTasks(
 	return c.client.MergeDLQTasks(ctx, request, opts...)
 }
 
+func (c *metricClient) NewPayloadStore(
+	ctx context.Context,
+	request *adminservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.NewPayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientNewPayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.NewPayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) PurgeDLQMessages(
 	ctx context.Context,
 	request *adminservice.PurgeDLQMessagesRequest,
@@ -525,6 +581,20 @@ func (c *metricClient) RefreshWorkflowTasks(
 	}()
 
 	return c.client.RefreshWorkflowTasks(ctx, request, opts...)
+}
+
+func (c *metricClient) RemovePayload(
+	ctx context.Context,
+	request *adminservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.RemovePayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientRemovePayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.RemovePayload(ctx, request, opts...)
 }
 
 func (c *metricClient) RemoveRemoteCluster(

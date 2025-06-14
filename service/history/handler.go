@@ -18,6 +18,8 @@ import (
 	namespacespb "go.temporal.io/server/api/namespace/v1"
 	replicationspb "go.temporal.io/server/api/replication/v1"
 	tokenspb "go.temporal.io/server/api/token/v1"
+	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/chasm/lib/example"
 	"go.temporal.io/server/client/history"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/archiver"
@@ -92,6 +94,7 @@ type (
 		taskQueueManager             persistence.HistoryTaskQueueManager
 		taskCategoryRegistry         tasks.TaskCategoryRegistry
 		dlqMetricsEmitter            *persistence.DLQMetricsEmitter
+		chasmEngine                  chasm.Engine
 
 		replicationTaskFetcherFactory    replication.TaskFetcherFactory
 		replicationTaskConverterProvider replication.SourceTaskConverterProvider
@@ -126,6 +129,7 @@ type (
 		TaskQueueManager             persistence.HistoryTaskQueueManager
 		TaskCategoryRegistry         tasks.TaskCategoryRegistry
 		DLQMetricsEmitter            *persistence.DLQMetricsEmitter
+		ChasmEngine                  chasm.Engine
 
 		ReplicationTaskFetcherFactory   replication.TaskFetcherFactory
 		ReplicationTaskConverterFactory replication.SourceTaskConverterProvider
@@ -2625,4 +2629,24 @@ func (h *Handler) ResetActivity(
 		return nil, h.convertError(err)
 	}
 	return response, nil
+}
+
+func (h *Handler) NewPayloadStore(ctx context.Context, request *historyservice.NewPayloadStoreRequest) (*historyservice.NewPayloadStoreResponse, error) {
+	return example.NewPayloadStoreHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
+}
+
+func (h *Handler) DescribePayloadStore(ctx context.Context, request *historyservice.DescribePayloadStoreRequest) (*historyservice.DescribePayloadStoreResponse, error) {
+	return example.DescribePayloadStoreHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
+}
+
+func (h *Handler) AddPayload(ctx context.Context, request *historyservice.AddPayloadRequest) (*historyservice.AddPayloadResponse, error) {
+	return example.AddPayloadHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
+}
+
+func (h *Handler) GetPayload(ctx context.Context, request *historyservice.GetPayloadRequest) (*historyservice.GetPayloadResponse, error) {
+	return example.GetPayloadHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
+}
+
+func (h *Handler) RemovePayload(ctx context.Context, request *historyservice.RemovePayloadRequest) (*historyservice.RemovePayloadResponse, error) {
+	return example.RemovePayloadHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
 }

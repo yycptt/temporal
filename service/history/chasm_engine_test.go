@@ -113,10 +113,11 @@ func (s *chasmEngineSuite) SetupTest() {
 
 	s.engine = NewChasmEngine(
 		s.entityCache,
-		s.mockShardController,
+		// s.mockShardController,
 		s.registry,
 		s.config,
 	)
+	s.engine.SetShardController(s.mockShardController)
 }
 
 func (s *chasmEngineSuite) SetupSubTest() {

@@ -91,6 +91,11 @@ const (
 	HistoryService_PauseActivity_FullMethodName                          = "/temporal.server.api.historyservice.v1.HistoryService/PauseActivity"
 	HistoryService_UnpauseActivity_FullMethodName                        = "/temporal.server.api.historyservice.v1.HistoryService/UnpauseActivity"
 	HistoryService_ResetActivity_FullMethodName                          = "/temporal.server.api.historyservice.v1.HistoryService/ResetActivity"
+	HistoryService_NewPayloadStore_FullMethodName                        = "/temporal.server.api.historyservice.v1.HistoryService/NewPayloadStore"
+	HistoryService_DescribePayloadStore_FullMethodName                   = "/temporal.server.api.historyservice.v1.HistoryService/DescribePayloadStore"
+	HistoryService_AddPayload_FullMethodName                             = "/temporal.server.api.historyservice.v1.HistoryService/AddPayload"
+	HistoryService_GetPayload_FullMethodName                             = "/temporal.server.api.historyservice.v1.HistoryService/GetPayload"
+	HistoryService_RemovePayload_FullMethodName                          = "/temporal.server.api.historyservice.v1.HistoryService/RemovePayload"
 )
 
 // HistoryServiceClient is the client API for HistoryService service.
@@ -369,6 +374,11 @@ type HistoryServiceClient interface {
 	// (-- api-linter: core::0134::method-signature=disabled
 	// (-- api-linter: core::0134::response-message-name=disabled
 	ResetActivity(ctx context.Context, in *ResetActivityRequest, opts ...grpc.CallOption) (*ResetActivityResponse, error)
+	NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error)
+	DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error)
+	AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error)
+	GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error)
+	RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error)
 }
 
 type historyServiceClient struct {
@@ -1040,6 +1050,51 @@ func (c *historyServiceClient) ResetActivity(ctx context.Context, in *ResetActiv
 	return out, nil
 }
 
+func (c *historyServiceClient) NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error) {
+	out := new(NewPayloadStoreResponse)
+	err := c.cc.Invoke(ctx, HistoryService_NewPayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *historyServiceClient) DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error) {
+	out := new(DescribePayloadStoreResponse)
+	err := c.cc.Invoke(ctx, HistoryService_DescribePayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *historyServiceClient) AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error) {
+	out := new(AddPayloadResponse)
+	err := c.cc.Invoke(ctx, HistoryService_AddPayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *historyServiceClient) GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error) {
+	out := new(GetPayloadResponse)
+	err := c.cc.Invoke(ctx, HistoryService_GetPayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *historyServiceClient) RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error) {
+	out := new(RemovePayloadResponse)
+	err := c.cc.Invoke(ctx, HistoryService_RemovePayload_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // HistoryServiceServer is the server API for HistoryService service.
 // All implementations must embed UnimplementedHistoryServiceServer
 // for forward compatibility
@@ -1316,6 +1371,11 @@ type HistoryServiceServer interface {
 	// (-- api-linter: core::0134::method-signature=disabled
 	// (-- api-linter: core::0134::response-message-name=disabled
 	ResetActivity(context.Context, *ResetActivityRequest) (*ResetActivityResponse, error)
+	NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error)
+	DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error)
+	AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error)
+	GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error)
+	RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error)
 	mustEmbedUnimplementedHistoryServiceServer()
 }
 
@@ -1535,6 +1595,21 @@ func (UnimplementedHistoryServiceServer) UnpauseActivity(context.Context, *Unpau
 }
 func (UnimplementedHistoryServiceServer) ResetActivity(context.Context, *ResetActivityRequest) (*ResetActivityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ResetActivity not implemented")
+}
+func (UnimplementedHistoryServiceServer) NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NewPayloadStore not implemented")
+}
+func (UnimplementedHistoryServiceServer) DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribePayloadStore not implemented")
+}
+func (UnimplementedHistoryServiceServer) AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddPayload not implemented")
+}
+func (UnimplementedHistoryServiceServer) GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPayload not implemented")
+}
+func (UnimplementedHistoryServiceServer) RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemovePayload not implemented")
 }
 func (UnimplementedHistoryServiceServer) mustEmbedUnimplementedHistoryServiceServer() {}
 
@@ -2835,6 +2910,96 @@ func _HistoryService_ResetActivity_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HistoryService_NewPayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NewPayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).NewPayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_NewPayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).NewPayloadStore(ctx, req.(*NewPayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HistoryService_DescribePayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribePayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).DescribePayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_DescribePayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).DescribePayloadStore(ctx, req.(*DescribePayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HistoryService_AddPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).AddPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_AddPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).AddPayload(ctx, req.(*AddPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HistoryService_GetPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).GetPayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_GetPayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).GetPayload(ctx, req.(*GetPayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _HistoryService_RemovePayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemovePayloadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).RemovePayload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_RemovePayload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).RemovePayload(ctx, req.(*RemovePayloadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // HistoryService_ServiceDesc is the grpc.ServiceDesc for HistoryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -3121,6 +3286,26 @@ var HistoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResetActivity",
 			Handler:    _HistoryService_ResetActivity_Handler,
+		},
+		{
+			MethodName: "NewPayloadStore",
+			Handler:    _HistoryService_NewPayloadStore_Handler,
+		},
+		{
+			MethodName: "DescribePayloadStore",
+			Handler:    _HistoryService_DescribePayloadStore_Handler,
+		},
+		{
+			MethodName: "AddPayload",
+			Handler:    _HistoryService_AddPayload_Handler,
+		},
+		{
+			MethodName: "GetPayload",
+			Handler:    _HistoryService_GetPayload_Handler,
+		},
+		{
+			MethodName: "RemovePayload",
+			Handler:    _HistoryService_RemovePayload_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

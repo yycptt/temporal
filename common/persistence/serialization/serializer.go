@@ -564,14 +564,24 @@ func (t *serializerImpl) ChasmNodeToBlobs(node *persistencespb.ChasmNode, encodi
 	if err != nil {
 		return nil, nil, err
 	}
+	userData := node.Data
+	if userData == nil {
+		userData = &commonpb.DataBlob{
+			Data:         nil,
+			EncodingType: enumspb.ENCODING_TYPE_UNSPECIFIED,
+		}
+	}
 
-	return metadata, node.Data, nil
+	return metadata, userData, nil
 }
 
 func (t *serializerImpl) ChasmNodeFromBlobs(metadata *commonpb.DataBlob, data *commonpb.DataBlob) (*persistencespb.ChasmNode, error) {
 	result := &persistencespb.ChasmNode{
 		Metadata: &persistencespb.ChasmNodeMetadata{},
 		Data:     data,
+	}
+	if data == nil || len(data.Data) == 0 || data.EncodingType == enumspb.ENCODING_TYPE_UNSPECIFIED {
+		result.Data = nil
 	}
 
 	return result, ProtoDecodeBlob(metadata, result.Metadata)

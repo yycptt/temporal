@@ -19,6 +19,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.temporal.io/api/serviceerror"
 	persistencespb "go.temporal.io/server/api/persistence/v1"
+	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/chasm/lib/example"
 	"go.temporal.io/server/client"
 	"go.temporal.io/server/common/archiver"
 	"go.temporal.io/server/common/authorization"
@@ -137,6 +139,8 @@ var (
 		dynamicconfig.Module,
 		pprof.Module,
 		TraceExportModule,
+		chasm.Module,
+		example.Module,
 		FxLogAdapter,
 		fx.Invoke(ServerLifetimeHooks),
 	)
@@ -352,6 +356,7 @@ type (
 		InstanceID                 resource.InstanceID                     `optional:"true"`
 		StaticServiceHosts         map[primitives.ServiceName]static.Hosts `optional:"true"`
 		TaskCategoryRegistry       tasks.TaskCategoryRegistry
+		ChasmRegistry              *chasm.Registry
 	}
 )
 
@@ -423,6 +428,9 @@ func (params ServiceProviderParamsCommon) GetCommonServiceOptions(serviceName pr
 			},
 			func() tasks.TaskCategoryRegistry {
 				return params.TaskCategoryRegistry
+			},
+			func() *chasm.Registry {
+				return params.ChasmRegistry
 			},
 		),
 		ServiceTracingModule,

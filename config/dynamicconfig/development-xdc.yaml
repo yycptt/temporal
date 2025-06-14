@@ -50,3 +50,5 @@ history.ReplicationEnableUpdateWithNewTaskMerge:
   - value: true
 history.enableTransitionHistory:
   - value: true
+history.enableChasm:
+  - value: true

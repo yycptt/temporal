@@ -13,6 +13,12 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 		return nil
 	case *adminservice.AddOrUpdateRemoteClusterResponse:
 		return nil
+	case *adminservice.AddPayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *adminservice.AddPayloadResponse:
+		return nil
 	case *adminservice.AddSearchAttributesRequest:
 		return nil
 	case *adminservice.AddSearchAttributesResponse:
@@ -62,6 +68,12 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 		}
 	case *adminservice.DescribeMutableStateResponse:
 		return nil
+	case *adminservice.DescribePayloadStoreRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *adminservice.DescribePayloadStoreResponse:
+		return nil
 	case *adminservice.DescribeTaskQueuePartitionRequest:
 		return nil
 	case *adminservice.DescribeTaskQueuePartitionResponse:
@@ -96,6 +108,12 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 	case *adminservice.GetNamespaceReplicationMessagesRequest:
 		return nil
 	case *adminservice.GetNamespaceReplicationMessagesResponse:
+		return nil
+	case *adminservice.GetPayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *adminservice.GetPayloadResponse:
 		return nil
 	case *adminservice.GetReplicationMessagesRequest:
 		return nil
@@ -158,6 +176,12 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 		return nil
 	case *adminservice.MergeDLQTasksResponse:
 		return nil
+	case *adminservice.NewPayloadStoreRequest:
+		return nil
+	case *adminservice.NewPayloadStoreResponse:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
 	case *adminservice.PurgeDLQMessagesRequest:
 		return nil
 	case *adminservice.PurgeDLQMessagesResponse:
@@ -186,6 +210,12 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 			tag.WorkflowRunID(r.GetExecution().GetRunId()),
 		}
 	case *adminservice.RefreshWorkflowTasksResponse:
+		return nil
+	case *adminservice.RemovePayloadRequest:
+		return []tag.Tag{
+			tag.WorkflowRunID(r.GetRunId()),
+		}
+	case *adminservice.RemovePayloadResponse:
 		return nil
 	case *adminservice.RemoveRemoteClusterRequest:
 		return nil

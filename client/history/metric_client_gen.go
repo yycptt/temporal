@@ -9,6 +9,20 @@ import (
 	"google.golang.org/grpc"
 )
 
+func (c *metricClient) AddPayload(
+	ctx context.Context,
+	request *historyservice.AddPayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.AddPayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientAddPayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.AddPayload(ctx, request, opts...)
+}
+
 func (c *metricClient) AddTasks(
 	ctx context.Context,
 	request *historyservice.AddTasksRequest,
@@ -135,6 +149,20 @@ func (c *metricClient) DescribeMutableState(
 	return c.client.DescribeMutableState(ctx, request, opts...)
 }
 
+func (c *metricClient) DescribePayloadStore(
+	ctx context.Context,
+	request *historyservice.DescribePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.DescribePayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientDescribePayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.DescribePayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) DescribeWorkflowExecution(
 	ctx context.Context,
 	request *historyservice.DescribeWorkflowExecutionRequest,
@@ -245,6 +273,20 @@ func (c *metricClient) GetMutableState(
 	}()
 
 	return c.client.GetMutableState(ctx, request, opts...)
+}
+
+func (c *metricClient) GetPayload(
+	ctx context.Context,
+	request *historyservice.GetPayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.GetPayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientGetPayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.GetPayload(ctx, request, opts...)
 }
 
 func (c *metricClient) GetReplicationMessages(
@@ -443,6 +485,20 @@ func (c *metricClient) MergeDLQMessages(
 	return c.client.MergeDLQMessages(ctx, request, opts...)
 }
 
+func (c *metricClient) NewPayloadStore(
+	ctx context.Context,
+	request *historyservice.NewPayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.NewPayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientNewPayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.NewPayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) PauseActivity(
 	ctx context.Context,
 	request *historyservice.PauseActivityRequest,
@@ -609,6 +665,20 @@ func (c *metricClient) RefreshWorkflowTasks(
 	}()
 
 	return c.client.RefreshWorkflowTasks(ctx, request, opts...)
+}
+
+func (c *metricClient) RemovePayload(
+	ctx context.Context,
+	request *historyservice.RemovePayloadRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.RemovePayloadResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientRemovePayload")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.RemovePayload(ctx, request, opts...)
 }
 
 func (c *metricClient) RemoveSignalMutableState(
