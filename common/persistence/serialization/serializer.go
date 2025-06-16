@@ -580,7 +580,7 @@ func (t *serializerImpl) ChasmNodeFromBlobs(metadata *commonpb.DataBlob, data *c
 		Metadata: &persistencespb.ChasmNodeMetadata{},
 		Data:     data,
 	}
-	if data == nil || len(data.Data) == 0 || data.EncodingType == enumspb.ENCODING_TYPE_UNSPECIFIED {
+	if data != nil && data.EncodingType == enumspb.ENCODING_TYPE_UNSPECIFIED {
 		result.Data = nil
 	}
 

@@ -1610,7 +1610,9 @@ func (n *Node) applyUpdates(
 			continue
 		}
 
-		if transitionhistory.Compare(
+		// An empty node may be created when child is applied before the parent, in which case
+		// node.serializedNode will be nil.
+		if node.serializedNode == nil || transitionhistory.Compare(
 			node.serializedNode.Metadata.LastUpdateVersionedTransition,
 			updatedNode.Metadata.LastUpdateVersionedTransition,
 		) != 0 {

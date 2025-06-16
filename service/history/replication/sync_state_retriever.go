@@ -270,13 +270,15 @@ func (s *SyncStateRetrieverImpl) getSyncStateResult(
 		if err != nil {
 			return nil, err
 		}
-		sourceLastItem, err := versionhistory.GetLastVersionHistoryItem(sourceHistory)
-		if err != nil {
-			return nil, err
-		}
-		events, err = s.getEventsBlob(ctx, wfKey, sourceHistory, 1, sourceLastItem.GetEventId()+1, false)
-		if err != nil {
-			return nil, err
+		if !versionhistory.IsEmptyVersionHistory(sourceHistory) {
+			sourceLastItem, err := versionhistory.GetLastVersionHistoryItem(sourceHistory)
+			if err != nil {
+				return nil, err
+			}
+			events, err = s.getEventsBlob(ctx, wfKey, sourceHistory, 1, sourceLastItem.GetEventId()+1, false)
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		events, err = s.getSyncStateEvents(ctx, wfKey, targetVersionHistories, sourceVersionHistories)

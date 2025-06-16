@@ -25,7 +25,7 @@ func NewPayloadStore() *PayloadStore {
 			// TODO: there's a bug in the chasm engine, if the state is zero value,
 			// upon loading it will become nil.
 			TotalCount: 0,
-			TotalSize:  1,
+			TotalSize:  0,
 		},
 	}
 }
