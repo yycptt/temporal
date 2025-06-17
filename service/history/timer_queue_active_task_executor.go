@@ -1040,6 +1040,9 @@ func (t *timerQueueActiveTaskExecutor) executeChasmPureTimerTask(
 		return nil
 	}
 
+	// TODO: skip updating if the chasm tree is clean, i.e. all processed timers are actually invalid timers
+	// What if the invalid timer is the timer with earliest timestamp and new physical pure task needs to be created?
+	// That won't happen because the new physical pure task should be created when the existing timers get invalidated.
 	if t.config.EnableUpdateWorkflowModeIgnoreCurrent() {
 		return wfCtx.UpdateWorkflowExecutionAsActive(ctx, t.shardContext)
 	}

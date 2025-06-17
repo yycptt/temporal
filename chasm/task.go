@@ -13,12 +13,14 @@ type (
 		Destination   string
 	}
 
+	// TODO: Make TaskAttributes available to executors and validator
+
 	SideEffectTaskExecutor[C any, T any] interface {
 		Execute(context.Context, ComponentRef, T) error
 	}
 
 	PureTaskExecutor[C any, T any] interface {
-		Execute(Context, C, T) error
+		Execute(MutableContext, C, T) error
 	}
 
 	TaskValidator[C any, T any] interface {

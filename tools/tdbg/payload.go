@@ -54,6 +54,10 @@ func newPayloadCommands(
 					Name:  "payload",
 					Usage: "Payload value (string)",
 				},
+				&cli.Int64Flag{
+					Name:  FlagTTL,
+					Usage: "Time to live in seconds for the payload",
+				},
 			},
 			Action: func(c *cli.Context) error {
 				return AddPayloadCommand(c, clientFactory)
@@ -144,7 +148,7 @@ func DescribePayloadStoreCommand(c *cli.Context, clientFactory ClientFactory) er
 	if err != nil {
 		return fmt.Errorf("unable to new payload store: %s", err)
 	}
-	fmt.Println(resp)
+	prettyPrintJSONObject(c, resp)
 	return nil
 }
 
@@ -179,6 +183,7 @@ func AddPayloadCommand(c *cli.Context, clientFactory ClientFactory) error {
 		StoreId:    storeID,
 		PayloadKey: payloadKey,
 		Payload:    payloadValue,
+		TtlSeconds: c.Int64(FlagTTL),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to new payload store: %s", err)

@@ -70,4 +70,5 @@ var (
 	FlagBuildIDs                   = "select-build-id"
 	FlagUnversioned                = "select-unversioned"
 	FlagAllActive                  = "select-all-active"
+	FlagTTL                        = "ttl"
 )

@@ -1,12 +1,15 @@
 package example
 
 import (
+	"time"
+
 	commonpb "go.temporal.io/api/common/v1"
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/chasm"
 	"go.temporal.io/server/common"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type (
@@ -22,10 +25,9 @@ type (
 func NewPayloadStore() *PayloadStore {
 	return &PayloadStore{
 		State: &persistence.PayloadStore{
-			// TODO: there's a bug in the chasm engine, if the state is zero value,
-			// upon loading it will become nil.
-			TotalCount: 0,
-			TotalSize:  0,
+			TotalCount:      0,
+			TotalSize:       0,
+			ExpirationTimes: make(map[string]*timestamppb.Timestamp),
 		},
 	}
 }
@@ -34,9 +36,6 @@ func (s *PayloadStore) Describe(
 	_ chasm.Context,
 	_ *historyservice.DescribePayloadStoreRequest,
 ) (*persistence.PayloadStore, error) {
-	if s.State == nil {
-		panic("payload store state is nil!!!!")
-	}
 	return common.CloneProto(s.State), nil
 }
 
@@ -55,6 +54,26 @@ func (s *PayloadStore) AddPayload(
 	s.Payloads[request.PayloadKey] = chasm.NewDataField(mutableContext, request.Payload)
 	s.State.TotalCount++
 	s.State.TotalSize += int64(len(request.Payload.Data))
+
+	if request.TtlSeconds > 0 {
+		expirationTime := mutableContext.Now(s).Add(time.Duration(request.TtlSeconds) * time.Second)
+		if s.State.ExpirationTimes == nil {
+			s.State.ExpirationTimes = make(map[string]*timestamppb.Timestamp)
+		}
+		s.State.ExpirationTimes[request.PayloadKey] = timestamppb.New(expirationTime)
+		if err := mutableContext.AddTask(
+			s,
+			chasm.TaskAttributes{ScheduledTime: expirationTime},
+			// You can switch between PayloadTTLPureTask & PayloadTTLSideEffectTask
+			&persistence.PayloadTTLSideEffectTask{
+				PayloadKey:     request.PayloadKey,
+				ExpirationTime: timestamppb.New(expirationTime),
+			},
+		); err != nil {
+			return nil, err
+		}
+	}
+
 	return s.Describe(mutableContext, nil)
 }
 
@@ -84,6 +103,7 @@ func (s *PayloadStore) RemovePayload(
 	s.State.TotalCount--
 	s.State.TotalSize -= int64(len(payload.Data))
 	delete(s.Payloads, key)
+	delete(s.State.ExpirationTimes, key)
 	return s.Describe(mutableContext, nil)
 }
 

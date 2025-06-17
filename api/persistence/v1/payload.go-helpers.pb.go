@@ -41,3 +41,77 @@ func (this *PayloadStore) Equal(that interface{}) bool {
 
 	return proto.Equal(this, that1)
 }
+
+// Marshal an object of type PayloadTTLPureTask to the protobuf v3 wire format
+func (val *PayloadTTLPureTask) Marshal() ([]byte, error) {
+	return proto.Marshal(val)
+}
+
+// Unmarshal an object of type PayloadTTLPureTask from the protobuf v3 wire format
+func (val *PayloadTTLPureTask) Unmarshal(buf []byte) error {
+	return proto.Unmarshal(buf, val)
+}
+
+// Size returns the size of the object, in bytes, once serialized
+func (val *PayloadTTLPureTask) Size() int {
+	return proto.Size(val)
+}
+
+// Equal returns whether two PayloadTTLPureTask values are equivalent by recursively
+// comparing the message's fields.
+// For more information see the documentation for
+// https://pkg.go.dev/google.golang.org/protobuf/proto#Equal
+func (this *PayloadTTLPureTask) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	var that1 *PayloadTTLPureTask
+	switch t := that.(type) {
+	case *PayloadTTLPureTask:
+		that1 = t
+	case PayloadTTLPureTask:
+		that1 = &t
+	default:
+		return false
+	}
+
+	return proto.Equal(this, that1)
+}
+
+// Marshal an object of type PayloadTTLSideEffectTask to the protobuf v3 wire format
+func (val *PayloadTTLSideEffectTask) Marshal() ([]byte, error) {
+	return proto.Marshal(val)
+}
+
+// Unmarshal an object of type PayloadTTLSideEffectTask from the protobuf v3 wire format
+func (val *PayloadTTLSideEffectTask) Unmarshal(buf []byte) error {
+	return proto.Unmarshal(buf, val)
+}
+
+// Size returns the size of the object, in bytes, once serialized
+func (val *PayloadTTLSideEffectTask) Size() int {
+	return proto.Size(val)
+}
+
+// Equal returns whether two PayloadTTLSideEffectTask values are equivalent by recursively
+// comparing the message's fields.
+// For more information see the documentation for
+// https://pkg.go.dev/google.golang.org/protobuf/proto#Equal
+func (this *PayloadTTLSideEffectTask) Equal(that interface{}) bool {
+	if that == nil {
+		return this == nil
+	}
+
+	var that1 *PayloadTTLSideEffectTask
+	switch t := that.(type) {
+	case *PayloadTTLSideEffectTask:
+		that1 = t
+	case PayloadTTLSideEffectTask:
+		that1 = &t
+	default:
+		return false
+	}
+
+	return proto.Equal(this, that1)
+}

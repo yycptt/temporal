@@ -617,6 +617,8 @@ message DescribePayloadStoreResponse {
   int64 total_count = 1;
   // The total size of all payloads in the store.
   int64 total_size = 2;
+  // (-- api-linter: core::0142::time-field-type=disabled --)
+  map<string, google.protobuf.Timestamp> expiration_times = 3;
 }
 
 message AddPayloadRequest {
@@ -629,6 +631,9 @@ message AddPayloadRequest {
   string payload_key  = 4;
   // The payload to be added.
   temporal.api.common.v1.Payload payload = 5;
+  // Time to live in seconds for the payload.
+  // (-- api-linter: core::0142::time-field-type=disabled --)
+  int64 ttl_seconds = 6; 
 }
 
 message AddPayloadResponse {

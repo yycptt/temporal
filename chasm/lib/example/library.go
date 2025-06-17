@@ -19,3 +19,18 @@ func (l *library) Components() []*chasm.RegistrableComponent {
 		chasm.NewRegistrableComponent[*PayloadStore]("payloadStore"),
 	}
 }
+
+func (l *library) Tasks() []*chasm.RegistrableTask {
+	return []*chasm.RegistrableTask{
+		chasm.NewRegistrablePureTask(
+			"payloadStoreTTLPureTask",
+			&PayloadTTLPureTaskValidator{},
+			&PayloadTTLPureTaskExecutor{},
+		),
+		chasm.NewRegistrableSideEffectTask(
+			"payloadStoreTTLSideEffectTask",
+			&PayloadTTLSideEffectTaskValidator{},
+			&PayloadTTLSideEffectTaskExecutor{},
+		),
+	}
+}

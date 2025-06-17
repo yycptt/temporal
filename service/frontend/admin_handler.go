@@ -2258,8 +2258,9 @@ func (adh *AdminHandler) DescribePayloadStore(ctx context.Context, request *admi
 		return nil, err
 	}
 	return &adminservice.DescribePayloadStoreResponse{
-		TotalCount: resp.GetTotalCount(),
-		TotalSize:  resp.GetTotalSize(),
+		TotalCount:      resp.GetTotalCount(),
+		TotalSize:       resp.GetTotalSize(),
+		ExpirationTimes: resp.GetExpirationTimes(),
 	}, nil
 }
 func (adh *AdminHandler) AddPayload(ctx context.Context, request *adminservice.AddPayloadRequest) (*adminservice.AddPayloadResponse, error) {
@@ -2276,6 +2277,7 @@ func (adh *AdminHandler) AddPayload(ctx context.Context, request *adminservice.A
 			RunId:       request.GetRunId(),
 			PayloadKey:  request.GetPayloadKey(),
 			Payload:     request.GetPayload(),
+			TtlSeconds:  request.GetTtlSeconds(),
 		},
 	)
 	if err != nil {

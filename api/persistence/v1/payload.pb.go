@@ -13,6 +13,7 @@ import (
 
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -23,11 +24,13 @@ const (
 )
 
 type PayloadStore struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TotalCount    int64                  `protobuf:"varint,1,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
-	TotalSize     int64                  `protobuf:"varint,2,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	TotalCount int64                  `protobuf:"varint,1,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`
+	TotalSize  int64                  `protobuf:"varint,2,opt,name=total_size,json=totalSize,proto3" json:"total_size,omitempty"`
+	// (-- api-linter: core::0142::time-field-type=disabled --)
+	ExpirationTimes map[string]*timestamppb.Timestamp `protobuf:"bytes,3,rep,name=expiration_times,json=expirationTimes,proto3" json:"expiration_times,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *PayloadStore) Reset() {
@@ -74,16 +77,139 @@ func (x *PayloadStore) GetTotalSize() int64 {
 	return 0
 }
 
+func (x *PayloadStore) GetExpirationTimes() map[string]*timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpirationTimes
+	}
+	return nil
+}
+
+type PayloadTTLPureTask struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PayloadKey     string                 `protobuf:"bytes,1,opt,name=payload_key,json=payloadKey,proto3" json:"payload_key,omitempty"`
+	ExpirationTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expiration_time,json=expirationTime,proto3" json:"expiration_time,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PayloadTTLPureTask) Reset() {
+	*x = PayloadTTLPureTask{}
+	mi := &file_temporal_server_api_persistence_v1_payload_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayloadTTLPureTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayloadTTLPureTask) ProtoMessage() {}
+
+func (x *PayloadTTLPureTask) ProtoReflect() protoreflect.Message {
+	mi := &file_temporal_server_api_persistence_v1_payload_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayloadTTLPureTask.ProtoReflect.Descriptor instead.
+func (*PayloadTTLPureTask) Descriptor() ([]byte, []int) {
+	return file_temporal_server_api_persistence_v1_payload_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PayloadTTLPureTask) GetPayloadKey() string {
+	if x != nil {
+		return x.PayloadKey
+	}
+	return ""
+}
+
+func (x *PayloadTTLPureTask) GetExpirationTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpirationTime
+	}
+	return nil
+}
+
+type PayloadTTLSideEffectTask struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PayloadKey     string                 `protobuf:"bytes,1,opt,name=payload_key,json=payloadKey,proto3" json:"payload_key,omitempty"`
+	ExpirationTime *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=expiration_time,json=expirationTime,proto3" json:"expiration_time,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PayloadTTLSideEffectTask) Reset() {
+	*x = PayloadTTLSideEffectTask{}
+	mi := &file_temporal_server_api_persistence_v1_payload_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PayloadTTLSideEffectTask) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PayloadTTLSideEffectTask) ProtoMessage() {}
+
+func (x *PayloadTTLSideEffectTask) ProtoReflect() protoreflect.Message {
+	mi := &file_temporal_server_api_persistence_v1_payload_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PayloadTTLSideEffectTask.ProtoReflect.Descriptor instead.
+func (*PayloadTTLSideEffectTask) Descriptor() ([]byte, []int) {
+	return file_temporal_server_api_persistence_v1_payload_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PayloadTTLSideEffectTask) GetPayloadKey() string {
+	if x != nil {
+		return x.PayloadKey
+	}
+	return ""
+}
+
+func (x *PayloadTTLSideEffectTask) GetExpirationTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpirationTime
+	}
+	return nil
+}
+
 var File_temporal_server_api_persistence_v1_payload_proto protoreflect.FileDescriptor
 
 const file_temporal_server_api_persistence_v1_payload_proto_rawDesc = "" +
 	"\n" +
-	"0temporal/server/api/persistence/v1/payload.proto\x12\"temporal.server.api.persistence.v1\"N\n" +
+	"0temporal/server/api/persistence/v1/payload.proto\x12\"temporal.server.api.persistence.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa0\x02\n" +
 	"\fPayloadStore\x12\x1f\n" +
 	"\vtotal_count\x18\x01 \x01(\x03R\n" +
 	"totalCount\x12\x1d\n" +
 	"\n" +
-	"total_size\x18\x02 \x01(\x03R\ttotalSizeB6Z4go.temporal.io/server/api/persistence/v1;persistenceb\x06proto3"
+	"total_size\x18\x02 \x01(\x03R\ttotalSize\x12p\n" +
+	"\x10expiration_times\x18\x03 \x03(\v2E.temporal.server.api.persistence.v1.PayloadStore.ExpirationTimesEntryR\x0fexpirationTimes\x1a^\n" +
+	"\x14ExpirationTimesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x120\n" +
+	"\x05value\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x05value:\x028\x01\"z\n" +
+	"\x12PayloadTTLPureTask\x12\x1f\n" +
+	"\vpayload_key\x18\x01 \x01(\tR\n" +
+	"payloadKey\x12C\n" +
+	"\x0fexpiration_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x0eexpirationTime\"\x80\x01\n" +
+	"\x18PayloadTTLSideEffectTask\x12\x1f\n" +
+	"\vpayload_key\x18\x01 \x01(\tR\n" +
+	"payloadKey\x12C\n" +
+	"\x0fexpiration_time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x0eexpirationTimeB6Z4go.temporal.io/server/api/persistence/v1;persistenceb\x06proto3"
 
 var (
 	file_temporal_server_api_persistence_v1_payload_proto_rawDescOnce sync.Once
@@ -97,16 +223,24 @@ func file_temporal_server_api_persistence_v1_payload_proto_rawDescGZIP() []byte 
 	return file_temporal_server_api_persistence_v1_payload_proto_rawDescData
 }
 
-var file_temporal_server_api_persistence_v1_payload_proto_msgTypes = make([]protoimpl.MessageInfo, 1)
+var file_temporal_server_api_persistence_v1_payload_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_temporal_server_api_persistence_v1_payload_proto_goTypes = []any{
-	(*PayloadStore)(nil), // 0: temporal.server.api.persistence.v1.PayloadStore
+	(*PayloadStore)(nil),             // 0: temporal.server.api.persistence.v1.PayloadStore
+	(*PayloadTTLPureTask)(nil),       // 1: temporal.server.api.persistence.v1.PayloadTTLPureTask
+	(*PayloadTTLSideEffectTask)(nil), // 2: temporal.server.api.persistence.v1.PayloadTTLSideEffectTask
+	nil,                              // 3: temporal.server.api.persistence.v1.PayloadStore.ExpirationTimesEntry
+	(*timestamppb.Timestamp)(nil),    // 4: google.protobuf.Timestamp
 }
 var file_temporal_server_api_persistence_v1_payload_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	3, // 0: temporal.server.api.persistence.v1.PayloadStore.expiration_times:type_name -> temporal.server.api.persistence.v1.PayloadStore.ExpirationTimesEntry
+	4, // 1: temporal.server.api.persistence.v1.PayloadTTLPureTask.expiration_time:type_name -> google.protobuf.Timestamp
+	4, // 2: temporal.server.api.persistence.v1.PayloadTTLSideEffectTask.expiration_time:type_name -> google.protobuf.Timestamp
+	4, // 3: temporal.server.api.persistence.v1.PayloadStore.ExpirationTimesEntry.value:type_name -> google.protobuf.Timestamp
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_temporal_server_api_persistence_v1_payload_proto_init() }
@@ -120,7 +254,7 @@ func file_temporal_server_api_persistence_v1_payload_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_temporal_server_api_persistence_v1_payload_proto_rawDesc), len(file_temporal_server_api_persistence_v1_payload_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   1,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

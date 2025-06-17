@@ -49,8 +49,9 @@ func DescribePayloadStoreHandler(
 		return nil, err
 	}
 	return &historyservice.DescribePayloadStoreResponse{
-		TotalCount: state.TotalCount,
-		TotalSize:  state.TotalSize,
+		TotalCount:      state.TotalCount,
+		TotalSize:       state.TotalSize,
+		ExpirationTimes: state.ExpirationTimes,
 	}, nil
 }
 
