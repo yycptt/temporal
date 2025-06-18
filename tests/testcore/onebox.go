@@ -19,6 +19,8 @@ import (
 	"go.temporal.io/server/api/adminservice/v1"
 	"go.temporal.io/server/api/historyservice/v1"
 	"go.temporal.io/server/api/matchingservice/v1"
+	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/chasm/lib/example"
 	"go.temporal.io/server/client"
 	"go.temporal.io/server/common"
 	carchiver "go.temporal.io/server/common/archiver"
@@ -68,6 +70,7 @@ type (
 		namespaceRegistries []namespace.Registry
 		// Address for SDK to connect to, using membership grpc resolver.
 		frontendMembershipAddress string
+		chasmEngine               chasm.Engine
 
 		// These are routing/load balancing clients but do not do retries:
 		adminClient    adminservice.AdminServiceClient
@@ -293,6 +296,13 @@ func (c *TemporalImpl) NamespaceRegistries() []namespace.Registry {
 	return c.namespaceRegistries
 }
 
+func (c *TemporalImpl) ChasmEngine() (chasm.Engine, error) {
+	if numHistoryHosts := len(c.hostsByProtocolByService[grpcProtocol][primitives.HistoryService].All); numHistoryHosts != 1 {
+		return nil, fmt.Errorf("expected exactly one host for chasm engine, got %d", numHistoryHosts)
+	}
+	return c.chasmEngine, nil
+}
+
 func (c *TemporalImpl) copyPersistenceConfig() config.Persistence {
 	persistenceConfig := copyPersistenceConfig(c.persistenceConfig)
 	if c.esConfig != nil {
@@ -436,6 +446,9 @@ func (c *TemporalImpl) startHistory() {
 			temporal.FxLogAdapter,
 			c.getFxOptionsForService(primitives.HistoryService),
 			fx.Populate(&namespaceRegistry),
+			chasm.Module,
+			example.Module,
+			fx.Populate(&c.chasmEngine),
 		)
 		err := app.Err()
 		if err != nil {
