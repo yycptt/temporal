@@ -1295,6 +1295,16 @@ message NewPayloadStoreResponse {
     string run_id = 1;
 }
 
+message ClosePayloadStoreRequest {
+    option (routing).workflow_id = "store_id";
+
+    // The namespace ID for the payload store.
+    string namespace_id = 1;
+    string store_id = 2;
+}
+
+message ClosePayloadStoreResponse {}
+
 message DescribePayloadStoreRequest {
     option (routing).workflow_id = "store_id";
 

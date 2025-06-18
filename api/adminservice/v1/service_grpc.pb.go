@@ -65,6 +65,7 @@ const (
 	AdminService_ForceUnloadTaskQueuePartition_FullMethodName       = "/temporal.server.api.adminservice.v1.AdminService/ForceUnloadTaskQueuePartition"
 	AdminService_NewPayloadStore_FullMethodName                     = "/temporal.server.api.adminservice.v1.AdminService/NewPayloadStore"
 	AdminService_DescribePayloadStore_FullMethodName                = "/temporal.server.api.adminservice.v1.AdminService/DescribePayloadStore"
+	AdminService_ClosePayloadStore_FullMethodName                   = "/temporal.server.api.adminservice.v1.AdminService/ClosePayloadStore"
 	AdminService_AddPayload_FullMethodName                          = "/temporal.server.api.adminservice.v1.AdminService/AddPayload"
 	AdminService_GetPayload_FullMethodName                          = "/temporal.server.api.adminservice.v1.AdminService/GetPayload"
 	AdminService_RemovePayload_FullMethodName                       = "/temporal.server.api.adminservice.v1.AdminService/RemovePayload"
@@ -160,6 +161,7 @@ type AdminServiceClient interface {
 	ForceUnloadTaskQueuePartition(ctx context.Context, in *ForceUnloadTaskQueuePartitionRequest, opts ...grpc.CallOption) (*ForceUnloadTaskQueuePartitionResponse, error)
 	NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error)
 	DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error)
+	ClosePayloadStore(ctx context.Context, in *ClosePayloadStoreRequest, opts ...grpc.CallOption) (*ClosePayloadStoreResponse, error)
 	AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error)
 	GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error)
 	RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error)
@@ -600,6 +602,15 @@ func (c *adminServiceClient) DescribePayloadStore(ctx context.Context, in *Descr
 	return out, nil
 }
 
+func (c *adminServiceClient) ClosePayloadStore(ctx context.Context, in *ClosePayloadStoreRequest, opts ...grpc.CallOption) (*ClosePayloadStoreResponse, error) {
+	out := new(ClosePayloadStoreResponse)
+	err := c.cc.Invoke(ctx, AdminService_ClosePayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *adminServiceClient) AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error) {
 	out := new(AddPayloadResponse)
 	err := c.cc.Invoke(ctx, AdminService_AddPayload_FullMethodName, in, out, opts...)
@@ -717,6 +728,7 @@ type AdminServiceServer interface {
 	ForceUnloadTaskQueuePartition(context.Context, *ForceUnloadTaskQueuePartitionRequest) (*ForceUnloadTaskQueuePartitionResponse, error)
 	NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error)
 	DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error)
+	ClosePayloadStore(context.Context, *ClosePayloadStoreRequest) (*ClosePayloadStoreResponse, error)
 	AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error)
 	GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error)
 	RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error)
@@ -861,6 +873,9 @@ func (UnimplementedAdminServiceServer) NewPayloadStore(context.Context, *NewPayl
 }
 func (UnimplementedAdminServiceServer) DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribePayloadStore not implemented")
+}
+func (UnimplementedAdminServiceServer) ClosePayloadStore(context.Context, *ClosePayloadStoreRequest) (*ClosePayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClosePayloadStore not implemented")
 }
 func (UnimplementedAdminServiceServer) AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddPayload not implemented")
@@ -1702,6 +1717,24 @@ func _AdminService_DescribePayloadStore_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AdminService_ClosePayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClosePayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AdminServiceServer).ClosePayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AdminService_ClosePayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AdminServiceServer).ClosePayloadStore(ctx, req.(*ClosePayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AdminService_AddPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddPayloadRequest)
 	if err := dec(in); err != nil {
@@ -1938,6 +1971,10 @@ var AdminService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribePayloadStore",
 			Handler:    _AdminService_DescribePayloadStore_Handler,
+		},
+		{
+			MethodName: "ClosePayloadStore",
+			Handler:    _AdminService_ClosePayloadStore_Handler,
 		},
 		{
 			MethodName: "AddPayload",

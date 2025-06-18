@@ -2639,6 +2639,10 @@ func (h *Handler) DescribePayloadStore(ctx context.Context, request *historyserv
 	return example.DescribePayloadStoreHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
 }
 
+func (h *Handler) ClosePayloadStore(ctx context.Context, request *historyservice.ClosePayloadStoreRequest) (*historyservice.ClosePayloadStoreResponse, error) {
+	return example.ClosePayloadStoreHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
+}
+
 func (h *Handler) AddPayload(ctx context.Context, request *historyservice.AddPayloadRequest) (*historyservice.AddPayloadResponse, error) {
 	return example.AddPayloadHandler(chasm.NewEngineContext(ctx, h.chasmEngine), request)
 }

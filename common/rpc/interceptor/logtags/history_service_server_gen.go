@@ -19,6 +19,10 @@ func (wt *WorkflowTags) extractFromHistoryServiceServerMessage(message any) []ta
 		return nil
 	case *historyservice.AddTasksResponse:
 		return nil
+	case *historyservice.ClosePayloadStoreRequest:
+		return nil
+	case *historyservice.ClosePayloadStoreResponse:
+		return nil
 	case *historyservice.CloseShardRequest:
 		return nil
 	case *historyservice.CloseShardResponse:

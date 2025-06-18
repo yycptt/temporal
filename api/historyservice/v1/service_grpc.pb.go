@@ -93,6 +93,7 @@ const (
 	HistoryService_ResetActivity_FullMethodName                          = "/temporal.server.api.historyservice.v1.HistoryService/ResetActivity"
 	HistoryService_NewPayloadStore_FullMethodName                        = "/temporal.server.api.historyservice.v1.HistoryService/NewPayloadStore"
 	HistoryService_DescribePayloadStore_FullMethodName                   = "/temporal.server.api.historyservice.v1.HistoryService/DescribePayloadStore"
+	HistoryService_ClosePayloadStore_FullMethodName                      = "/temporal.server.api.historyservice.v1.HistoryService/ClosePayloadStore"
 	HistoryService_AddPayload_FullMethodName                             = "/temporal.server.api.historyservice.v1.HistoryService/AddPayload"
 	HistoryService_GetPayload_FullMethodName                             = "/temporal.server.api.historyservice.v1.HistoryService/GetPayload"
 	HistoryService_RemovePayload_FullMethodName                          = "/temporal.server.api.historyservice.v1.HistoryService/RemovePayload"
@@ -376,6 +377,7 @@ type HistoryServiceClient interface {
 	ResetActivity(ctx context.Context, in *ResetActivityRequest, opts ...grpc.CallOption) (*ResetActivityResponse, error)
 	NewPayloadStore(ctx context.Context, in *NewPayloadStoreRequest, opts ...grpc.CallOption) (*NewPayloadStoreResponse, error)
 	DescribePayloadStore(ctx context.Context, in *DescribePayloadStoreRequest, opts ...grpc.CallOption) (*DescribePayloadStoreResponse, error)
+	ClosePayloadStore(ctx context.Context, in *ClosePayloadStoreRequest, opts ...grpc.CallOption) (*ClosePayloadStoreResponse, error)
 	AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error)
 	GetPayload(ctx context.Context, in *GetPayloadRequest, opts ...grpc.CallOption) (*GetPayloadResponse, error)
 	RemovePayload(ctx context.Context, in *RemovePayloadRequest, opts ...grpc.CallOption) (*RemovePayloadResponse, error)
@@ -1068,6 +1070,15 @@ func (c *historyServiceClient) DescribePayloadStore(ctx context.Context, in *Des
 	return out, nil
 }
 
+func (c *historyServiceClient) ClosePayloadStore(ctx context.Context, in *ClosePayloadStoreRequest, opts ...grpc.CallOption) (*ClosePayloadStoreResponse, error) {
+	out := new(ClosePayloadStoreResponse)
+	err := c.cc.Invoke(ctx, HistoryService_ClosePayloadStore_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *historyServiceClient) AddPayload(ctx context.Context, in *AddPayloadRequest, opts ...grpc.CallOption) (*AddPayloadResponse, error) {
 	out := new(AddPayloadResponse)
 	err := c.cc.Invoke(ctx, HistoryService_AddPayload_FullMethodName, in, out, opts...)
@@ -1373,6 +1384,7 @@ type HistoryServiceServer interface {
 	ResetActivity(context.Context, *ResetActivityRequest) (*ResetActivityResponse, error)
 	NewPayloadStore(context.Context, *NewPayloadStoreRequest) (*NewPayloadStoreResponse, error)
 	DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error)
+	ClosePayloadStore(context.Context, *ClosePayloadStoreRequest) (*ClosePayloadStoreResponse, error)
 	AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error)
 	GetPayload(context.Context, *GetPayloadRequest) (*GetPayloadResponse, error)
 	RemovePayload(context.Context, *RemovePayloadRequest) (*RemovePayloadResponse, error)
@@ -1601,6 +1613,9 @@ func (UnimplementedHistoryServiceServer) NewPayloadStore(context.Context, *NewPa
 }
 func (UnimplementedHistoryServiceServer) DescribePayloadStore(context.Context, *DescribePayloadStoreRequest) (*DescribePayloadStoreResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribePayloadStore not implemented")
+}
+func (UnimplementedHistoryServiceServer) ClosePayloadStore(context.Context, *ClosePayloadStoreRequest) (*ClosePayloadStoreResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClosePayloadStore not implemented")
 }
 func (UnimplementedHistoryServiceServer) AddPayload(context.Context, *AddPayloadRequest) (*AddPayloadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddPayload not implemented")
@@ -2946,6 +2961,24 @@ func _HistoryService_DescribePayloadStore_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _HistoryService_ClosePayloadStore_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClosePayloadStoreRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(HistoryServiceServer).ClosePayloadStore(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: HistoryService_ClosePayloadStore_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(HistoryServiceServer).ClosePayloadStore(ctx, req.(*ClosePayloadStoreRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _HistoryService_AddPayload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(AddPayloadRequest)
 	if err := dec(in); err != nil {
@@ -3294,6 +3327,10 @@ var HistoryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribePayloadStore",
 			Handler:    _HistoryService_DescribePayloadStore_Handler,
+		},
+		{
+			MethodName: "ClosePayloadStore",
+			Handler:    _HistoryService_ClosePayloadStore_Handler,
 		},
 		{
 			MethodName: "AddPayload",

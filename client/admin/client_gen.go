@@ -59,6 +59,16 @@ func (c *clientImpl) CancelDLQJob(
 	return c.client.CancelDLQJob(ctx, request, opts...)
 }
 
+func (c *clientImpl) ClosePayloadStore(
+	ctx context.Context,
+	request *adminservice.ClosePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.ClosePayloadStoreResponse, error) {
+	ctx, cancel := c.createContext(ctx)
+	defer cancel()
+	return c.client.ClosePayloadStore(ctx, request, opts...)
+}
+
 func (c *clientImpl) CloseShard(
 	ctx context.Context,
 	request *adminservice.CloseShardRequest,

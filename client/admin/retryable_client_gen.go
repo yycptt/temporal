@@ -86,6 +86,21 @@ func (c *retryableClient) CancelDLQJob(
 	return resp, err
 }
 
+func (c *retryableClient) ClosePayloadStore(
+	ctx context.Context,
+	request *adminservice.ClosePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*adminservice.ClosePayloadStoreResponse, error) {
+	var resp *adminservice.ClosePayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.ClosePayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) CloseShard(
 	ctx context.Context,
 	request *adminservice.CloseShardRequest,

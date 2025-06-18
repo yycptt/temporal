@@ -39,6 +39,14 @@ func (s *PayloadStore) Describe(
 	return common.CloneProto(s.State), nil
 }
 
+func (s *PayloadStore) Close(
+	_ chasm.MutableContext,
+	_ *historyservice.ClosePayloadStoreRequest,
+) (*historyservice.ClosePayloadStoreResponse, error) {
+	s.State.Closed = true
+	return &historyservice.ClosePayloadStoreResponse{}, nil
+}
+
 func (s *PayloadStore) AddPayload(
 	mutableContext chasm.MutableContext,
 	request *historyservice.AddPayloadRequest,
@@ -65,7 +73,7 @@ func (s *PayloadStore) AddPayload(
 			s,
 			chasm.TaskAttributes{ScheduledTime: expirationTime},
 			// You can switch between PayloadTTLPureTask & PayloadTTLSideEffectTask
-			&persistence.PayloadTTLSideEffectTask{
+			&persistence.PayloadTTLPureTask{
 				PayloadKey:     request.PayloadKey,
 				ExpirationTime: timestamppb.New(expirationTime),
 			},
@@ -110,5 +118,8 @@ func (s *PayloadStore) RemovePayload(
 func (s *PayloadStore) LifecycleState(
 	_ chasm.Context,
 ) chasm.LifecycleState {
+	if s.State.Closed {
+		return chasm.LifecycleStateCompleted
+	}
 	return chasm.LifecycleStateRunning
 }

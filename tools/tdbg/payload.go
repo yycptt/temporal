@@ -39,6 +39,19 @@ func newPayloadCommands(
 			},
 		},
 		{
+			Name:  "close",
+			Usage: "Close a payload store",
+			Flags: []cli.Flag{
+				&cli.StringFlag{
+					Name:  FlagStoreID,
+					Usage: "Store ID",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				return ClosePayloadStoreCommand(c, clientFactory)
+			},
+		},
+		{
 			Name:  "add",
 			Usage: "Add payload (string) to a payload store",
 			Flags: []cli.Flag{
@@ -120,7 +133,7 @@ func NewPayloadStoreCommand(c *cli.Context, clientFactory ClientFactory) error {
 		StoreId:   storeID,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to new payload store: %s", err)
+		return fmt.Errorf("unable to new payload store: %v", err)
 	}
 	fmt.Println("Payload store created successfully. RunID: ", resp.RunId)
 	return nil
@@ -146,9 +159,35 @@ func DescribePayloadStoreCommand(c *cli.Context, clientFactory ClientFactory) er
 		StoreId:   storeID,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to new payload store: %s", err)
+		return fmt.Errorf("unable to describe payload store: %v", err)
 	}
 	prettyPrintJSONObject(c, resp)
+	return nil
+}
+
+func ClosePayloadStoreCommand(c *cli.Context, clientFactory ClientFactory) error {
+	nsName, err := getRequiredOption(c, FlagNamespace)
+	if err != nil {
+		return err
+	}
+
+	storeID := c.String(FlagStoreID)
+	if storeID == "" {
+		return cli.Exit("Store ID is required", 1)
+	}
+	client := clientFactory.AdminClient(c)
+
+	ctx, cancel := newContext(c)
+	defer cancel()
+
+	_, err = client.ClosePayloadStore(ctx, &adminservice.ClosePayloadStoreRequest{
+		Namespace: nsName,
+		StoreId:   storeID,
+	})
+	if err != nil {
+		return fmt.Errorf("unable to close payload store: %v", err)
+	}
+	fmt.Println("Payload store closed successfully.")
 	return nil
 }
 
@@ -186,7 +225,7 @@ func AddPayloadCommand(c *cli.Context, clientFactory ClientFactory) error {
 		TtlSeconds: c.Int64(FlagTTL),
 	})
 	if err != nil {
-		return fmt.Errorf("unable to new payload store: %s", err)
+		return fmt.Errorf("unable to add payload: %v", err)
 	}
 	fmt.Println(resp)
 	return nil
@@ -219,7 +258,7 @@ func GetPayloadCommand(c *cli.Context, clientFactory ClientFactory) error {
 		PayloadKey: payloadKey,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to new payload store: %s", err)
+		return fmt.Errorf("unable to get payload: %v", err)
 	}
 
 	var payloadString string
@@ -255,7 +294,7 @@ func RemovePayloadCommand(c *cli.Context, clientFactory ClientFactory) error {
 		PayloadKey: payloadKey,
 	})
 	if err != nil {
-		return fmt.Errorf("unable to new payload store: %s", err)
+		return fmt.Errorf("unable to remove payload: %v", err)
 	}
 	fmt.Println(resp)
 	return nil

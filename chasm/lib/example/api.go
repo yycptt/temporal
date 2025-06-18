@@ -55,6 +55,24 @@ func DescribePayloadStoreHandler(
 	}, nil
 }
 
+func ClosePayloadStoreHandler(
+	ctx context.Context,
+	request *historyservice.ClosePayloadStoreRequest,
+) (*historyservice.ClosePayloadStoreResponse, error) {
+	resp, _, err := chasm.UpdateComponent(
+		ctx,
+		chasm.NewComponentRef[*PayloadStore](
+			chasm.EntityKey{
+				NamespaceID: request.NamespaceId,
+				BusinessID:  request.StoreId,
+			},
+		),
+		(*PayloadStore).Close,
+		request,
+	)
+	return resp, err
+}
+
 func AddPayloadHandler(
 	ctx context.Context,
 	request *historyservice.AddPayloadRequest,

@@ -37,6 +37,20 @@ func (c *metricClient) AddTasks(
 	return c.client.AddTasks(ctx, request, opts...)
 }
 
+func (c *metricClient) ClosePayloadStore(
+	ctx context.Context,
+	request *historyservice.ClosePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *historyservice.ClosePayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "HistoryClientClosePayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.ClosePayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) CloseShard(
 	ctx context.Context,
 	request *historyservice.CloseShardRequest,

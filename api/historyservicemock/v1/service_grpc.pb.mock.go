@@ -83,6 +83,26 @@ func (mr *MockHistoryServiceClientMockRecorder) AddTasks(ctx, in any, opts ...an
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTasks", reflect.TypeOf((*MockHistoryServiceClient)(nil).AddTasks), varargs...)
 }
 
+// ClosePayloadStore mocks base method.
+func (m *MockHistoryServiceClient) ClosePayloadStore(ctx context.Context, in *historyservice.ClosePayloadStoreRequest, opts ...grpc.CallOption) (*historyservice.ClosePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ClosePayloadStore", varargs...)
+	ret0, _ := ret[0].(*historyservice.ClosePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClosePayloadStore indicates an expected call of ClosePayloadStore.
+func (mr *MockHistoryServiceClientMockRecorder) ClosePayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClosePayloadStore", reflect.TypeOf((*MockHistoryServiceClient)(nil).ClosePayloadStore), varargs...)
+}
+
 // CloseShard mocks base method.
 func (m *MockHistoryServiceClient) CloseShard(ctx context.Context, in *historyservice.CloseShardRequest, opts ...grpc.CallOption) (*historyservice.CloseShardResponse, error) {
 	m.ctrl.T.Helper()
@@ -1753,6 +1773,21 @@ func (m *MockHistoryServiceServer) AddTasks(arg0 context.Context, arg1 *historys
 func (mr *MockHistoryServiceServerMockRecorder) AddTasks(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddTasks", reflect.TypeOf((*MockHistoryServiceServer)(nil).AddTasks), arg0, arg1)
+}
+
+// ClosePayloadStore mocks base method.
+func (m *MockHistoryServiceServer) ClosePayloadStore(arg0 context.Context, arg1 *historyservice.ClosePayloadStoreRequest) (*historyservice.ClosePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClosePayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*historyservice.ClosePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClosePayloadStore indicates an expected call of ClosePayloadStore.
+func (mr *MockHistoryServiceServerMockRecorder) ClosePayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClosePayloadStore", reflect.TypeOf((*MockHistoryServiceServer)(nil).ClosePayloadStore), arg0, arg1)
 }
 
 // CloseShard mocks base method.

@@ -2240,6 +2240,7 @@ func (adh *AdminHandler) NewPayloadStore(ctx context.Context, request *adminserv
 		RunId: resp.GetRunId(),
 	}, nil
 }
+
 func (adh *AdminHandler) DescribePayloadStore(ctx context.Context, request *adminservice.DescribePayloadStoreRequest) (*adminservice.DescribePayloadStoreResponse, error) {
 	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
 	if err != nil {
@@ -2263,6 +2264,26 @@ func (adh *AdminHandler) DescribePayloadStore(ctx context.Context, request *admi
 		ExpirationTimes: resp.GetExpirationTimes(),
 	}, nil
 }
+
+func (adh *AdminHandler) ClosePayloadStore(ctx context.Context, request *adminservice.ClosePayloadStoreRequest) (*adminservice.ClosePayloadStoreResponse, error) {
+	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = adh.historyClient.ClosePayloadStore(
+		ctx,
+		&historyservice.ClosePayloadStoreRequest{
+			NamespaceId: namespaceEntry.ID().String(),
+			StoreId:     request.GetStoreId(),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &adminservice.ClosePayloadStoreResponse{}, nil
+}
+
 func (adh *AdminHandler) AddPayload(ctx context.Context, request *adminservice.AddPayloadRequest) (*adminservice.AddPayloadResponse, error) {
 	namespaceEntry, err := adh.namespaceRegistry.GetNamespace(namespace.Name(request.GetNamespace()))
 	if err != nil {

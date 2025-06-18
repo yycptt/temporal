@@ -79,6 +79,20 @@ func (c *metricClient) CancelDLQJob(
 	return c.client.CancelDLQJob(ctx, request, opts...)
 }
 
+func (c *metricClient) ClosePayloadStore(
+	ctx context.Context,
+	request *adminservice.ClosePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (_ *adminservice.ClosePayloadStoreResponse, retError error) {
+
+	metricsHandler, startTime := c.startMetricsRecording(ctx, "AdminClientClosePayloadStore")
+	defer func() {
+		c.finishMetricsRecording(metricsHandler, startTime, retError)
+	}()
+
+	return c.client.ClosePayloadStore(ctx, request, opts...)
+}
+
 func (c *metricClient) CloseShard(
 	ctx context.Context,
 	request *adminservice.CloseShardRequest,

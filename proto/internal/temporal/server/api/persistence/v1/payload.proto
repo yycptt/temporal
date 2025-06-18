@@ -10,6 +10,7 @@ message PayloadStore {
     int64 total_size = 2;
     // (-- api-linter: core::0142::time-field-type=disabled --)
     map<string, google.protobuf.Timestamp> expiration_times = 3;
+    bool closed = 4;
 }
 
 message PayloadTTLPureTask {

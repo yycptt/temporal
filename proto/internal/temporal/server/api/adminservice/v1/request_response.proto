@@ -606,6 +606,13 @@ message NewPayloadStoreResponse {
   string run_id = 1;
 }
 
+message ClosePayloadStoreRequest {
+  string namespace = 1;
+  string store_id = 2;
+}
+
+message ClosePayloadStoreResponse {}
+
 message DescribePayloadStoreRequest {
   string namespace = 1;
   string store_id = 2;

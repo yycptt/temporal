@@ -100,7 +100,7 @@ func GetTimerTaskEventID(
 	case *WorkflowExecutionTimeoutTask:
 		eventID = common.FirstEventID
 	case *DeleteHistoryEventTask:
-		eventID = common.FirstEventID
+		return 0, false
 	case *StateMachineTimerTask:
 		eventID = common.FirstEventID
 	case *ChasmTaskPure:

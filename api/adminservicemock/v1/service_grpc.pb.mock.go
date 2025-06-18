@@ -143,6 +143,26 @@ func (mr *MockAdminServiceClientMockRecorder) CancelDLQJob(ctx, in any, opts ...
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelDLQJob", reflect.TypeOf((*MockAdminServiceClient)(nil).CancelDLQJob), varargs...)
 }
 
+// ClosePayloadStore mocks base method.
+func (m *MockAdminServiceClient) ClosePayloadStore(ctx context.Context, in *adminservice.ClosePayloadStoreRequest, opts ...grpc.CallOption) (*adminservice.ClosePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	varargs := []any{ctx, in}
+	for _, a := range opts {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ClosePayloadStore", varargs...)
+	ret0, _ := ret[0].(*adminservice.ClosePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClosePayloadStore indicates an expected call of ClosePayloadStore.
+func (mr *MockAdminServiceClientMockRecorder) ClosePayloadStore(ctx, in any, opts ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{ctx, in}, opts...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClosePayloadStore", reflect.TypeOf((*MockAdminServiceClient)(nil).ClosePayloadStore), varargs...)
+}
+
 // CloseShard mocks base method.
 func (m *MockAdminServiceClient) CloseShard(ctx context.Context, in *adminservice.CloseShardRequest, opts ...grpc.CallOption) (*adminservice.CloseShardResponse, error) {
 	m.ctrl.T.Helper()
@@ -1238,6 +1258,21 @@ func (m *MockAdminServiceServer) CancelDLQJob(arg0 context.Context, arg1 *admins
 func (mr *MockAdminServiceServerMockRecorder) CancelDLQJob(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelDLQJob", reflect.TypeOf((*MockAdminServiceServer)(nil).CancelDLQJob), arg0, arg1)
+}
+
+// ClosePayloadStore mocks base method.
+func (m *MockAdminServiceServer) ClosePayloadStore(arg0 context.Context, arg1 *adminservice.ClosePayloadStoreRequest) (*adminservice.ClosePayloadStoreResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClosePayloadStore", arg0, arg1)
+	ret0, _ := ret[0].(*adminservice.ClosePayloadStoreResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ClosePayloadStore indicates an expected call of ClosePayloadStore.
+func (mr *MockAdminServiceServerMockRecorder) ClosePayloadStore(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClosePayloadStore", reflect.TypeOf((*MockAdminServiceServer)(nil).ClosePayloadStore), arg0, arg1)
 }
 
 // CloseShard mocks base method.

@@ -41,6 +41,21 @@ func (c *retryableClient) AddTasks(
 	return resp, err
 }
 
+func (c *retryableClient) ClosePayloadStore(
+	ctx context.Context,
+	request *historyservice.ClosePayloadStoreRequest,
+	opts ...grpc.CallOption,
+) (*historyservice.ClosePayloadStoreResponse, error) {
+	var resp *historyservice.ClosePayloadStoreResponse
+	op := func(ctx context.Context) error {
+		var err error
+		resp, err = c.client.ClosePayloadStore(ctx, request, opts...)
+		return err
+	}
+	err := backoff.ThrottleRetryContext(ctx, op, c.policy, c.isRetryable)
+	return resp, err
+}
+
 func (c *retryableClient) CloseShard(
 	ctx context.Context,
 	request *historyservice.CloseShardRequest,

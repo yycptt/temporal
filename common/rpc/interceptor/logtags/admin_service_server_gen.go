@@ -31,6 +31,10 @@ func (wt *WorkflowTags) extractFromAdminServiceServerMessage(message any) []tag.
 		return nil
 	case *adminservice.CancelDLQJobResponse:
 		return nil
+	case *adminservice.ClosePayloadStoreRequest:
+		return nil
+	case *adminservice.ClosePayloadStoreResponse:
+		return nil
 	case *adminservice.CloseShardRequest:
 		return nil
 	case *adminservice.CloseShardResponse:

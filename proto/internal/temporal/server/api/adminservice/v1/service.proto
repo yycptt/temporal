@@ -164,6 +164,7 @@ service AdminService {
 
     rpc NewPayloadStore (NewPayloadStoreRequest) returns (NewPayloadStoreResponse) {}
     rpc DescribePayloadStore (DescribePayloadStoreRequest) returns (DescribePayloadStoreResponse) {}
+    rpc ClosePayloadStore (ClosePayloadStoreRequest) returns (ClosePayloadStoreResponse) {}
     rpc AddPayload (AddPayloadRequest) returns (AddPayloadResponse) {}
     rpc GetPayload (GetPayloadRequest) returns (GetPayloadResponse) {}
     rpc RemovePayload (RemovePayloadRequest) returns (RemovePayloadResponse) {}
