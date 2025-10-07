@@ -131,6 +131,20 @@ func (mr *MockNodeBackendMockRecorder) GetWorkflowKey() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkflowKey", reflect.TypeOf((*MockNodeBackend)(nil).GetWorkflowKey))
 }
 
+// IsWorkflow mocks base method.
+func (m *MockNodeBackend) IsWorkflow() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsWorkflow")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsWorkflow indicates an expected call of IsWorkflow.
+func (mr *MockNodeBackendMockRecorder) IsWorkflow() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsWorkflow", reflect.TypeOf((*MockNodeBackend)(nil).IsWorkflow))
+}
+
 // NextTransitionCount mocks base method.
 func (m *MockNodeBackend) NextTransitionCount() int64 {
 	m.ctrl.T.Helper()

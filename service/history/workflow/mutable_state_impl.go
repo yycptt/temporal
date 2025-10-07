@@ -34,6 +34,7 @@ import (
 	tokenspb "go.temporal.io/server/api/token/v1"
 	workflowspb "go.temporal.io/server/api/workflow/v1"
 	"go.temporal.io/server/chasm"
+	"go.temporal.io/server/chasm/lib/workflow"
 	chasmworkflow "go.temporal.io/server/chasm/lib/workflow"
 	"go.temporal.io/server/common"
 	"go.temporal.io/server/common/backoff"
@@ -2756,6 +2757,21 @@ func (ms *MutableStateImpl) ApplyWorkflowExecutionStartedEvent(
 	ms.approximateSize += ms.executionState.Size()
 
 	ms.writeEventToCache(startEvent)
+
+	// init chasm tree for new workflows
+	// Only need to do once when creating the workflow
+	mutableContext := chasm.NewMutableContext(context.TODO(), ms.chasmTree.(*chasm.Node))
+	ms.chasmTree.(*chasm.Node).SetRootComponent(workflow.NewWorkflow(mutableContext))
+
+	// To read or update a component
+	// Make sure you use a mutable context when mutating the component
+	component, err := ms.chasmTree.(*chasm.Node).ComponentByPath(mutableContext, []string{}) // empty path gives you root
+	if err != nil {
+		return err
+	}
+	// Do a type assertion to get the actual component struct type, then use it like a normal chasm component.
+	// component.(*workflow.Workflow) ...
+
 	return nil
 }
 

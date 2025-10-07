@@ -188,6 +188,7 @@ type (
 			state enumsspb.WorkflowExecutionState,
 			status enumspb.WorkflowExecutionStatus,
 		) (bool, error)
+		IsWorkflow() bool
 	}
 
 	// NodePathEncoder is an interface for encoding and decoding node paths.
@@ -1042,6 +1043,7 @@ func (n *Node) deserialize(
 	return nil
 }
 
+// Change this method and fieldsOf() in fields_iterator.go to populate the special MSPointer field in Component struct.
 func (n *Node) deserializeComponentNode(
 	valueT reflect.Type,
 ) error {
@@ -1352,6 +1354,11 @@ func (n *Node) executeImmediatePureTasks() error {
 }
 
 func (n *Node) closeTransactionHandleRootLifecycleChange() (bool, error) {
+	if n.backend.IsWorkflow() {
+		// workflow manages its lifecycle directly in mutable state.
+		return false, nil
+	}
+
 	if n.valueState != valueStateNeedSerialize {
 		return false, nil
 	}
