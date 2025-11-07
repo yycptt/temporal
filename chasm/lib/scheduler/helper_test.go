@@ -13,7 +13,6 @@ import (
 	"go.temporal.io/server/common/backoff"
 	"go.temporal.io/server/common/clock"
 	"go.temporal.io/server/common/testing/testlogger"
-	"go.temporal.io/server/common/testing/testvars"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -84,10 +83,8 @@ func setupSchedulerForTest(t *testing.T) (*scheduler.Scheduler, chasm.MutableCon
 	timeSource := clock.NewEventTimeSource()
 	timeSource.Update(time.Now())
 
-	tv := testvars.New(t)
 	nodeBackend.HandleNextTransitionCount = func() int64 { return 2 }
 	nodeBackend.HandleGetCurrentVersion = func() int64 { return 1 }
-	nodeBackend.HandleGetWorkflowKey = tv.Any().WorkflowKey
 	nodeBackend.HandleIsWorkflow = func() bool { return false }
 	nodeBackend.HandleCurrentVersionedTransition = func() *persistencespb.VersionedTransition {
 		return &persistencespb.VersionedTransition{

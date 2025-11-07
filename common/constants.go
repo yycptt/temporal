@@ -53,3 +53,8 @@ const (
 	// DefaultOperatorRPSRatio is the default percentage of rate limit that should be used for operator priority requests
 	DefaultOperatorRPSRatio float64 = 0.2
 )
+
+const (
+	// ScheduledTaskMinPrecision is the minimum precision for storing scheduled tasks's scheduled time in DB.
+	ScheduledTaskMinPrecision = time.Millisecond
+)

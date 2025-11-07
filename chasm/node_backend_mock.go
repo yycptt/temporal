@@ -13,6 +13,18 @@ import (
 	"go.temporal.io/server/service/history/tasks"
 )
 
+var testWorkflowKey = definition.WorkflowKey{
+	NamespaceID: "test-namespace-id",
+	WorkflowID:  "test-workflow-id",
+	RunID:       "test-run-id",
+}
+
+var testEntityKey = EntityKey{
+	NamespaceID: testWorkflowKey.NamespaceID,
+	BusinessID:  testWorkflowKey.WorkflowID,
+	EntityID:    testWorkflowKey.RunID,
+}
+
 // MockNodeBackend is a lightweight manual mock for the NodeBackend interface.
 // Methods may be stubbed by assigning the corresponding Handle fields. Update call history is recorded in the struct
 // fields (thread-safe).
@@ -77,7 +89,7 @@ func (m *MockNodeBackend) GetWorkflowKey() definition.WorkflowKey {
 	if m.HandleGetWorkflowKey != nil {
 		return m.HandleGetWorkflowKey()
 	}
-	return definition.WorkflowKey{}
+	return testWorkflowKey
 }
 
 func (m *MockNodeBackend) AddTasks(ts ...tasks.Task) {

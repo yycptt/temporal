@@ -7,6 +7,7 @@ import (
 
 	"go.temporal.io/server/chasm"
 	callbackspb "go.temporal.io/server/chasm/lib/callback/gen/callbackpb/v1"
+	chasmnexus "go.temporal.io/server/chasm/nexus"
 	"go.temporal.io/server/service/history/queues"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -81,7 +82,7 @@ func (c *Callback) loadInvocationArgs(
 
 	switch variant := c.GetCallback().GetVariant().(type) {
 	case *callbackspb.Callback_Nexus_:
-		if variant.Nexus.Url == chasm.NexusCompletionHandlerURL {
+		if variant.Nexus.Url == chasmnexus.CompletionHandlerURL {
 			return chasmInvocation{
 				nexus:      variant.Nexus,
 				attempt:    c.Attempt,

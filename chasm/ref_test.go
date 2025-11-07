@@ -1,6 +1,7 @@
 package chasm
 
 import (
+	"math/rand"
 	"reflect"
 	"testing"
 
@@ -9,7 +10,6 @@ import (
 	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/testing/protorequire"
-	"go.temporal.io/server/common/testing/testvars"
 	"go.uber.org/mock/gomock"
 )
 
@@ -40,13 +40,7 @@ func (s *componentRefSuite) SetupTest() {
 }
 
 func (s *componentRefSuite) TestArchetype() {
-	tv := testvars.New(s.T())
-	entityKey := EntityKey{
-		tv.NamespaceID().String(),
-		tv.WorkflowID(),
-		tv.RunID(),
-	}
-	ref := NewComponentRef[*TestComponent](entityKey)
+	ref := NewComponentRef[*TestComponent](testEntityKey)
 
 	archetype, err := ref.Archetype(s.registry)
 	s.NoError(err)
@@ -58,13 +52,7 @@ func (s *componentRefSuite) TestArchetype() {
 }
 
 func (s *componentRefSuite) TestShardingKey() {
-	tv := testvars.New(s.T())
-	entityKey := EntityKey{
-		tv.NamespaceID().String(),
-		tv.WorkflowID(),
-		tv.RunID(),
-	}
-	ref := NewComponentRef[*TestComponent](entityKey)
+	ref := NewComponentRef[*TestComponent](testEntityKey)
 
 	shardingKey, err := ref.ShardingKey(s.registry)
 	s.NoError(err)
@@ -72,27 +60,21 @@ func (s *componentRefSuite) TestShardingKey() {
 	rc, ok := s.registry.ComponentOf(reflect.TypeFor[*TestComponent]())
 	s.True(ok)
 
-	s.Equal(rc.shardingFn(entityKey), shardingKey)
+	s.Equal(rc.shardingFn(testEntityKey), shardingKey)
 }
 
 func (s *componentRefSuite) TestSerializeDeserialize() {
-	tv := testvars.New(s.T())
-	entityKey := EntityKey{
-		tv.NamespaceID().String(),
-		tv.WorkflowID(),
-		tv.RunID(),
-	}
 	ref := ComponentRef{
-		EntityKey:    entityKey,
+		EntityKey:    testEntityKey,
 		entityGoType: reflect.TypeFor[*TestComponent](),
 		entityLastUpdateVT: &persistencespb.VersionedTransition{
-			NamespaceFailoverVersion: tv.Namespace().FailoverVersion(),
-			TransitionCount:          tv.Any().Int64(),
+			NamespaceFailoverVersion: rand.Int63(),
+			TransitionCount:          rand.Int63(),
 		},
-		componentPath: []string{tv.Any().String(), tv.Any().String()},
+		componentPath: []string{"component", "path"},
 		componentInitialVT: &persistencespb.VersionedTransition{
-			NamespaceFailoverVersion: tv.Namespace().FailoverVersion(),
-			TransitionCount:          tv.Any().Int64(),
+			NamespaceFailoverVersion: rand.Int63(),
+			TransitionCount:          rand.Int63(),
 		},
 	}
 

@@ -14,7 +14,6 @@ import (
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/testing/protorequire"
 	"go.temporal.io/server/common/testing/testlogger"
-	"go.temporal.io/server/common/testing/testvars"
 	"go.uber.org/mock/gomock"
 )
 
@@ -59,11 +58,9 @@ func (s *schedulerSuite) SetupTest() {
 	s.timeSource.Update(time.Now())
 
 	// Stub NodeBackend for NewEmptytree
-	tv := testvars.New(s.T())
 	s.nodeBackend = &chasm.MockNodeBackend{
 		HandleNextTransitionCount: func() int64 { return 2 },
 		HandleGetCurrentVersion:   func() int64 { return 1 },
-		HandleGetWorkflowKey:      tv.Any().WorkflowKey,
 		HandleIsWorkflow:          func() bool { return false },
 		HandleCurrentVersionedTransition: func() *persistencespb.VersionedTransition {
 			return &persistencespb.VersionedTransition{

@@ -7,6 +7,7 @@ import (
 
 	persistencespb "go.temporal.io/server/api/persistence/v1"
 	"go.temporal.io/server/chasm"
+	chasmnexus "go.temporal.io/server/chasm/nexus"
 	"go.temporal.io/server/common/log"
 	"go.temporal.io/server/common/metrics"
 	"go.temporal.io/server/common/namespace"
@@ -155,7 +156,7 @@ func (e taskExecutor) loadInvocationArgs(
 
 			// CHASM internal callbacks make use of Nexus as their callback delivery
 			// mechanism, but with the internal delivery URL.
-			if variant.Nexus.Url == chasm.NexusCompletionHandlerURL {
+			if variant.Nexus.Url == chasmnexus.CompletionHandlerURL {
 				invokable = chasmInvocation{
 					nexus:      variant.Nexus,
 					attempt:    callback.Attempt,
