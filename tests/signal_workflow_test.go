@@ -24,6 +24,7 @@ import (
 	"go.temporal.io/server/common/payloads"
 	"go.temporal.io/server/common/rpc"
 	"go.temporal.io/server/common/testing/parallelsuite"
+	"go.temporal.io/server/common/testing/testvars"
 	"go.temporal.io/server/service/history/consts"
 	"go.temporal.io/server/tests/testcore"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -1712,6 +1713,60 @@ func (s *SignalWorkflowTestSuite) TestSignalWithStartWorkflow_ResolveIDDeduplica
 	})
 	s.NoError(err)
 	s.Equal(enumspb.WORKFLOW_EXECUTION_STATUS_RUNNING, descResp.WorkflowExecutionInfo.Status)
+}
+
+func (s *SignalWorkflowTestSuite) TestSignalWithStartWorkflow_DuplicateRequestAfterStartedRunClosed(opts []testcore.TestOption) {
+	env := testcore.NewEnv(s.T(), opts...)
+	env.OverrideDynamicConfig(dynamicconfig.WorkflowIdReuseMinimalInterval, 0)
+	tv := testvars.New(s.T())
+
+	request := &workflowservice.SignalWithStartWorkflowExecutionRequest{
+		RequestId:             uuid.NewString(),
+		Namespace:             env.Namespace().String(),
+		WorkflowId:            tv.WorkflowID(),
+		WorkflowType:          tv.WorkflowType(),
+		TaskQueue:             tv.TaskQueue(),
+		WorkflowRunTimeout:    durationpb.New(100 * time.Second),
+		WorkflowTaskTimeout:   durationpb.New(1 * time.Second),
+		SignalName:            "test-signal",
+		SignalInput:           payloads.EncodeString("test-signal-input"),
+		Identity:              tv.WorkerIdentity(),
+		WorkflowIdReusePolicy: enumspb.WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE,
+	}
+
+	first, err := env.FrontendClient().SignalWithStartWorkflowExecution(s.Context(), request)
+	s.NoError(err)
+	s.True(first.Started)
+	s.NotEmpty(first.GetRunId())
+
+	_, err = env.TaskPoller().PollAndHandleWorkflowTask(
+		tv,
+		func(_ *workflowservice.PollWorkflowTaskQueueResponse) (*workflowservice.RespondWorkflowTaskCompletedRequest, error) {
+			return &workflowservice.RespondWorkflowTaskCompletedRequest{Commands: []*commandpb.Command{{
+				CommandType: enumspb.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION,
+				Attributes: &commandpb.Command_CompleteWorkflowExecutionCommandAttributes{
+					CompleteWorkflowExecutionCommandAttributes: &commandpb.CompleteWorkflowExecutionCommandAttributes{},
+				},
+			}}}, nil
+		},
+	)
+	s.NoError(err)
+
+	descResp, err := env.FrontendClient().DescribeWorkflowExecution(s.Context(), &workflowservice.DescribeWorkflowExecutionRequest{
+		Namespace: env.Namespace().String(),
+		Execution: &commonpb.WorkflowExecution{
+			WorkflowId: tv.WorkflowID(),
+			RunId:      first.GetRunId(),
+		},
+	})
+	s.NoError(err)
+	s.Equal(enumspb.WORKFLOW_EXECUTION_STATUS_COMPLETED, descResp.GetWorkflowExecutionInfo().GetStatus())
+
+	second, err := env.FrontendClient().SignalWithStartWorkflowExecution(s.Context(), request)
+	s.NoError(err)
+	s.True(second.Started)
+	s.NotEmpty(second.GetRunId())
+	s.NotEqual(first.GetRunId(), second.GetRunId())
 }
 
 func (s *SignalWorkflowTestSuite) TestSignalWithStartWorkflow_StartDelay(opts []testcore.TestOption) {
